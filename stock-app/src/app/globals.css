@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Sistema de diseño "Depósito" — inspirado en Notion/Linear/Stripe pero con
+  identidad propia: base neutra fría (slate), acento "cobalto de planta"
+  (azul saturado, no violeta genérico), y semáforos de estado nítidos
+  (verde esmeralda / ámbar / rojo) porque en un conteo físico el color
+  ES la información (coincide / sobra / falta).
+*/
+
+:root {
+  --background: 210 20% 98%;
+  --foreground: 222 30% 11%;
+
+  --card: 0 0% 100%;
+  --card-foreground: 222 30% 11%;
+
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 30% 11%;
+
+  --primary: 221 83% 53%;
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 210 20% 94%;
+  --secondary-foreground: 222 30% 15%;
+
+  --muted: 210 20% 94%;
+  --muted-foreground: 215 16% 47%;
+
+  --accent: 221 83% 96%;
+  --accent-foreground: 221 83% 40%;
+
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 152 60% 36%;
+  --success-foreground: 0 0% 100%;
+
+  --warning: 38 92% 50%;
+  --warning-foreground: 26 40% 15%;
+
+  --border: 214 20% 90%;
+  --input: 214 20% 88%;
+  --ring: 221 83% 53%;
+
+  --radius: 0.75rem;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-display: "Inter", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+.dark {
+  --background: 222 30% 7%;
+  --foreground: 210 20% 96%;
+
+  --card: 222 26% 10%;
+  --card-foreground: 210 20% 96%;
+
+  --popover: 222 26% 10%;
+  --popover-foreground: 210 20% 96%;
+
+  --primary: 221 83% 60%;
+  --primary-foreground: 222 30% 8%;
+
+  --secondary: 222 20% 15%;
+  --secondary-foreground: 210 20% 92%;
+
+  --muted: 222 20% 15%;
+  --muted-foreground: 215 16% 60%;
+
+  --accent: 221 40% 18%;
+  --accent-foreground: 221 83% 75%;
+
+  --destructive: 0 72% 55%;
+  --destructive-foreground: 0 0% 100%;
+
+  --success: 152 55% 45%;
+  --success-foreground: 152 60% 8%;
+
+  --warning: 38 92% 55%;
+  --warning-foreground: 26 40% 10%;
+
+  --border: 222 20% 18%;
+  --input: 222 20% 18%;
+  --ring: 221 83% 60%;
+}
+
+* {
+  @apply border-border;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  @apply bg-border rounded-full;
+}
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-muted-foreground/40;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

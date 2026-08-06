@@ -1,0 +1,68 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { getConteosPendientes, marcarConteosSincronizados } from "@/db/offlineDb";
+
+export function useSync() {
+  const [isOnline, setIsOnline] = useState(true);
+  const [pendientes, setPendientes] = useState(0);
+  const [sincronizando, setSincronizando] = useState(false);
+  const [ultimaSync, setUltimaSync] = useState<Date | null>(null);
+
+  const refrescarPendientes = useCallback(async () => {
+    const pendientesActuales = await getConteosPendientes();
+    setPendientes(pendientesActuales.length);
+    return pendientesActuales;
+  }, []);
+
+  const sincronizarAhora = useCallback(async () => {
+    if (!navigator.onLine || sincronizando) return;
+    setSincronizando(true);
+    try {
+      const pendientesActuales = await getConteosPendientes();
+      if (pendientesActuales.length > 0) {
+        const res = await fetch("/api/conteos/sync-batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            conteos: pendientesActuales.map(({ localId, synced, createdAt, ...resto }) => resto),
+          }),
+        });
+        const json = await res.json();
+        if (json.ok) {
+          const ids = pendientesActuales.map((c) => c.localId!).filter(Boolean);
+          await marcarConteosSincronizados(ids);
+        }
+      }
+      setUltimaSync(new Date());
+      await refrescarPendientes();
+    } catch (err) {
+      console.error("Error al sincronizar:", err);
+    } finally {
+      setSincronizando(false);
+    }
+  }, [sincronizando, refrescarPendientes]);
+
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    refrescarPendientes();
+
+    function goOnline() {
+      setIsOnline(true);
+      sincronizarAhora();
+    }
+    function goOffline() {
+      setIsOnline(false);
+    }
+
+    window.addEventListener("online", goOnline);
+    window.addEventListener("offline", goOffline);
+    return () => {
+      window.removeEventListener("online", goOnline);
+      window.removeEventListener("offline", goOffline);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return { isOnline, pendientes, sincronizando, ultimaSync, sincronizarAhora, refrescarPendientes };
+}
