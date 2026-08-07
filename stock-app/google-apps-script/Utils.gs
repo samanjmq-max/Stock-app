@@ -25,9 +25,9 @@ const SHEETS = {
 const HEADERS = {
   [SHEETS.USUARIOS]: ["id", "nombre", "email", "passwordHash", "rol", "activo", "creadoEn"],
   [SHEETS.PRODUCTOS]: ["id", "codigo", "descripcion", "ubicacion", "familia", "proveedor", "stockSap", "actualizadoEn"],
-  [SHEETS.CONTEOS]: [
+ [SHEETS.CONTEOS]: [
     "id", "codigo", "descripcion", "ubicacion", "stockSap", "stockContado", "diferencia",
-    "estado", "observaciones", "usuarioId", "usuarioEmail", "fecha", "hora", "sincronizado", "creadoEn",
+    "estado", "observaciones", "ubicacionNueva", "usuarioId", "usuarioEmail", "fecha", "hora", "sincronizado", "creadoEn",
   ],
   [SHEETS.HISTORIAL]: [
     "id", "usuarioId", "usuarioEmail", "rol", "accion", "entidad",
