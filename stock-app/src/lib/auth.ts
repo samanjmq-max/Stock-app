@@ -1,5 +1,4 @@
 import { SignJWT, jwtVerify } from "jose";
-import bcrypt from "bcryptjs";
 import type { JwtPayload, Rol } from "@/types";
 
 const secretKey = process.env.JWT_SECRET;
@@ -38,15 +37,4 @@ export async function verificarToken(token: string): Promise<JwtPayload | null> 
   } catch {
     return null;
   }
-}
-
-/** Hashea una contraseña en texto plano para guardarla. */
-export async function hashPassword(password: string): Promise<string> {
-  const salt = await bcrypt.genSalt(10);
-  return bcrypt.hash(password, salt);
-}
-
-/** Compara una contraseña en texto plano contra su hash. */
-export async function compararPassword(password: string, hash: string): Promise<boolean> {
-  return bcrypt.compare(password, hash);
 }
