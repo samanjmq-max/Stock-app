@@ -35,6 +35,7 @@ export interface Conteo {
   codigo: string;
   descripcion: string;
   ubicacion: string;
+  ubicacionNueva: string;
   stockSap: number;
   stockContado: number;
   diferencia: number;
