@@ -82,7 +82,7 @@ export function OcrScanner({ onDetected, onClose }: Props) {
       } else {
         setCodigoDetectado(texto);
       }
-    } catch (err) { const detalle = err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err); setError(`No se pudo procesar la foto: ${detalle || "error desconocido"}`); } finally {
+    } catch (err) { const detalle = err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err); setError(`No se pudo procesar la foto: ${detalle || "error desconocido"}`); } finally { 
       setProcesando(false);
     }
   }, []);
