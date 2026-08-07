@@ -66,12 +66,26 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       controlsRef.current = controls;
 
       // Detectar si el dispositivo soporta linterna (torch)
-      const stream = videoRef.current?.srcObject as MediaStream | undefined;
-      const track = stream?.getVideoTracks()[0];
-      trackRef.current = track || null;
-      try { await track?.applyConstraints({ advanced: [{ focusMode: "continuous" }] as any }); } catch { // Este celular/navegador no permite reenfoque automático continuo; se ignora. }
-      const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
-      setLinternaDisponible(Boolean(capabilities?.torch));
+      // Detectar si el dispositivo soporta linterna (torch)
+const stream = videoRef.current?.srcObject as MediaStream | undefined;
+const track = stream?.getVideoTracks()[0];
+
+trackRef.current = track || null;
+
+try {
+  await track?.applyConstraints({
+    advanced: [{ focusMode: "continuous" } as any],
+  });
+} catch {
+  // Este celular/navegador no permite reenfoque automático continuo; se ignora.
+}
+
+const capabilities =
+  track?.getCapabilities?.() as MediaTrackCapabilities & {
+    torch?: boolean;
+  };
+
+setLinternaDisponible(Boolean(capabilities?.torch));
     } catch (err) {
       setError(
         err instanceof Error
