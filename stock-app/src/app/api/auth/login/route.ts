@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginSchema } from "@/lib/validations";
 import { getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
-import { compararPassword, crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
+import { crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
+import { compararPassword } from "@/lib/password";
 import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes } from "@/lib/rateLimit";
 
 export async function POST(request: NextRequest) {
