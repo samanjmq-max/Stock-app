@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { actualizarUsuario, eliminarUsuario, registrarHistorial } from "@/lib/sheets";
 import { usuarioSchema } from "@/lib/validations";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword } from "@/lib/password";
 import type { Rol } from "@/types";
 
 export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
