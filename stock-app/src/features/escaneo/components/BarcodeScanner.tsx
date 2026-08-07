@@ -66,26 +66,21 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
       controlsRef.current = controls;
 
       // Detectar si el dispositivo soporta linterna (torch)
-      // Detectar si el dispositivo soporta linterna (torch)
-const stream = videoRef.current?.srcObject as MediaStream | undefined;
-const track = stream?.getVideoTracks()[0];
+      const stream = videoRef.current?.srcObject as MediaStream | undefined;
+      const track = stream?.getVideoTracks()[0];
+      trackRef.current = track || null;
 
-trackRef.current = track || null;
+      // Fuerza reenfoque automático continuo: en la cámara trasera de muchos
+      // celulares, el autofoco por default enfoca una sola vez y se queda
+      // fijo, por lo que el segundo/tercer código queda desenfocado.
+      try {
+        await track?.applyConstraints({ advanced: [{ focusMode: "continuous" } as any] });
+      } catch {
+        // Este celular/navegador no permite reenfoque automático continuo; se ignora.
+      }
 
-try {
-  await track?.applyConstraints({
-    advanced: [{ focusMode: "continuous" } as any],
-  });
-} catch {
-  // Este celular/navegador no permite reenfoque automático continuo; se ignora.
-}
-
-const capabilities =
-  track?.getCapabilities?.() as MediaTrackCapabilities & {
-    torch?: boolean;
-  };
-
-setLinternaDisponible(Boolean(capabilities?.torch));
+      const capabilities = track?.getCapabilities?.() as MediaTrackCapabilities & { torch?: boolean };
+      setLinternaDisponible(Boolean(capabilities?.torch));
     } catch (err) {
       setError(
         err instanceof Error
