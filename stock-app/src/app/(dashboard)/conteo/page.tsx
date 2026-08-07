@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Save, Loader2, PackageX, Camera, Clock, WifiOff, ScanText } from "lucide-react";
+import { Search, Save, Loader2, PackageX, Camera, Clock, WifiOff, ScanText, MapPin, MapPinOff } from "lucide-react";
 import { conteoSchema, type ConteoInput } from "@/lib/validations";
 import type { Producto } from "@/types";
 import { calcularDiferencia, estadoDesdeDiferencia } from "@/lib/utils";
@@ -53,6 +53,12 @@ export default function ConteoPage() {
   const [mostrarCamaraOcr, setMostrarCamaraOcr] = useState(false);
   const [historialProducto, setHistorialProducto] = useState<ConteoLocal[]>([]);
 
+  // Corrección de ubicación: por defecto se asume que la ubicación de SAP
+  // es correcta. Si el operario marca que no lo es, aparece un campo para
+  // anotar la ubicación real, que viaja en el reporte junto al conteo.
+  const [ubicacionIncorrecta, setUbicacionIncorrecta] = useState(false);
+  const [ubicacionNueva, setUbicacionNueva] = useState("");
+
   const {
     register,
     handleSubmit,
@@ -82,7 +88,9 @@ export default function ConteoPage() {
       setProducto(null);
       setNoExiste(false);
       setCodigoBuscado(c);
-      reset({ codigo: c, stockContado: undefined, observaciones: "" });
+      setUbicacionIncorrecta(false);
+      setUbicacionNueva("");
+      reset({ codigo: c, stockContado: undefined, observaciones: "", ubicacionNueva: "" });
 
       try {
         let encontrado = await getProductoCachePorCodigo(c);
@@ -113,6 +121,11 @@ export default function ConteoPage() {
   useHardwareScanner((codigo) => buscarCodigo(codigo), true);
 
   async function onSubmit(data: ConteoInput) {
+    if (ubicacionIncorrecta && !ubicacionNueva.trim()) {
+      toast.error("Escribí la nueva ubicación, o marcá que la ubicación es correcta");
+      return;
+    }
+
     const now = new Date();
 
     const stockSap = producto?.stockSap ?? 0;
@@ -126,6 +139,7 @@ export default function ConteoPage() {
         observaciones: data.observaciones || "",
         descripcion: producto?.descripcion || "(no existe en SAP)",
         ubicacion: producto?.ubicacion || "",
+        ubicacionNueva: ubicacionIncorrecta ? ubicacionNueva.trim() : "",
         stockSap,
         diferencia,
         estado,
@@ -152,7 +166,9 @@ export default function ConteoPage() {
         setNoExiste(false);
         setCodigoBuscado("");
         setHistorialProducto([]);
-        reset({ codigo: "", stockContado: undefined, observaciones: "" });
+        setUbicacionIncorrecta(false);
+        setUbicacionNueva("");
+        reset({ codigo: "", stockContado: undefined, observaciones: "", ubicacionNueva: "" });
       }, 600);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar el conteo");
@@ -251,6 +267,30 @@ export default function ConteoPage() {
                   <Label htmlFor="stockContado">Cantidad encontrada</Label>
                   <Input id="stockContado" type="number" inputMode="decimal" step="any" {...register("stockContado")} />
                   {errors.stockContado && <p className="text-xs text-destructive">{errors.stockContado.message}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Button
+                    type="button"
+                    variant={ubicacionIncorrecta ? "default" : "secondary"}
+                    className="w-full"
+                    onClick={() => setUbicacionIncorrecta((v) => !v)}
+                  >
+                    {ubicacionIncorrecta ? <MapPinOff size={16} /> : <MapPin size={16} />}
+                    {ubicacionIncorrecta ? "La ubicación no es correcta" : "La ubicación es correcta"}
+                  </Button>
+
+                  {ubicacionIncorrecta && (
+                    <div className="space-y-1.5">
+                      <Label htmlFor="ubicacionNueva">Ubicación real (dónde se encontró)</Label>
+                      <Input
+                        id="ubicacionNueva"
+                        placeholder="Ej: Pasillo 4, Estante B"
+                        value={ubicacionNueva}
+                        onChange={(e) => setUbicacionNueva(e.target.value)}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {producto && diferenciaPreview !== null && (
