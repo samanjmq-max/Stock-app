@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getUsuarios, crearUsuario, getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
 import { usuarioSchema } from "@/lib/validations";
-import { hashPassword } from "@/lib/auth";
+import { hashPassword } from "@/lib/password";
 import type { Rol } from "@/types";
 
 // El middleware ya restringe /api/usuarios a administradores (RUTAS_SOLO_ADMIN),
