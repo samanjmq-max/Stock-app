@@ -29,5 +29,6 @@ export const conteoSchema = z.object({
   codigo: z.string().min(1),
   stockContado: z.coerce.number().min(0, "No puede ser negativo"),
   observaciones: z.string().optional().default(""),
+  ubicacionNueva: z.string().optional().default(""),
 });
 export type ConteoInput = z.infer<typeof conteoSchema>;
