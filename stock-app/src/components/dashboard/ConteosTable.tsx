@@ -1,7 +1,10 @@
 "use client";
 
-import { Pencil, X } from "lucide-react";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Pencil, Trash2, X, Loader2 } from "lucide-react";
 import type { Conteo, EstadoConteo } from "@/types";
+import { conteosService } from "@/services/conteos.service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,9 +27,30 @@ interface Props {
   filtro: EstadoConteo | null;
   onQuitarFiltro: () => void;
   onEditar: (conteo: Conteo) => void;
+  onEliminado: () => void;
 }
 
-export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar }: Props) {
+export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onEliminado }: Props) {
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+
+  async function eliminar(conteo: Conteo) {
+    const confirmado = window.confirm(
+      `¿Eliminar el conteo de "${conteo.codigo} — ${conteo.descripcion}"?\n\nEsta acción no se puede deshacer.`
+    );
+    if (!confirmado) return;
+
+    setEliminandoId(conteo.id);
+    try {
+      await conteosService.eliminar(conteo.id);
+      toast.success("Conteo eliminado");
+      onEliminado();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo eliminar el conteo");
+    } finally {
+      setEliminandoId(null);
+    }
+  }
+
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between space-y-0">
@@ -59,7 +83,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar }: Prop
                   <th className="px-2 py-2 font-medium">Estado</th>
                   <th className="px-2 py-2 font-medium">Usuario</th>
                   <th className="px-2 py-2 font-medium">Fecha</th>
-                  <th className="px-5 py-2 font-medium text-right">Acción</th>
+                  <th className="px-5 py-2 font-medium text-right">Acciones</th>
                 </tr>
               </thead>
               <tbody>
@@ -90,9 +114,18 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar }: Prop
                       {c.usuarioEmail}
                     </td>
                     <td className="px-2 py-2 whitespace-nowrap">{c.fecha}</td>
-                    <td className="px-5 py-2 text-right">
+                    <td className="px-5 py-2 text-right whitespace-nowrap">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
                         <Pencil size={13} />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => eliminar(c)}
+                        disabled={eliminandoId === c.id}
+                      >
+                        {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
                       </Button>
                     </td>
                   </tr>
