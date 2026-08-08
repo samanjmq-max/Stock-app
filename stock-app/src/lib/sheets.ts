@@ -138,6 +138,11 @@ export async function editarConteo(
   return gasPost<Conteo>("editarConteo", { id, ...input });
 }
 
+/** Elimina UN conteo puntual por su id. */
+export async function eliminarConteo(id: string): Promise<{ id: string; eliminado: boolean }> {
+  return gasPost<{ id: string; eliminado: boolean }>("eliminarConteo", { id });
+}
+
 export async function resetearConteos(): Promise<{ eliminados: number }> {
   return gasPost<{ eliminados: number }>("resetearConteos", {});
 }
