@@ -16,4 +16,15 @@ export const conteosService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }).then((r) => parseOrThrow<Conteo>(r)),
+
+  /** Corrige un conteo ya guardado (por su id) — no crea uno nuevo. */
+  editar: (
+    id: string,
+    input: { stockContado: number; diferencia: number; estado: string; observaciones: string; ubicacionNueva: string }
+  ): Promise<Conteo> =>
+    fetch(`/api/conteos/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }).then((r) => parseOrThrow<Conteo>(r)),
 };
