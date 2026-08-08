@@ -1,19 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download } from "lucide-react";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { ConteosTable } from "@/components/dashboard/ConteosTable";
+import { EditarConteoDialog } from "@/components/dashboard/EditarConteoDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { exportarExcel, exportarPDF } from "@/lib/exportacion";
+import type { Conteo, EstadoConteo } from "@/types";
 
 const COLORS = { coincide: "#16a34a", falta: "#dc2626", sobra: "#2563eb" };
 
 export default function DashboardPage() {
-  const { stats, conteos, loading, error } = useDashboardData();
+  const { stats, conteos, loading, error, recargar } = useDashboardData();
+  const [filtro, setFiltro] = useState<EstadoConteo | null>(null);
+  const [conteoAEditar, setConteoAEditar] = useState<Conteo | null>(null);
 
   if (loading) {
     return (
@@ -45,13 +51,16 @@ export default function DashboardPage() {
     { name: "Sobran", value: stats.diferenciasPositivas, color: COLORS.sobra },
   ];
 
-  // Último conteo por código (para top diferencias y progreso por ubicación)
-  const ultimoPorCodigo = new Map<string, (typeof conteos)[number]>();
+  // "Estado actual" = último conteo por CÓDIGO + UBICACIÓN (no solo por
+  // código): un mismo artículo puede existir físicamente en más de un
+  // lugar, y cada ubicación tiene su propio conteo vigente.
+  const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
   for (const c of conteos) {
-    const prev = ultimoPorCodigo.get(c.codigo);
-    if (!prev || new Date(c.creadoEn) > new Date(prev.creadoEn)) ultimoPorCodigo.set(c.codigo, c);
+    const clave = `${c.codigo}|||${c.ubicacionNueva || c.ubicacion || ""}`;
+    const prev = ultimoPorCodigoUbicacion.get(clave);
+    if (!prev || new Date(c.creadoEn) > new Date(prev.creadoEn)) ultimoPorCodigoUbicacion.set(clave, c);
   }
-  const todosLosConteos = Array.from(ultimoPorCodigo.values());
+  const todosLosConteos = Array.from(ultimoPorCodigoUbicacion.values());
 
   const topDiferencias = [...todosLosConteos]
     .filter((c) => c.diferencia !== 0)
@@ -61,7 +70,7 @@ export default function DashboardPage() {
 
   const porUbicacion = new Map<string, { contados: number }>();
   todosLosConteos.forEach((c) => {
-    const key = c.ubicacion || "Sin ubicación";
+    const key = c.ubicacionNueva || c.ubicacion || "Sin ubicación";
     const actual = porUbicacion.get(key) || { contados: 0 };
     actual.contados += 1;
     porUbicacion.set(key, actual);
@@ -70,6 +79,12 @@ export default function DashboardPage() {
     .map(([ubicacion, v]) => ({ ubicacion, contados: v.contados }))
     .sort((a, b) => b.contados - a.contados)
     .slice(0, 8);
+
+  const conteosFiltrados = filtro ? todosLosConteos.filter((c) => c.estado === filtro) : todosLosConteos;
+
+  function toggleFiltro(estado: EstadoConteo) {
+    setFiltro((actual) => (actual === estado ? null : estado));
+  }
 
   function exportarReporte(formato: "xlsx" | "pdf") {
     const datos = todosLosConteos.map((c) => ({
@@ -80,6 +95,7 @@ export default function DashboardPage() {
       "Stock Contado": c.stockContado,
       Diferencia: c.diferencia,
       Estado: c.estado,
+      "Ubicación (nueva)": c.ubicacionNueva || "",
       Usuario: c.usuarioEmail,
       Fecha: c.fecha,
     }));
@@ -95,6 +111,7 @@ export default function DashboardPage() {
           { header: "Contado", key: "Stock Contado" },
           { header: "Dif.", key: "Diferencia" },
           { header: "Estado", key: "Estado" },
+          { header: "Ubic. nueva", key: "Ubicación (nueva)" },
         ],
         "Reporte de inventario",
         "reporte-inventario"
@@ -108,9 +125,30 @@ export default function DashboardPage() {
         <StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success" />
         <StatCard label="Pendientes" value={stats.pendientes} icon={Clock} tone="warning" />
         <StatCard label="Avance" value={`${stats.porcentajeCompletado}%`} icon={TrendingUp} />
-        <StatCard label="Coincidencias" value={stats.coincidencias} icon={CheckCircle2} tone="success" />
-        <StatCard label="Diferencias +" value={stats.diferenciasPositivas} icon={ArrowUpCircle} tone="success" />
-        <StatCard label="Diferencias −" value={stats.diferenciasNegativas} icon={ArrowDownCircle} tone="destructive" />
+        <StatCard
+          label="Coincidencias"
+          value={stats.coincidencias}
+          icon={CheckCircle2}
+          tone="success"
+          onClick={() => toggleFiltro("coincide")}
+          activo={filtro === "coincide"}
+        />
+        <StatCard
+          label="Diferencias +"
+          value={stats.diferenciasPositivas}
+          icon={ArrowUpCircle}
+          tone="success"
+          onClick={() => toggleFiltro("sobra")}
+          activo={filtro === "sobra"}
+        />
+        <StatCard
+          label="Diferencias −"
+          value={stats.diferenciasNegativas}
+          icon={ArrowDownCircle}
+          tone="destructive"
+          onClick={() => toggleFiltro("falta")}
+          activo={filtro === "falta"}
+        />
         <StatCard
           label="Última sincronización"
           value={
@@ -188,6 +226,13 @@ export default function DashboardPage() {
         </Card>
       </div>
 
+      <ConteosTable
+        conteos={conteosFiltrados}
+        filtro={filtro}
+        onQuitarFiltro={() => setFiltro(null)}
+        onEditar={setConteoAEditar}
+      />
+
       <Card>
         <CardHeader><CardTitle>Reporte completo</CardTitle></CardHeader>
         <CardContent className="flex gap-2">
@@ -201,6 +246,13 @@ export default function DashboardPage() {
           </Button>
         </CardContent>
       </Card>
+
+      <EditarConteoDialog
+        key={conteoAEditar?.id || "none"}
+        conteo={conteoAEditar}
+        onClose={() => setConteoAEditar(null)}
+        onGuardado={recargar}
+      />
     </motion.div>
   );
 }
