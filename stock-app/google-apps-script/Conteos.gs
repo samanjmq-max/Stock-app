@@ -35,23 +35,17 @@ function guardarConteo_(input) {
 
   agregarFila_(SHEETS.CONTEOS, conteo);
   logAccion_("guardarConteo", conteo.codigo);
-
   return conteo;
 }
 
-/**
- * Guarda varios conteos de una vez
- * (usado por la sincronización offline en lote).
- */
+/** Guarda varios conteos de una vez (usado por la sincronización offline en lote). */
 function guardarConteosLote_(input) {
   const conteos = input.conteos || [];
-
   if (!Array.isArray(conteos) || conteos.length === 0) {
     throw new Error("No se recibieron conteos para sincronizar");
   }
 
   const timestamp = ahora_().iso;
-
   const filas = conteos.map((c) => ({
     id: nuevoId_(),
     codigo: c.codigo,
@@ -72,36 +66,18 @@ function guardarConteosLote_(input) {
   }));
 
   agregarFilas_(SHEETS.CONTEOS, filas);
-
-  logAccion_(
-    "guardarConteosLote",
-    `${filas.length} conteos sincronizados`
-  );
-
-  return {
-    guardados: filas.length
-  };
+  logAccion_("guardarConteosLote", `${filas.length} conteos sincronizados`);
+  return { guardados: filas.length };
 }
 
-/**
- * Elimina TODOS los conteos
- * (usado por un administrador para reiniciar un inventario).
- */
+/** Elimina TODOS los conteos (usado por un administrador para reiniciar un inventario). */
 function resetearConteos_() {
   const sheet = getSheet_(SHEETS.CONTEOS);
   const filas = sheet.getLastRow();
   const cantidad = Math.max(filas - 1, 0);
-
   if (filas > 1) {
     sheet.deleteRows(2, filas - 1);
   }
-
-  logAccion_(
-    "resetearConteos",
-    `${cantidad} conteos eliminados`
-  );
-
-  return {
-    eliminados: cantidad
-  };
+  logAccion_("resetearConteos", `${cantidad} conteos eliminados`);
+  return { eliminados: cantidad };
 }
