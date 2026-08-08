@@ -38,23 +38,28 @@ export function useDashboardData() {
 }
 
 function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats {
-  const ultimoPorCodigo = new Map<string, Conteo>();
+  // Se agrupa por CÓDIGO + UBICACIÓN (no solo código): un mismo artículo
+  // puede existir físicamente en más de un lugar, y cada ubicación tiene
+  // su propio conteo vigente — si agrupáramos solo por código, el conteo
+  // de una ubicación "taparía" al de la otra en las estadísticas.
+  const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
   for (const c of conteos) {
-    const prev = ultimoPorCodigo.get(c.codigo);
+    const clave = `${c.codigo}|||${c.ubicacionNueva || c.ubicacion || ""}`;
+    const prev = ultimoPorCodigoUbicacion.get(clave);
     if (!prev || new Date(c.creadoEn) > new Date(prev.creadoEn)) {
-      ultimoPorCodigo.set(c.codigo, c);
+      ultimoPorCodigoUbicacion.set(clave, c);
     }
   }
 
   const totalProductos = productos.length;
-  const totalContados = ultimoPorCodigo.size;
+  const totalContados = ultimoPorCodigoUbicacion.size;
   const pendientes = Math.max(totalProductos - totalContados, 0);
   const porcentajeCompletado = totalProductos > 0 ? Math.round((totalContados / totalProductos) * 100) : 0;
 
   let coincidencias = 0;
   let diferenciasPositivas = 0;
   let diferenciasNegativas = 0;
-  ultimoPorCodigo.forEach((c) => {
+  ultimoPorCodigoUbicacion.forEach((c) => {
     if (c.estado === "coincide") coincidencias++;
     else if (c.estado === "sobra") diferenciasPositivas++;
     else if (c.estado === "falta") diferenciasNegativas++;
