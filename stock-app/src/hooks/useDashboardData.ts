@@ -38,10 +38,12 @@ export function useDashboardData() {
 }
 
 function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats {
-  // Se agrupa por CÓDIGO + UBICACIÓN (no solo código): un mismo artículo
-  // puede existir físicamente en más de un lugar, y cada ubicación tiene
-  // su propio conteo vigente — si agrupáramos solo por código, el conteo
-  // de una ubicación "taparía" al de la otra en las estadísticas.
+  // "Contado" / "Pendiente" se mide por CÓDIGO únicamente: es un checklist
+  // de "¿ya tocamos este artículo, en cualquier ubicación?". Las
+  // coincidencias/diferencias, en cambio, se miden por código + ubicación,
+  // porque ahí sí importa el detalle de cada ubicación por separado.
+  const codigosContados = new Set(conteos.map((c) => c.codigo));
+
   const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
   for (const c of conteos) {
     const clave = `${c.codigo}|||${c.ubicacionNueva || c.ubicacion || ""}`;
@@ -52,7 +54,7 @@ function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats
   }
 
   const totalProductos = productos.length;
-  const totalContados = ultimoPorCodigoUbicacion.size;
+  const totalContados = codigosContados.size;
   const pendientes = Math.max(totalProductos - totalContados, 0);
   const porcentajeCompletado = totalProductos > 0 ? Math.round((totalContados / totalProductos) * 100) : 0;
 
