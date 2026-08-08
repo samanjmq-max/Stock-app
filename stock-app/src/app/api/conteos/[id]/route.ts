@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { editarConteo, registrarHistorial } from "@/lib/sheets";
+import { editarConteo, eliminarConteo, registrarHistorial } from "@/lib/sheets";
 import type { Rol } from "@/types";
 import { z } from "zod";
 
@@ -44,6 +44,37 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     console.error("Error al editar conteo:", err);
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "No se pudo editar el conteo" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const rol = request.headers.get("x-user-rol") as Rol | null;
+  const userId = request.headers.get("x-user-id") || "";
+  const email = request.headers.get("x-user-email") || "";
+
+  if (!rol) {
+    return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+  }
+
+  try {
+    const resultado = await eliminarConteo(params.id);
+
+    await registrarHistorial({
+      usuarioId: userId,
+      usuarioEmail: email,
+      rol,
+      accion: "guardar_conteo",
+      entidad: `conteo:${params.id}`,
+      observacion: "Eliminación de un conteo",
+    });
+
+    return NextResponse.json({ ok: true, data: resultado });
+  } catch (err) {
+    console.error("Error al eliminar conteo:", err);
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "No se pudo eliminar el conteo" },
       { status: 500 }
     );
   }
