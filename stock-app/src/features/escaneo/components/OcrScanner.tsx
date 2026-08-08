@@ -33,9 +33,63 @@ async function reconocerTexto(fuente: HTMLCanvasElement): Promise<string> {
   }
 }
 
+/**
+ * Recorta el canvas al área exacta del recuadro-guía que ve la persona en
+ * pantalla (mapeando coordenadas de pantalla a píxeles nativos del video,
+ * considerando el escalado "object-cover"), y lo agranda ~2.5x. Sin esto,
+ * el reconocimiento leía TODO lo visible en la cámara (cajas, otras
+ * etiquetas, el código de barras de al lado) en vez de solo el número
+ * enmarcado, devolviendo texto mezclado e inútil.
+ */
+function recortarAlRecuadro(video: HTMLVideoElement, guiaEl: HTMLDivElement): HTMLCanvasElement {
+  const videoRect = video.getBoundingClientRect();
+  const guiaRect = guiaEl.getBoundingClientRect();
+
+  const escala = Math.max(videoRect.width / video.videoWidth, videoRect.height / video.videoHeight);
+  const origenX = videoRect.left - (video.videoWidth * escala - videoRect.width) / 2;
+  const origenY = videoRect.top - (video.videoHeight * escala - videoRect.height) / 2;
+
+  // 12% de margen extra alrededor del recuadro, por si el número queda
+  // justo al borde.
+  const margenX = (guiaRect.width * 0.12) / escala;
+  const margenY = (guiaRect.height * 0.12) / escala;
+
+  let sx = (guiaRect.left - origenX) / escala - margenX;
+  let sy = (guiaRect.top - origenY) / escala - margenY;
+  let sw = guiaRect.width / escala + margenX * 2;
+  let sh = guiaRect.height / escala + margenY * 2;
+
+  sx = Math.max(0, sx);
+  sy = Math.max(0, sy);
+  sw = Math.min(sw, video.videoWidth - sx);
+  sh = Math.min(sh, video.videoHeight - sy);
+
+  const ESCALADO_SALIDA = 2.5;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(sw * ESCALADO_SALIDA);
+  canvas.height = Math.round(sh * ESCALADO_SALIDA);
+
+  const ctx = canvas.getContext("2d")!;
+  ctx.imageSmoothingEnabled = true;
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+
+  // Escala de grises + contraste: ayuda mucho al reconocimiento cuando la
+  // luz del depósito es despareja o la etiqueta está algo gastada.
+  const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const gris = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+    const contraste = Math.min(255, Math.max(0, (gris - 128) * 1.4 + 128));
+    d[i] = d[i + 1] = d[i + 2] = contraste;
+  }
+  ctx.putImageData(img, 0, 0);
+
+  return canvas;
+}
+
 export function OcrScanner({ onDetected, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const guiaRef = useRef<HTMLDivElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
   const [procesando, setProcesando] = useState(false);
@@ -64,25 +118,28 @@ export function OcrScanner({ onDetected, onClose }: Props) {
 
   const capturar = useCallback(async () => {
     const video = videoRef.current;
-    const canvas = canvasRef.current;
-    if (!video || !canvas) return;
-
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const guia = guiaRef.current;
+    if (!video || !guia) return;
 
     setProcesando(true);
     setError(null);
     try {
-      const texto = await reconocerTexto(canvas);
+      const recorte = recortarAlRecuadro(video, guia);
+      const texto = await reconocerTexto(recorte);
       if (!texto) {
-        setError("No se pudo leer ningún número o código en la foto. Probá acercar más la cámara o mejorar la luz.");
+        setError("No se pudo leer ningún número dentro del recuadro. Acercá más la cámara o mejorá la luz.");
       } else {
         setCodigoDetectado(texto);
       }
-    } catch (err) { const detalle = err instanceof Error ? err.message : typeof err === "string" ? err : JSON.stringify(err); setError(`No se pudo procesar la foto: ${detalle || "error desconocido"}`); } finally { 
+    } catch (err) {
+      const detalle =
+        err instanceof Error
+          ? err.message
+          : typeof err === "string"
+          ? err
+          : JSON.stringify(err);
+      setError(`No se pudo procesar la foto: ${detalle || "error desconocido"}`);
+    } finally {
       setProcesando(false);
     }
   }, []);
@@ -114,10 +171,15 @@ export function OcrScanner({ onDetected, onClose }: Props) {
 
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
         <video ref={videoRef} className="w-full h-full object-cover" muted playsInline autoPlay />
-        <canvas ref={canvasRef} className="hidden" />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="w-64 h-24 border-2 border-white/70 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+          <div
+            ref={guiaRef}
+            className="w-64 h-20 border-2 border-white/70 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
+          />
         </div>
+        <p className="absolute bottom-3 inset-x-0 text-center text-white/80 text-xs px-6 pointer-events-none">
+          Encuadrá SOLO el número dentro del recuadro
+        </p>
         {procesando && (
           <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2">
             <Loader2 className="animate-spin text-white" size={28} />
