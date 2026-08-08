@@ -130,6 +130,14 @@ export async function guardarConteosLote(
   return gasPost<{ guardados: number }>("guardarConteosLote", { conteos });
 }
 
+/** Corrige un conteo YA guardado (por su id) — no crea uno nuevo. */
+export async function editarConteo(
+  id: string,
+  input: { stockContado: number; diferencia: number; estado: string; observaciones: string; ubicacionNueva: string }
+): Promise<Conteo> {
+  return gasPost<Conteo>("editarConteo", { id, ...input });
+}
+
 export async function resetearConteos(): Promise<{ eliminados: number }> {
   return gasPost<{ eliminados: number }>("resetearConteos", {});
 }
