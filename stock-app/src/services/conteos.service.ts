@@ -27,4 +27,14 @@ export const conteosService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }).then((r) => parseOrThrow<Conteo>(r)),
+
+  /** Elimina un conteo puntual. */
+  eliminar: (id: string): Promise<{ id: string; eliminado: boolean }> =>
+    fetch(`/api/conteos/${id}`, { method: "DELETE" }).then((r) =>
+      parseOrThrow<{ id: string; eliminado: boolean }>(r)
+    ),
+
+  /** Elimina TODOS los conteos (solo administradores) — para arrancar un inventario de cero. */
+  resetear: (): Promise<{ eliminados: number }> =>
+    fetch("/api/conteos/reset", { method: "POST" }).then((r) => parseOrThrow<{ eliminados: number }>(r)),
 };
