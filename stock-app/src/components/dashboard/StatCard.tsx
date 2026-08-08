@@ -1,4 +1,4 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
@@ -7,11 +7,17 @@ export function StatCard({
   value,
   icon: Icon,
   tone = "default",
+  onClick,
+  activo = false,
 }: {
   label: string;
   value: string | number;
   icon: LucideIcon;
   tone?: "default" | "success" | "warning" | "destructive";
+  /** Si se pasa, la tarjeta se vuelve clickeable (ej: filtrar la tabla de abajo). */
+  onClick?: () => void;
+  /** Resalta la tarjeta cuando el filtro que representa está activo. */
+  activo?: boolean;
 }) {
   const toneClasses = {
     default: "text-primary bg-primary/10",
@@ -21,7 +27,22 @@ export function StatCard({
   }[tone];
 
   return (
-    <Card>
+    <Card
+      onClick={onClick}
+      className={cn(
+        onClick && "cursor-pointer transition hover:border-primary/50",
+        activo && "border-primary ring-1 ring-primary"
+      )}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={
+        onClick
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") onClick();
+            }
+          : undefined
+      }
+    >
       <CardContent className="pt-5 flex items-center justify-between">
         <div>
           <CardTitle className="mb-1.5">{label}</CardTitle>
