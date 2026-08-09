@@ -143,6 +143,11 @@ export async function eliminarConteo(id: string): Promise<{ id: string; eliminad
   return gasPost<{ id: string; eliminado: boolean }>("eliminarConteo", { id });
 }
 
+/** Elimina VARIOS conteos de una vez (selección múltiple). */
+export async function eliminarConteos(ids: string[]): Promise<{ eliminados: number }> {
+  return gasPost<{ eliminados: number }>("eliminarConteos", { ids });
+}
+
 export async function resetearConteos(): Promise<{ eliminados: number }> {
   return gasPost<{ eliminados: number }>("resetearConteos", {});
 }
