@@ -32,6 +32,24 @@ interface Props {
 
 export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onEliminado }: Props) {
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
+  const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
+  const [eliminandoLote, setEliminandoLote] = useState(false);
+
+  const todosSeleccionados = conteos.length > 0 && seleccionados.size === conteos.length;
+  const algunoSeleccionado = seleccionados.size > 0;
+
+  function toggleUno(id: string) {
+    setSeleccionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleTodos() {
+    setSeleccionados(todosSeleccionados ? new Set() : new Set(conteos.map((c) => c.id)));
+  }
 
   async function eliminar(conteo: Conteo) {
     const confirmado = window.confirm(
@@ -51,19 +69,53 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
     }
   }
 
+  async function eliminarSeleccionados() {
+    const cantidad = seleccionados.size;
+    const confirmado = window.confirm(
+      `¿Eliminar ${cantidad} conteo${cantidad === 1 ? "" : "s"} seleccionado${cantidad === 1 ? "" : "s"}?\n\nEsta acción no se puede deshacer.`
+    );
+    if (!confirmado) return;
+
+    setEliminandoLote(true);
+    try {
+      const res = await conteosService.eliminarVarios(Array.from(seleccionados));
+      toast.success(`${res.eliminados} conteos eliminados`);
+      setSeleccionados(new Set());
+      onEliminado();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudieron eliminar los conteos");
+    } finally {
+      setEliminandoLote(false);
+    }
+  }
+
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
+      <CardHeader className="flex-row items-center justify-between space-y-0 flex-wrap gap-2">
         <CardTitle className="text-sm">
           {filtro ? `Conteos — ${LABEL_FILTRO[filtro] || filtro}` : "Todos los conteos"}
           <span className="ml-2 text-muted-foreground font-normal">({conteos.length})</span>
         </CardTitle>
-        {filtro && (
-          <Button variant="ghost" size="sm" onClick={onQuitarFiltro} className="h-7 text-xs">
-            <X size={13} />
-            Quitar filtro
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {algunoSeleccionado && (
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={eliminarSeleccionados}
+              disabled={eliminandoLote}
+              className="h-7 text-xs"
+            >
+              {eliminandoLote ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
+              Eliminar seleccionados ({seleccionados.size})
+            </Button>
+          )}
+          {filtro && (
+            <Button variant="ghost" size="sm" onClick={onQuitarFiltro} className="h-7 text-xs">
+              <X size={13} />
+              Quitar filtro
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="pt-0">
         {conteos.length === 0 ? (
@@ -73,7 +125,16 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-muted-foreground border-b border-border">
-                  <th className="px-5 py-2 font-medium">Código</th>
+                  <th className="px-5 py-2 font-medium w-8">
+                    <input
+                      type="checkbox"
+                      checked={todosSeleccionados}
+                      onChange={toggleTodos}
+                      aria-label="Seleccionar todos"
+                      className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                    />
+                  </th>
+                  <th className="px-2 py-2 font-medium">Código</th>
                   <th className="px-2 py-2 font-medium">Descripción</th>
                   <th className="px-2 py-2 font-medium">Ubicación</th>
                   <th className="px-2 py-2 font-medium">Ubic. nueva</th>
@@ -88,8 +149,22 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
               </thead>
               <tbody>
                 {conteos.map((c) => (
-                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="px-5 py-2 font-medium whitespace-nowrap">{c.codigo}</td>
+                  <tr
+                    key={c.id}
+                    className={`border-b border-border last:border-0 hover:bg-muted/30 ${
+                      seleccionados.has(c.id) ? "bg-primary/5" : ""
+                    }`}
+                  >
+                    <td className="px-5 py-2">
+                      <input
+                        type="checkbox"
+                        checked={seleccionados.has(c.id)}
+                        onChange={() => toggleUno(c.id)}
+                        aria-label={`Seleccionar ${c.codigo}`}
+                        className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                      />
+                    </td>
+                    <td className="px-2 py-2 font-medium whitespace-nowrap">{c.codigo}</td>
                     <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
                       {c.descripcion}
                     </td>
