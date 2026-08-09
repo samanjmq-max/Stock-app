@@ -34,6 +34,14 @@ export const conteosService = {
       parseOrThrow<{ id: string; eliminado: boolean }>(r)
     ),
 
+  /** Elimina varios conteos seleccionados de una vez. */
+  eliminarVarios: (ids: string[]): Promise<{ eliminados: number }> =>
+    fetch("/api/conteos/eliminar-lote", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
+    }).then((r) => parseOrThrow<{ eliminados: number }>(r)),
+
   /** Elimina TODOS los conteos (solo administradores) — para arrancar un inventario de cero. */
   resetear: (): Promise<{ eliminados: number }> =>
     fetch("/api/conteos/reset", { method: "POST" }).then((r) => parseOrThrow<{ eliminados: number }>(r)),
