@@ -2,10 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import { getConteos, guardarConteo, getProductoPorCodigo, registrarHistorial } from "@/lib/sheets";
 import { conteoSchema } from "@/lib/validations";
 import { calcularDiferencia, estadoDesdeDiferencia, formatFecha, formatHora } from "@/lib/utils";
+import type { Agencia } from "@/types";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const conteos = await getConteos();
+    const agencia = request.headers.get("x-user-agencia") as Agencia | null;
+    const rol = request.headers.get("x-user-rol");
+    // Admin puede ver todas las agencias o filtrar por una.
+    // Operador solo ve la suya.
+    const agenciaFiltro = rol === "administrador"
+      ? (request.nextUrl.searchParams.get("agencia") as Agencia | null) ?? agencia ?? undefined
+      : agencia ?? undefined;
+
+    const conteos = await getConteos(agenciaFiltro);
     return NextResponse.json({ ok: true, data: conteos });
   } catch (err) {
     console.error("Error al listar conteos:", err);
@@ -17,6 +26,7 @@ export async function POST(request: NextRequest) {
   const userId = request.headers.get("x-user-id") || "";
   const email = request.headers.get("x-user-email") || "";
   const rol = (request.headers.get("x-user-rol") || "operador") as "administrador" | "operador";
+  const agencia = (request.headers.get("x-user-agencia") || "Centro Logístico") as Agencia;
 
   try {
     const body = await request.json();
@@ -24,9 +34,9 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: parsed.error.errors[0]?.message }, { status: 400 });
     }
-    const { codigo, stockContado, observaciones } = parsed.data;
+    const { codigo, stockContado, observaciones, ubicacionNueva } = parsed.data;
 
-    const producto = await getProductoPorCodigo(codigo);
+    const producto = await getProductoPorCodigo(codigo, agencia);
     const now = new Date();
 
     const stockSap = producto?.stockSap ?? 0;
@@ -42,6 +52,8 @@ export async function POST(request: NextRequest) {
       diferencia,
       estado,
       observaciones: observaciones || "",
+      ubicacionNueva: ubicacionNueva || "",
+      agencia,
       usuarioId: userId,
       usuarioEmail: email,
       fecha: formatFecha(now),
