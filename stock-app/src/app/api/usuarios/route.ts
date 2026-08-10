@@ -2,15 +2,26 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUsuarios, crearUsuario, getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
 import { usuarioSchema } from "@/lib/validations";
 import { hashPassword } from "@/lib/password";
-import type { Rol } from "@/types";
+import { esSuperAdmin } from "@/lib/permisos";
+import type { Rol, Agencia } from "@/types";
 
 // El middleware ya restringe /api/usuarios a administradores (RUTAS_SOLO_ADMIN),
 // pero se revalida acá también por defensa en profundidad.
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const email = request.headers.get("x-user-email");
+    const agenciaPropia = request.headers.get("x-user-agencia") as Agencia | null;
+
     const usuarios = await getUsuarios();
-    return NextResponse.json({ ok: true, data: usuarios });
+
+    // El super administrador ve todas las agencias. Un jefe de planta
+    // (administrador normal) solo ve los usuarios de su propia agencia.
+    const visibles = esSuperAdmin(email)
+      ? usuarios
+      : usuarios.filter((u) => u.agencia === agenciaPropia);
+
+    return NextResponse.json({ ok: true, data: visibles });
   } catch (err) {
     console.error("Error al listar usuarios:", err);
     return NextResponse.json({ ok: false, error: "No se pudieron obtener los usuarios" }, { status: 500 });
@@ -21,6 +32,7 @@ export async function POST(request: NextRequest) {
   const rol = request.headers.get("x-user-rol") as Rol | null;
   const userId = request.headers.get("x-user-id") || "";
   const email = request.headers.get("x-user-email") || "";
+  const agenciaPropia = request.headers.get("x-user-agencia") as Agencia | null;
 
   if (rol !== "administrador") {
     return NextResponse.json({ ok: false, error: "Solo un administrador puede crear usuarios" }, { status: 403 });
@@ -34,6 +46,16 @@ export async function POST(request: NextRequest) {
     }
     if (!parsed.data.password) {
       return NextResponse.json({ ok: false, error: "La contraseña es obligatoria para un usuario nuevo" }, { status: 400 });
+    }
+
+    // Un administrador que NO es el super administrador solo puede crear
+    // usuarios (operadores o administradores) para su propia agencia.
+    const esSuper = esSuperAdmin(email);
+    if (!esSuper && parsed.data.agencia !== agenciaPropia) {
+      return NextResponse.json(
+        { ok: false, error: "Solo podés crear usuarios para tu propia agencia" },
+        { status: 403 }
+      );
     }
 
     const existente = await getUsuarioPorEmail(parsed.data.email.toLowerCase().trim());
