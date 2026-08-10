@@ -2,19 +2,21 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { Rol } from "@/types";
+import type { Rol, Agencia } from "@/types";
 
 interface SessionUser {
   id: string;
   nombre: string;
   email: string;
   rol: Rol;
+  agencia: Agencia;
 }
 
 interface AuthContextValue {
   user: SessionUser | null;
   loading: boolean;
   isAdmin: boolean;
+  agencia: Agencia | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -41,9 +43,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
+  useEffect(() => { refresh(); }, [refresh]);
 
   async function login(email: string, password: string) {
     const res = await fetch("/api/auth/login", {
@@ -52,9 +52,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
     const json = await res.json();
-    if (!res.ok || !json.ok) {
-      throw new Error(json.error || "No se pudo iniciar sesión");
-    }
+    if (!res.ok || !json.ok) throw new Error(json.error || "No se pudo iniciar sesión");
     await refresh();
     router.push("/dashboard");
     router.refresh();
@@ -68,7 +66,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin: user?.rol === "administrador", login, logout, refresh }}>
+    <AuthContext.Provider value={{
+      user,
+      loading,
+      isAdmin: user?.rol === "administrador",
+      agencia: user?.agencia ?? null,
+      login,
+      logout,
+      refresh,
+    }}>
       {children}
     </AuthContext.Provider>
   );
