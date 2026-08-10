@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginSchema } from "@/lib/validations";
 import { getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
-import { compararPassword, crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
+import { crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
+import { compararPassword } from "@/lib/password";
 import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes } from "@/lib/rateLimit";
 import type { Agencia } from "@/types";
-
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -16,10 +16,8 @@ export async function POST(request: NextRequest) {
       );
     }
     const { email, password } = parsed.data;
-
     const ip = request.headers.get("x-forwarded-for") || "sin-ip";
     const claveLimite = `${ip}:${email.toLowerCase().trim()}`;
-
     if (estaLimitado(claveLimite)) {
       const minutos = minutosRestantes(claveLimite);
       return NextResponse.json(
@@ -27,21 +25,17 @@ export async function POST(request: NextRequest) {
         { status: 429 }
       );
     }
-
     const usuario = await getUsuarioPorEmail(email.toLowerCase().trim());
     if (!usuario || !usuario.activo) {
       registrarIntentoFallido(claveLimite);
       return NextResponse.json({ ok: false, error: "Email o contraseña incorrectos" }, { status: 401 });
     }
-
     const passwordOk = await compararPassword(password, usuario.passwordHash);
     if (!passwordOk) {
       registrarIntentoFallido(claveLimite);
       return NextResponse.json({ ok: false, error: "Email o contraseña incorrectos" }, { status: 401 });
     }
-
     limpiarIntentos(claveLimite);
-
     // La agencia queda grabada en el token — el frontend la usa para filtrar
     // productos, conteos y Dashboard sin tener que pedirla de nuevo.
     const token = await crearToken({
@@ -51,7 +45,6 @@ export async function POST(request: NextRequest) {
       nombre: usuario.nombre,
       agencia: (usuario.agencia || "Centro Logístico") as Agencia,
     });
-
     await registrarHistorial({
       usuarioId: usuario.id,
       usuarioEmail: usuario.email,
@@ -60,7 +53,6 @@ export async function POST(request: NextRequest) {
       dispositivo: request.headers.get("user-agent") || "",
       ip,
     });
-
     const response = NextResponse.json({
       ok: true,
       data: {
@@ -71,7 +63,6 @@ export async function POST(request: NextRequest) {
         agencia: usuario.agencia || "Centro Logístico",
       },
     });
-
     response.cookies.set(AUTH_COOKIE_NAME, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -79,7 +70,6 @@ export async function POST(request: NextRequest) {
       path: "/",
       maxAge: 60 * 60 * 8,
     });
-
     return response;
   } catch (err) {
     console.error("Error en login:", err);
