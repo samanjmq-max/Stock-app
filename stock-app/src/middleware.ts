@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verificarToken, AUTH_COOKIE_NAME } from "@/lib/auth";
-
+import { esSuperAdmin } from "@/lib/permisos";
 const RUTAS_PUBLICAS = ["/login", "/api/auth/login"];
 const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios"];
-
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
   const esPublica = RUTAS_PUBLICAS.some((r) => pathname.startsWith(r));
   const esAsset =
     pathname.startsWith("/_next") ||
@@ -14,12 +12,9 @@ export async function middleware(request: NextRequest) {
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
     pathname === "/favicon.ico";
-
   if (esPublica || esAsset) return NextResponse.next();
-
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const payload = token ? await verificarToken(token) : null;
-
   if (!payload) {
     if (pathname.startsWith("/api")) {
       return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
@@ -28,7 +23,6 @@ export async function middleware(request: NextRequest) {
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
-
   const requiereAdmin = RUTAS_SOLO_ADMIN.some((r) => pathname.startsWith(r));
   if (requiereAdmin && payload.rol !== "administrador") {
     if (pathname.startsWith("/api")) {
@@ -36,7 +30,6 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
-
   // Propaga la identidad del usuario (incluyendo agencia) a las API routes
   // vía headers internos — así cada ruta sabe a qué agencia filtrar sin
   // que el frontend tenga que mandarlo en cada request.
@@ -46,10 +39,9 @@ export async function middleware(request: NextRequest) {
   requestHeaders.set("x-user-rol", payload.rol);
   requestHeaders.set("x-user-nombre", payload.nombre);
   requestHeaders.set("x-user-agencia", payload.agencia || "Centro Logístico");
-
+  requestHeaders.set("x-user-es-super-admin", esSuperAdmin(payload.email) ? "1" : "0");
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
-
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js).*)"],
 };
