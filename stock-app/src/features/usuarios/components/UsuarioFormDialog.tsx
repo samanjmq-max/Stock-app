@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 import { usuarioSchema, type UsuarioInput } from "@/lib/validations";
 import type { Usuario } from "@/types";
 import { AGENCIAS } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuardar }: Props) {
+  const { esSuperAdmin, agencia: agenciaPropia } = useAuth();
   const {
     register,
     handleSubmit,
@@ -41,13 +43,26 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
               activo: usuarioEditando.activo,
               password: "",
             }
-          : { nombre: "", email: "", rol: "operador", agencia: "Centro Logístico", activo: true, password: "" }
+          : {
+              nombre: "",
+              email: "",
+              rol: "operador",
+              // Un jefe de planta (no super admin) siempre arranca con su propia agencia.
+              agencia: esSuperAdmin ? "Centro Logístico" : (agenciaPropia ?? "Centro Logístico"),
+              activo: true,
+              password: "",
+            }
       );
     }
-  }, [open, usuarioEditando, reset]);
+  }, [open, usuarioEditando, reset, esSuperAdmin, agenciaPropia]);
 
   async function onSubmit(data: UsuarioInput) {
-    await onGuardar(data);
+    // Refuerzo del lado del cliente: un jefe de planta nunca manda otra
+    // agencia distinta a la suya, aunque el backend ya lo bloquea igual.
+    const datosFinales = esSuperAdmin || !agenciaPropia
+      ? data
+      : { ...data, agencia: agenciaPropia };
+    await onGuardar(datosFinales);
     onOpenChange(false);
   }
 
@@ -92,21 +107,29 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
           </div>
           <div className="space-y-1.5">
             <Label>Agencia / Planta</Label>
-            <Controller
-              control={control}
-              name="agencia"
-              render={({ field }) => (
-                <Select value={field.value} onValueChange={field.onChange}>
-                  <SelectTrigger><SelectValue placeholder="Seleccioná la agencia..." /></SelectTrigger>
-                  <SelectContent>
-                    {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              )}
-            />
-            {errors.agencia && <p className="text-xs text-destructive">{errors.agencia.message}</p>}
+            {esSuperAdmin ? (
+              <>
+                <Controller
+                  control={control}
+                  name="agencia"
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger><SelectValue placeholder="Seleccioná la agencia..." /></SelectTrigger>
+                      <SelectContent>
+                        {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.agencia && <p className="text-xs text-destructive">{errors.agencia.message}</p>}
+              </>
+            ) : (
+              <Input value={agenciaPropia ?? ""} disabled />
+            )}
             <p className="text-xs text-muted-foreground">
-              El operador solo podrá ver y contar los productos de esta agencia.
+              {esSuperAdmin
+                ? "El operador solo podrá ver y contar los productos de esta agencia."
+                : "Como administrador de planta, solo podés crear usuarios para tu propia agencia."}
             </p>
           </div>
           <DialogFooter>
