@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import type { JwtPayload, Rol } from "@/types";
+import type { JwtPayload, Rol, Agencia } from "@/types";
 
 const secretKey = process.env.JWT_SECRET;
 if (!secretKey && process.env.NODE_ENV === "production") {
@@ -10,18 +10,19 @@ const encodedKey = new TextEncoder().encode(secretKey || "dev-secret-cambiar-en-
 const TOKEN_EXPIRATION = "8h";
 export const AUTH_COOKIE_NAME = "stock_session";
 
-/** Genera un JWT firmado con los datos mínimos necesarios del usuario. */
 export async function crearToken(payload: {
   userId: string;
   email: string;
   rol: Rol;
   nombre: string;
+  agencia: Agencia;
 }): Promise<string> {
   return new SignJWT({
     sub: payload.userId,
     email: payload.email,
     rol: payload.rol,
     nombre: payload.nombre,
+    agencia: payload.agencia,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
@@ -29,7 +30,6 @@ export async function crearToken(payload: {
     .sign(encodedKey);
 }
 
-/** Verifica y decodifica un JWT. Devuelve null si es inválido o expiró. */
 export async function verificarToken(token: string): Promise<JwtPayload | null> {
   try {
     const { payload } = await jwtVerify(token, encodedKey);
