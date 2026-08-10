@@ -1,47 +1,125 @@
-import { NextRequest, NextResponse } from "next/server";
-import { verificarToken, AUTH_COOKIE_NAME } from "@/lib/auth";
-import { esSuperAdmin } from "@/lib/permisos";
-const RUTAS_PUBLICAS = ["/login", "/api/auth/login"];
-const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios"];
-export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
-  const esPublica = RUTAS_PUBLICAS.some((r) => pathname.startsWith(r));
-  const esAsset =
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/icons") ||
-    pathname === "/manifest.json" ||
-    pathname === "/sw.js" ||
-    pathname === "/favicon.ico";
-  if (esPublica || esAsset) return NextResponse.next();
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  const payload = token ? await verificarToken(token) : null;
-  if (!payload) {
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
-    }
-    const loginUrl = new URL("/login", request.url);
-    loginUrl.searchParams.set("next", pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-  const requiereAdmin = RUTAS_SOLO_ADMIN.some((r) => pathname.startsWith(r));
-  if (requiereAdmin && payload.rol !== "administrador") {
-    if (pathname.startsWith("/api")) {
-      return NextResponse.json({ ok: false, error: "Acceso restringido a administradores" }, { status: 403 });
-    }
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
-  // Propaga la identidad del usuario (incluyendo agencia) a las API routes
-  // vía headers internos — así cada ruta sabe a qué agencia filtrar sin
-  // que el frontend tenga que mandarlo en cada request.
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-user-id", payload.sub);
-  requestHeaders.set("x-user-email", payload.email);
-  requestHeaders.set("x-user-rol", payload.rol);
-  requestHeaders.set("x-user-nombre", payload.nombre);
-  requestHeaders.set("x-user-agencia", payload.agencia || "Centro Logístico");
-  requestHeaders.set("x-user-es-super-admin", esSuperAdmin(payload.email) ? "1" : "0");
-  return NextResponse.next({ request: { headers: requestHeaders } });
+"use client";
+
+import { useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Loader2 } from "lucide-react";
+import { usuarioSchema, type UsuarioInput } from "@/lib/validations";
+import type { Usuario } from "@/types";
+import { AGENCIAS } from "@/types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+
+interface Props {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  usuarioEditando: Usuario | null;
+  onGuardar: (input: UsuarioInput) => Promise<void>;
 }
-export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|icons|manifest.json|sw.js).*)"],
-};
+
+export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuardar }: Props) {
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors, isSubmitting },
+  } = useForm<UsuarioInput>({ resolver: zodResolver(usuarioSchema) });
+
+  useEffect(() => {
+    if (open) {
+      reset(
+        usuarioEditando
+          ? {
+              nombre: usuarioEditando.nombre,
+              email: usuarioEditando.email,
+              rol: usuarioEditando.rol,
+              agencia: usuarioEditando.agencia,
+              activo: usuarioEditando.activo,
+              password: "",
+            }
+          : { nombre: "", email: "", rol: "operador", agencia: "Centro Logístico", activo: true, password: "" }
+      );
+    }
+  }, [open, usuarioEditando, reset]);
+
+  async function onSubmit(data: UsuarioInput) {
+    await onGuardar(data);
+    onOpenChange(false);
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{usuarioEditando ? "Editar usuario" : "Nuevo usuario"}</DialogTitle>
+          {usuarioEditando && <DialogDescription>Dejá la contraseña vacía si no querés cambiarla.</DialogDescription>}
+        </DialogHeader>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-3">
+          <div className="space-y-1.5">
+            <Label>Nombre</Label>
+            <Input {...register("nombre")} />
+            {errors.nombre && <p className="text-xs text-destructive">{errors.nombre.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Email</Label>
+            <Input type="email" {...register("email")} disabled={!!usuarioEditando} />
+            {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>{usuarioEditando ? "Nueva contraseña (opcional)" : "Contraseña"}</Label>
+            <Input type="password" {...register("password")} />
+            {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
+          </div>
+          <div className="space-y-1.5">
+            <Label>Rol</Label>
+            <Controller
+              control={control}
+              name="rol"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="operador">Operador</SelectItem>
+                    <SelectItem value="administrador">Administrador</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Agencia / Planta</Label>
+            <Controller
+              control={control}
+              name="agencia"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger><SelectValue placeholder="Seleccioná la agencia..." /></SelectTrigger>
+                  <SelectContent>
+                    {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.agencia && <p className="text-xs text-destructive">{errors.agencia.message}</p>}
+            <p className="text-xs text-muted-foreground">
+              El operador solo podrá ver y contar los productos de esta agencia.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting && <Loader2 className="animate-spin" size={15} />}
+              Guardar
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
