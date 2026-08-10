@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AGENCIAS } from "@/types";
 
 export const loginSchema = z.object({
   email: z.string().email("Ingresá un email válido"),
@@ -11,6 +12,7 @@ export const usuarioSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.union([z.literal(""), z.string().min(6, "Mínimo 6 caracteres")]).optional(),
   rol: z.enum(["administrador", "operador"]),
+  agencia: z.enum(AGENCIAS as unknown as [string, ...string[]]),
   activo: z.boolean().default(true),
 });
 export type UsuarioInput = z.infer<typeof usuarioSchema>;
@@ -22,6 +24,7 @@ export const productoSchema = z.object({
   familia: z.string().optional().default(""),
   proveedor: z.string().optional().default(""),
   stockSap: z.coerce.number().min(0, "No puede ser negativo"),
+  agencia: z.enum(AGENCIAS as unknown as [string, ...string[]]),
 });
 export type ProductoInput = z.infer<typeof productoSchema>;
 
