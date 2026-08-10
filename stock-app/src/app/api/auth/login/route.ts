@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loginSchema } from "@/lib/validations";
 import { getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
-import { crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
-import { compararPassword } from "@/lib/password";
+import { compararPassword, crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes } from "@/lib/rateLimit";
+import type { Agencia } from "@/types";
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,11 +42,14 @@ export async function POST(request: NextRequest) {
 
     limpiarIntentos(claveLimite);
 
+    // La agencia queda grabada en el token — el frontend la usa para filtrar
+    // productos, conteos y Dashboard sin tener que pedirla de nuevo.
     const token = await crearToken({
       userId: usuario.id,
       email: usuario.email,
       rol: usuario.rol,
       nombre: usuario.nombre,
+      agencia: (usuario.agencia || "Centro Logístico") as Agencia,
     });
 
     await registrarHistorial({
@@ -60,7 +63,13 @@ export async function POST(request: NextRequest) {
 
     const response = NextResponse.json({
       ok: true,
-      data: { id: usuario.id, nombre: usuario.nombre, email: usuario.email, rol: usuario.rol },
+      data: {
+        id: usuario.id,
+        nombre: usuario.nombre,
+        email: usuario.email,
+        rol: usuario.rol,
+        agencia: usuario.agencia || "Centro Logístico",
+      },
     });
 
     response.cookies.set(AUTH_COOKIE_NAME, token, {
@@ -68,7 +77,7 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
-      maxAge: 60 * 60 * 8, // 8 horas
+      maxAge: 60 * 60 * 8,
     });
 
     return response;
