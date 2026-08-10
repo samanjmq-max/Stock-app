@@ -1,4 +1,4 @@
-import type { Producto } from "@/types";
+import type { Producto, Agencia } from "@/types";
 import type { ProductoInput } from "@/lib/validations";
 
 async function parseOrThrow<T>(res: Response): Promise<T> {
@@ -17,10 +17,14 @@ export interface FilaImportacion {
 }
 
 export const productosService = {
-  listar: (): Promise<Producto[]> => fetch("/api/productos").then((r) => parseOrThrow<Producto[]>(r)),
+  /** Lista productos. Si se pasa agencia, filtra solo esa (admin). Sin agencia = solo los propios (operador). */
+  listar: (agencia?: Agencia): Promise<Producto[]> => {
+    const url = agencia ? `/api/productos?agencia=${encodeURIComponent(agencia)}` : "/api/productos";
+    return fetch(url).then((r) => parseOrThrow<Producto[]>(r));
+  },
 
-  buscarPorCodigo: async (codigo: string): Promise<Producto | undefined> => {
-    const productos = await productosService.listar();
+  buscarPorCodigo: async (codigo: string, agencia?: Agencia): Promise<Producto | undefined> => {
+    const productos = await productosService.listar(agencia);
     return productos.find((p) => p.codigo.toLowerCase() === codigo.toLowerCase());
   },
 
@@ -41,10 +45,11 @@ export const productosService = {
   eliminar: (id: string): Promise<{ id: string }> =>
     fetch(`/api/productos/${id}`, { method: "DELETE" }).then((r) => parseOrThrow<{ id: string }>(r)),
 
-  importar: (productos: FilaImportacion[]): Promise<{ importados: number }> =>
+  /** Importa productos para una agencia específica — obligatoria. */
+  importar: (productos: FilaImportacion[], agencia: Agencia): Promise<{ importados: number; actualizados: number; agencia: string }> =>
     fetch("/api/productos/importar", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ productos }),
-    }).then((r) => parseOrThrow<{ importados: number }>(r)),
+      body: JSON.stringify({ productos, agencia }),
+    }).then((r) => parseOrThrow<{ importados: number; actualizados: number; agencia: string }>(r)),
 };
