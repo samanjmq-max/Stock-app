@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { usuarioSchema, type UsuarioInput } from "@/lib/validations";
 import type { Usuario } from "@/types";
+import { AGENCIAS } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,8 +33,15 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
     if (open) {
       reset(
         usuarioEditando
-          ? { nombre: usuarioEditando.nombre, email: usuarioEditando.email, rol: usuarioEditando.rol, activo: usuarioEditando.activo, password: "" }
-          : { nombre: "", email: "", rol: "operador", activo: true, password: "" }
+          ? {
+              nombre: usuarioEditando.nombre,
+              email: usuarioEditando.email,
+              rol: usuarioEditando.rol,
+              agencia: usuarioEditando.agencia,
+              activo: usuarioEditando.activo,
+              password: "",
+            }
+          : { nombre: "", email: "", rol: "operador", agencia: "Centro Logístico", activo: true, password: "" }
       );
     }
   }, [open, usuarioEditando, reset]);
@@ -81,6 +89,25 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
                 </Select>
               )}
             />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Agencia / Planta</Label>
+            <Controller
+              control={control}
+              name="agencia"
+              render={({ field }) => (
+                <Select value={field.value} onValueChange={field.onChange}>
+                  <SelectTrigger><SelectValue placeholder="Seleccioná la agencia..." /></SelectTrigger>
+                  <SelectContent>
+                    {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            {errors.agencia && <p className="text-xs text-destructive">{errors.agencia.message}</p>}
+            <p className="text-xs text-muted-foreground">
+              El operador solo podrá ver y contar los productos de esta agencia.
+            </p>
           </div>
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
