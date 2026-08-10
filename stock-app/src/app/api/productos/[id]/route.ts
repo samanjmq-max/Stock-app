@@ -3,7 +3,7 @@ import { actualizarProducto, eliminarProducto, registrarHistorial } from "@/lib/
 import { productoSchema } from "@/lib/validations";
 import type { Rol } from "@/types";
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const rol = request.headers.get("x-user-rol") as Rol | null;
   const userId = request.headers.get("x-user-id") || "";
   const email = request.headers.get("x-user-email") || "";
@@ -13,13 +13,14 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 
   try {
+    const { id } = await params;
     const body = await request.json();
     const parsed = productoSchema.partial().safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: parsed.error.errors[0]?.message }, { status: 400 });
     }
 
-    const producto = await actualizarProducto(params.id, parsed.data);
+    const producto = await actualizarProducto(id, parsed.data);
 
     await registrarHistorial({
       usuarioId: userId,
@@ -37,7 +38,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const rol = request.headers.get("x-user-rol") as Rol | null;
   const userId = request.headers.get("x-user-id") || "";
   const email = request.headers.get("x-user-email") || "";
@@ -47,14 +48,15 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
   }
 
   try {
-    const resultado = await eliminarProducto(params.id);
+    const { id } = await params;
+    const resultado = await eliminarProducto(id);
 
     await registrarHistorial({
       usuarioId: userId,
       usuarioEmail: email,
       rol,
       accion: "eliminar_producto",
-      entidad: `producto:${params.id}`,
+      entidad: `producto:${id}`,
     });
 
     return NextResponse.json({ ok: true, data: resultado });
