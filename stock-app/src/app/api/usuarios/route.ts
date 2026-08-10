@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
       email: parsed.data.email.toLowerCase().trim(),
       passwordHash,
       rol: parsed.data.rol,
+      agencia: parsed.data.agencia,
     });
 
     await registrarHistorial({
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
       rol,
       accion: "crear_usuario",
       entidad: `usuario:${usuario.email}`,
-      valorNuevo: `rol:${usuario.rol}`,
+      valorNuevo: `rol:${usuario.rol}, agencia:${usuario.agencia}`,
     });
 
     return NextResponse.json({ ok: true, data: usuario }, { status: 201 });
