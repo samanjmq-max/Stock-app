@@ -37,12 +37,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Propaga la identidad del usuario a las API routes vía headers internos.
+  // Propaga la identidad del usuario (incluyendo agencia) a las API routes
+  // vía headers internos — así cada ruta sabe a qué agencia filtrar sin
+  // que el frontend tenga que mandarlo en cada request.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-user-id", payload.sub);
   requestHeaders.set("x-user-email", payload.email);
   requestHeaders.set("x-user-rol", payload.rol);
   requestHeaders.set("x-user-nombre", payload.nombre);
+  requestHeaders.set("x-user-agencia", payload.agencia || "Centro Logístico");
 
   return NextResponse.next({ request: { headers: requestHeaders } });
 }
