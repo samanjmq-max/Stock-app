@@ -30,9 +30,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
-// La librería de escaneo (ZXing) pesa varios cientos de KB y solo la usa
-// quien realmente abre la cámara — se carga bajo demanda, no en el bundle
-// inicial de la página, para que "Contar stock" abra rápido en 3G/4G.
 const BarcodeScanner = dynamic(
   () => import("@/features/escaneo/components/BarcodeScanner").then((m) => m.BarcodeScanner),
   { ssr: false, loading: () => <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-white" size={28} /></div> }
@@ -41,8 +38,9 @@ const OcrScanner = dynamic(
   () => import("@/features/escaneo/components/OcrScanner").then((m) => m.OcrScanner),
   { ssr: false, loading: () => <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center"><Loader2 className="animate-spin text-white" size={28} /></div> }
 );
+
 export default function ConteoPage() {
-  const { user } = useAuth();
+  const { user, agencia } = useAuth();
   const { isOnline, sincronizarAhora } = useSync();
 
   const [codigoBuscado, setCodigoBuscado] = useState("");
@@ -52,10 +50,6 @@ export default function ConteoPage() {
   const [mostrarCamara, setMostrarCamara] = useState(false);
   const [mostrarCamaraOcr, setMostrarCamaraOcr] = useState(false);
   const [historialProducto, setHistorialProducto] = useState<ConteoLocal[]>([]);
-
-  // Corrección de ubicación: por defecto se asume que la ubicación de SAP
-  // es correcta. Si el operario marca que no lo es, aparece un campo para
-  // anotar la ubicación real, que viaja en el reporte junto al conteo.
   const [ubicacionIncorrecta, setUbicacionIncorrecta] = useState(false);
   const [ubicacionNueva, setUbicacionNueva] = useState("");
 
@@ -69,16 +63,13 @@ export default function ConteoPage() {
 
   const cantidadActual = watch("stockContado");
 
-  // Cachea el catálogo de productos en IndexedDB apenas hay conexión,
-  // para poder seguir buscando y contando aunque se corte internet.
   useEffect(() => {
+    // Cachea SOLO los productos de la agencia del usuario logueado.
     productosService
-      .listar()
+      .listar(agencia ?? undefined)
       .then((productos) => cachearProductos(productos))
-      .catch(() => {
-        /* sin conexión: se sigue trabajando con lo que ya esté cacheado */
-      });
-  }, []);
+      .catch(() => { /* trabaja con lo que ya esté cacheado */ });
+  }, [agencia]);
 
   const buscarCodigo = useCallback(
     async (codigo: string) => {
@@ -95,9 +86,9 @@ export default function ConteoPage() {
       try {
         let encontrado = await getProductoCachePorCodigo(c);
         if (!encontrado) {
-          // Si no está en cache local, intenta contra el servidor (puede ser
-          // stock recién importado que todavía no se sincronizó al dispositivo).
-          encontrado = await productosService.buscarPorCodigo(c);
+          // Si no está en caché, busca contra el servidor (solo la agencia del usuario).
+          const todos = await productosService.listar(agencia ?? undefined);
+          encontrado = todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase()) ?? null;
         }
 
         if (encontrado) {
@@ -114,10 +105,9 @@ export default function ConteoPage() {
         setBuscando(false);
       }
     },
-    [reset]
+    [reset, agencia]
   );
 
-  // Lector Bluetooth: se comporta como teclado y "tipea" el código + Enter.
   useHardwareScanner((codigo) => buscarCodigo(codigo), true);
 
   async function onSubmit(data: ConteoInput) {
@@ -127,7 +117,6 @@ export default function ConteoPage() {
     }
 
     const now = new Date();
-
     const stockSap = producto?.stockSap ?? 0;
     const diferencia = calcularDiferencia(stockSap, data.stockContado);
     const estado = producto ? estadoDesdeDiferencia(diferencia) : "no_existe";
@@ -140,6 +129,7 @@ export default function ConteoPage() {
         descripcion: producto?.descripcion || "(no existe en SAP)",
         ubicacion: producto?.ubicacion || "",
         ubicacionNueva: ubicacionIncorrecta ? ubicacionNueva.trim() : "",
+        agencia: agencia || "Centro Logístico",
         stockSap,
         diferencia,
         estado,
@@ -190,6 +180,12 @@ export default function ConteoPage() {
         </div>
       )}
 
+      {agencia && (
+        <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-1.5">
+          Contando para: <span className="font-medium text-foreground">{agencia}</span>
+        </div>
+      )}
+
       <Card>
         <CardContent className="pt-5 space-y-3">
           <Label htmlFor="buscador">Código de producto</Label>
@@ -207,12 +203,10 @@ export default function ConteoPage() {
             </Button>
           </div>
           <Button variant="secondary" className="w-full" onClick={() => setMostrarCamara(true)}>
-            <Camera size={16} />
-            Escanear con la cámara
+            <Camera size={16} /> Escanear con la cámara
           </Button>
           <Button variant="secondary" className="w-full" onClick={() => setMostrarCamaraOcr(true)}>
-            <ScanText size={16} />
-            Tomar foto del número
+            <ScanText size={16} /> Tomar foto del número
           </Button>
           <p className="text-xs text-muted-foreground text-center">
             Compatible con EAN13, EAN8, UPC, Code128, Code39 y QR — también con lectores Bluetooth.
@@ -227,10 +221,9 @@ export default function ConteoPage() {
               <CardContent className="pt-5 flex items-start gap-3">
                 <PackageX className="text-warning-foreground shrink-0 mt-0.5" size={18} />
                 <div>
-                  <p className="text-sm font-medium">Este código no existe en SAP</p>
+                  <p className="text-sm font-medium">Este código no existe en SAP para {agencia || "tu agencia"}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Podés registrarlo igual: quedará marcado como "No existe en SAP" para que un
-                    administrador lo revise.
+                    Podés registrarlo igual — quedará marcado como "No existe en SAP".
                   </p>
                 </div>
               </CardContent>
@@ -239,13 +232,8 @@ export default function ConteoPage() {
         )}
 
         {(producto || noExiste) && (
-          <motion.form
-            key="form"
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            onSubmit={handleSubmit(onSubmit)}
-          >
+          <motion.form key="form" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            onSubmit={handleSubmit(onSubmit)}>
             <Card>
               <CardContent className="pt-5 space-y-4">
                 <input type="hidden" {...register("codigo")} value={codigoBuscado} />
@@ -270,33 +258,23 @@ export default function ConteoPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Button
-                    type="button"
-                    variant={ubicacionIncorrecta ? "default" : "secondary"}
-                    className="w-full"
-                    onClick={() => setUbicacionIncorrecta((v) => !v)}
-                  >
+                  <Button type="button" variant={ubicacionIncorrecta ? "default" : "secondary"} className="w-full"
+                    onClick={() => setUbicacionIncorrecta((v) => !v)}>
                     {ubicacionIncorrecta ? <MapPinOff size={16} /> : <MapPin size={16} />}
                     {ubicacionIncorrecta ? "La ubicación no es correcta" : "La ubicación es correcta"}
                   </Button>
-
                   {ubicacionIncorrecta && (
                     <div className="space-y-1.5">
                       <Label htmlFor="ubicacionNueva">Ubicación real (dónde se encontró)</Label>
-                      <Input
-                        id="ubicacionNueva"
-                        placeholder="Ej: Pasillo 4, Estante B"
-                        value={ubicacionNueva}
-                        onChange={(e) => setUbicacionNueva(e.target.value)}
-                      />
+                      <Input id="ubicacionNueva" placeholder="Ej: Pasillo 4, Estante B"
+                        value={ubicacionNueva} onChange={(e) => setUbicacionNueva(e.target.value)} />
                     </div>
                   )}
                 </div>
 
                 {producto && diferenciaPreview !== null && (
                   <Badge variant={diferenciaPreview === 0 || diferenciaPreview > 0 ? "success" : "destructive"}>
-                    Diferencia: {diferenciaPreview > 0 ? "+" : ""}
-                    {diferenciaPreview} ({estadoDesdeDiferencia(diferenciaPreview)})
+                    Diferencia: {diferenciaPreview > 0 ? "+" : ""}{diferenciaPreview} ({estadoDesdeDiferencia(diferenciaPreview)})
                   </Badge>
                 )}
 
@@ -323,17 +301,9 @@ export default function ConteoPage() {
                   Conteos anteriores de este producto (en este dispositivo)
                 </div>
                 {historialProducto.slice(0, 5).map((c, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between text-xs py-1.5 border-b border-border last:border-0"
-                  >
-                    <span className="text-muted-foreground">
-                      {c.fecha} {c.hora} · {c.usuarioEmail}
-                    </span>
-                    <span className="font-medium">
-                      {c.stockContado} ({c.diferencia > 0 ? "+" : ""}
-                      {c.diferencia})
-                    </span>
+                  <div key={i} className="flex items-center justify-between text-xs py-1.5 border-b border-border last:border-0">
+                    <span className="text-muted-foreground">{c.fecha} {c.hora} · {c.usuarioEmail}</span>
+                    <span className="font-medium">{c.stockContado} ({c.diferencia > 0 ? "+" : ""}{c.diferencia})</span>
                   </div>
                 ))}
               </CardContent>
@@ -344,20 +314,13 @@ export default function ConteoPage() {
 
       {mostrarCamara && (
         <BarcodeScanner
-          onDetected={(codigo) => {
-            setMostrarCamara(false);
-            buscarCodigo(codigo);
-          }}
+          onDetected={(codigo) => { setMostrarCamara(false); buscarCodigo(codigo); }}
           onClose={() => setMostrarCamara(false)}
         />
       )}
-
       {mostrarCamaraOcr && (
         <OcrScanner
-          onDetected={(codigo) => {
-            setMostrarCamaraOcr(false);
-            buscarCodigo(codigo);
-          }}
+          onDetected={(codigo) => { setMostrarCamaraOcr(false); buscarCodigo(codigo); }}
           onClose={() => setMostrarCamaraOcr(false)}
         />
       )}
