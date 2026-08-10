@@ -1,9 +1,20 @@
 // ============================================================
 // Tipos de dominio — reflejan las entidades lógicas del sistema
-// (hoy persistidas en Google Sheets, mañana en PostgreSQL/Supabase
-// sin que el frontend deba cambiar, porque solo conoce estos tipos
-// y la capa de servicios en `lib/`, nunca el detalle de la fuente).
 // ============================================================
+
+export const AGENCIAS = [
+  "JP Varela",
+  "Lascano",
+  "Vergara",
+  "Rio Branco",
+  "Tres Gomensoro",
+  "Tacuarembó",
+  "Salto",
+  "Montevideo",
+  "Centro Logístico",
+] as const;
+
+export type Agencia = (typeof AGENCIAS)[number];
 
 export type Rol = "administrador" | "operador";
 
@@ -12,9 +23,9 @@ export interface Usuario {
   nombre: string;
   email: string;
   rol: Rol;
+  agencia: Agencia;
   activo: boolean;
   creadoEn: string;
-  // passwordHash NUNCA viaja al frontend — se filtra en la capa de servicios.
 }
 
 export interface Producto {
@@ -25,6 +36,7 @@ export interface Producto {
   familia: string;
   proveedor: string;
   stockSap: number;
+  agencia: Agencia;
   actualizadoEn: string;
 }
 
@@ -41,6 +53,7 @@ export interface Conteo {
   diferencia: number;
   estado: EstadoConteo;
   observaciones: string;
+  agencia: Agencia;
   usuarioId: string;
   usuarioEmail: string;
   fecha: string;
@@ -69,7 +82,7 @@ export interface HistorialEntry {
   usuarioEmail: string;
   rol: Rol;
   accion: AccionHistorial;
-  entidad: string; // ej: "producto:COD123"
+  entidad: string;
   valorAnterior: string;
   valorNuevo: string;
   observacion: string;
@@ -92,10 +105,11 @@ export interface DashboardStats {
 }
 
 export interface JwtPayload {
-  sub: string; // userId
+  sub: string;
   email: string;
   rol: Rol;
   nombre: string;
+  agencia: Agencia;
   iat?: number;
   exp?: number;
 }
