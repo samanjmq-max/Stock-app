@@ -1,4 +1,4 @@
-import type { Conteo } from "@/types";
+import type { Conteo, Agencia } from "@/types";
 import type { ConteoInput } from "@/lib/validations";
 
 async function parseOrThrow<T>(res: Response): Promise<T> {
@@ -8,7 +8,11 @@ async function parseOrThrow<T>(res: Response): Promise<T> {
 }
 
 export const conteosService = {
-  listar: (): Promise<Conteo[]> => fetch("/api/conteos").then((r) => parseOrThrow<Conteo[]>(r)),
+  /** Lista conteos. Si se pasa agencia, filtra solo esa (admin). Sin agencia = solo los propios (operador). */
+  listar: (agencia?: Agencia): Promise<Conteo[]> => {
+    const url = agencia ? `/api/conteos?agencia=${encodeURIComponent(agencia)}` : "/api/conteos";
+    return fetch(url).then((r) => parseOrThrow<Conteo[]>(r));
+  },
 
   guardar: (input: ConteoInput): Promise<Conteo> =>
     fetch("/api/conteos", {
@@ -17,24 +21,16 @@ export const conteosService = {
       body: JSON.stringify(input),
     }).then((r) => parseOrThrow<Conteo>(r)),
 
-  /** Corrige un conteo ya guardado (por su id) — no crea uno nuevo. */
-  editar: (
-    id: string,
-    input: { stockContado: number; diferencia: number; estado: string; observaciones: string; ubicacionNueva: string }
-  ): Promise<Conteo> =>
+  editar: (id: string, input: { stockContado: number; diferencia: number; estado: string; observaciones: string; ubicacionNueva: string }): Promise<Conteo> =>
     fetch(`/api/conteos/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }).then((r) => parseOrThrow<Conteo>(r)),
 
-  /** Elimina un conteo puntual. */
   eliminar: (id: string): Promise<{ id: string; eliminado: boolean }> =>
-    fetch(`/api/conteos/${id}`, { method: "DELETE" }).then((r) =>
-      parseOrThrow<{ id: string; eliminado: boolean }>(r)
-    ),
+    fetch(`/api/conteos/${id}`, { method: "DELETE" }).then((r) => parseOrThrow<{ id: string; eliminado: boolean }>(r)),
 
-  /** Elimina varios conteos seleccionados de una vez. */
   eliminarVarios: (ids: string[]): Promise<{ eliminados: number }> =>
     fetch("/api/conteos/eliminar-lote", {
       method: "POST",
@@ -42,7 +38,11 @@ export const conteosService = {
       body: JSON.stringify({ ids }),
     }).then((r) => parseOrThrow<{ eliminados: number }>(r)),
 
-  /** Elimina TODOS los conteos (solo administradores) — para arrancar un inventario de cero. */
-  resetear: (): Promise<{ eliminados: number }> =>
-    fetch("/api/conteos/reset", { method: "POST" }).then((r) => parseOrThrow<{ eliminados: number }>(r)),
+  /** Resetea conteos. Si se pasa agencia, borra solo esa. Sin agencia o null = todas (solo admin global). */
+  resetear: (agencia?: Agencia | null): Promise<{ eliminados: number }> =>
+    fetch("/api/conteos/reset", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ agencia: agencia ?? null }),
+    }).then((r) => parseOrThrow<{ eliminados: number }>(r)),
 };
