@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
-import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw } from "lucide-react";
+import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -21,7 +21,10 @@ import { AGENCIAS } from "@/types";
 import type { Conteo, EstadoConteo, Agencia } from "@/types";
 
 const COLORS = { coincide: "#16a34a", falta: "#dc2626", sobra: "#2563eb" };
-type Vista = EstadoConteo | "pendientes" | null;
+type Vista = EstadoConteo | "pendientes" | "contados" | null;
+
+// Auto-actualización: cada cuánto se refresca el Dashboard solo, en milisegundos.
+const INTERVALO_AUTO_ACTUALIZACION = 30_000;
 
 export default function DashboardPage() {
   const { isAdmin, agencia: agenciaUsuario } = useAuth();
@@ -30,6 +33,27 @@ export default function DashboardPage() {
   const [vista, setVista] = useState<Vista>(null);
   const [conteoAEditar, setConteoAEditar] = useState<Conteo | null>(null);
   const [vaciando, setVaciando] = useState(false);
+  const [actualizando, setActualizando] = useState(false);
+
+  // Auto-actualización silenciosa: refresca el Dashboard solo cada 30s,
+  // así todos (administradores y operadores) ven el progreso de sus
+  // compañeros sin tener que cambiar de pestaña y volver.
+  useEffect(() => {
+    const intervalo = setInterval(() => {
+      recargar();
+    }, INTERVALO_AUTO_ACTUALIZACION);
+    return () => clearInterval(intervalo);
+  }, [recargar]);
+
+  async function actualizarManual() {
+    setActualizando(true);
+    try {
+      await recargar();
+      toast.success("Dashboard actualizado");
+    } finally {
+      setActualizando(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -87,11 +111,14 @@ export default function DashboardPage() {
     .sort((a, b) => b.contados - a.contados)
     .slice(0, 8);
 
-  const conteosFiltrados = vista && vista !== "pendientes"
+  // "Contados" muestra TODOS los conteos, sin filtrar por estado — mismo
+  // listado que la vista por defecto, pero ahora accesible como filtro
+  // explícito desde la tarjeta, con la tarjeta marcada como activa.
+  const conteosFiltrados = vista && vista !== "pendientes" && vista !== "contados"
     ? todosLosConteos.filter((c) => c.estado === vista)
     : todosLosConteos;
 
-  function toggleVista(v: EstadoConteo | "pendientes") {
+  function toggleVista(v: Vista) {
     setVista((actual) => (actual === v ? null : v));
   }
 
@@ -154,33 +181,41 @@ export default function DashboardPage() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="p-4 md:p-6 space-y-5">
 
-      {isAdmin && (
-        <div className="flex items-center gap-3 flex-wrap">
-          <p className="text-sm text-muted-foreground">Ver agencia:</p>
-          <Select
-            value={agenciaFiltro ?? "todas"}
-            onValueChange={(v) => {
-              setAgenciaFiltro(v === "todas" ? undefined : v as Agencia);
-              setVista(null);
-            }}
-          >
-            <SelectTrigger className="w-52">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todas las agencias</SelectItem>
-              {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-            </SelectContent>
-          </Select>
-          <span className="text-xs text-muted-foreground">
-            {agenciaFiltro ? `Mostrando: ${agenciaFiltro}` : "Mostrando el consolidado de toda la empresa"}
-          </span>
-        </div>
-      )}
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        {isAdmin ? (
+          <div className="flex items-center gap-3 flex-wrap">
+            <p className="text-sm text-muted-foreground">Ver agencia:</p>
+            <Select
+              value={agenciaFiltro ?? "todas"}
+              onValueChange={(v) => {
+                setAgenciaFiltro(v === "todas" ? undefined : v as Agencia);
+                setVista(null);
+              }}
+            >
+              <SelectTrigger className="w-52">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas las agencias</SelectItem>
+                {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <span className="text-xs text-muted-foreground">
+              {agenciaFiltro ? `Mostrando: ${agenciaFiltro}` : "Mostrando el consolidado de toda la empresa"}
+            </span>
+          </div>
+        ) : <div />}
+
+        <Button variant="outline" size="sm" onClick={actualizarManual} disabled={actualizando} className="h-8">
+          {actualizando ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+          Actualizar
+        </Button>
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Productos totales" value={stats.totalProductos} icon={Package} />
-        <StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success" />
+        <StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success"
+          onClick={() => toggleVista("contados")} activo={vista === "contados"} />
         <StatCard label="Pendientes" value={stats.pendientes} icon={Clock} tone="warning"
           onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"} />
         <StatCard label="Avance" value={`${stats.porcentajeCompletado}%`} icon={TrendingUp} />
@@ -253,7 +288,7 @@ export default function DashboardPage() {
 
       {vista === "pendientes"
         ? <PendientesTable productos={productosPendientes} onQuitarFiltro={() => setVista(null)} />
-        : <ConteosTable conteos={conteosFiltrados} filtro={vista as EstadoConteo | null}
+        : <ConteosTable conteos={conteosFiltrados} filtro={vista === "contados" ? null : (vista as EstadoConteo | null)}
             onQuitarFiltro={() => setVista(null)} onEditar={setConteoAEditar} onEliminado={recargar} />}
 
       <Card>
