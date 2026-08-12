@@ -110,9 +110,14 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
             </Button>
           )}
           {filtro && (
-            <Button variant="ghost" size="sm" onClick={onQuitarFiltro} className="h-7 text-xs">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onQuitarFiltro}
+              className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/5"
+            >
               <X size={13} />
-              Quitar filtro
+              Ver todos los conteos
             </Button>
           )}
         </div>
@@ -121,92 +126,98 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
         {conteos.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">No hay conteos para mostrar.</p>
         ) : (
-          <div className="overflow-x-auto -mx-5">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border">
-                  <th className="px-5 py-2 font-medium w-8">
-                    <input
-                      type="checkbox"
-                      checked={todosSeleccionados}
-                      onChange={toggleTodos}
-                      aria-label="Seleccionar todos"
-                      className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-                    />
-                  </th>
-                  <th className="px-2 py-2 font-medium">Código</th>
-                  <th className="px-2 py-2 font-medium">Descripción</th>
-                  <th className="px-2 py-2 font-medium">Ubicación</th>
-                  <th className="px-2 py-2 font-medium">Ubic. nueva</th>
-                  <th className="px-2 py-2 font-medium text-right">SAP</th>
-                  <th className="px-2 py-2 font-medium text-right">Contado</th>
-                  <th className="px-2 py-2 font-medium text-right">Dif.</th>
-                  <th className="px-2 py-2 font-medium">Estado</th>
-                  <th className="px-2 py-2 font-medium">Usuario</th>
-                  <th className="px-2 py-2 font-medium">Fecha</th>
-                  <th className="px-5 py-2 font-medium text-right">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {conteos.map((c) => (
-                  <tr
-                    key={c.id}
-                    className={`border-b border-border last:border-0 hover:bg-muted/30 ${
-                      seleccionados.has(c.id) ? "bg-primary/5" : ""
-                    }`}
-                  >
-                    <td className="px-5 py-2">
+          <div className="-mx-5">
+            {/* Recuadro de alto fijo: las filas scrollean adentro, el resto de la pantalla queda quieto. */}
+            <div className="overflow-auto max-h-[420px]">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b border-border sticky top-0 bg-background z-10">
+                    <th className="px-5 py-2 font-medium w-8">
                       <input
                         type="checkbox"
-                        checked={seleccionados.has(c.id)}
-                        onChange={() => toggleUno(c.id)}
-                        aria-label={`Seleccionar ${c.codigo}`}
+                        checked={todosSeleccionados}
+                        onChange={toggleTodos}
+                        aria-label="Seleccionar todos"
                         className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
                       />
-                    </td>
-                    <td className="px-2 py-2 font-medium whitespace-nowrap">{c.codigo}</td>
-                    <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
-                      {c.descripcion}
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">{c.ubicacion || "—"}</td>
-                    <td className="px-2 py-2 whitespace-nowrap">
-                      {c.ubicacionNueva ? (
-                        <span className="text-warning-foreground font-medium">{c.ubicacionNueva}</span>
-                      ) : (
-                        "—"
-                      )}
-                    </td>
-                    <td className="px-2 py-2 text-right">{c.stockSap}</td>
-                    <td className="px-2 py-2 text-right">{c.stockContado}</td>
-                    <td className="px-2 py-2 text-right">
-                      {c.diferencia > 0 ? "+" : ""}
-                      {c.diferencia}
-                    </td>
-                    <td className="px-2 py-2">
-                      <Badge variant={BADGE_POR_ESTADO[c.estado]}>{c.estado}</Badge>
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={c.usuarioEmail}>
-                      {c.usuarioEmail}
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">{c.fecha}</td>
-                    <td className="px-5 py-2 text-right whitespace-nowrap">
-                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
-                        <Pencil size={13} />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive hover:text-destructive"
-                        onClick={() => eliminar(c)}
-                        disabled={eliminandoId === c.id}
-                      >
-                        {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
-                      </Button>
-                    </td>
+                    </th>
+                    <th className="px-2 py-2 font-medium">Código</th>
+                    <th className="px-2 py-2 font-medium">Descripción</th>
+                    <th className="px-2 py-2 font-medium">Ubicación</th>
+                    <th className="px-2 py-2 font-medium">Ubic. nueva</th>
+                    <th className="px-2 py-2 font-medium text-right">SAP</th>
+                    <th className="px-2 py-2 font-medium text-right">Contado</th>
+                    <th className="px-2 py-2 font-medium text-right">Dif.</th>
+                    <th className="px-2 py-2 font-medium">Estado</th>
+                    <th className="px-2 py-2 font-medium">Usuario</th>
+                    <th className="px-2 py-2 font-medium">Fecha y hora</th>
+                    <th className="px-5 py-2 font-medium text-right">Acciones</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {conteos.map((c) => (
+                    <tr
+                      key={c.id}
+                      className={`border-b border-border last:border-0 hover:bg-muted/30 ${
+                        seleccionados.has(c.id) ? "bg-primary/5" : ""
+                      }`}
+                    >
+                      <td className="px-5 py-2">
+                        <input
+                          type="checkbox"
+                          checked={seleccionados.has(c.id)}
+                          onChange={() => toggleUno(c.id)}
+                          aria-label={`Seleccionar ${c.codigo}`}
+                          className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                        />
+                      </td>
+                      <td className="px-2 py-2 font-medium whitespace-nowrap">{c.codigo}</td>
+                      <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
+                        {c.descripcion}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">{c.ubicacion || "—"}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {c.ubicacionNueva ? (
+                          <span className="text-warning-foreground font-medium">{c.ubicacionNueva}</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right">{c.stockSap}</td>
+                      <td className="px-2 py-2 text-right">{c.stockContado}</td>
+                      <td className="px-2 py-2 text-right">
+                        {c.diferencia > 0 ? "+" : ""}
+                        {c.diferencia}
+                      </td>
+                      <td className="px-2 py-2">
+                        <Badge variant={BADGE_POR_ESTADO[c.estado]}>{c.estado}</Badge>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={c.usuarioEmail}>
+                        {c.usuarioEmail}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {c.fecha}
+                        {c.hora ? <span className="text-muted-foreground"> · {c.hora}</span> : ""}
+                      </td>
+                      <td className="px-5 py-2 text-right whitespace-nowrap">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
+                          <Pencil size={13} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 text-destructive hover:text-destructive"
+                          onClick={() => eliminar(c)}
+                          disabled={eliminandoId === c.id}
+                        >
+                          {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </CardContent>
