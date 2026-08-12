@@ -24,6 +24,16 @@ const LABEL_FILTRO: Record<string, string> = {
   falta: "Diferencias −",
 };
 
+// La columna "fecha" a veces llega como fecha simple y a veces como ISO
+// completo (con hora incluida) — esto la muestra siempre prolija, en
+// formato dd/mm/aaaa, sin importar cuál de los dos formatos llegó.
+function formatearFecha(valor: string): string {
+  if (!valor) return "—";
+  const fecha = new Date(valor);
+  if (isNaN(fecha.getTime())) return valor; // si no es una fecha válida, se muestra tal cual
+  return fecha.toLocaleDateString("es-UY", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 interface Props {
   conteos: Conteo[];
   filtro: EstadoConteo | null;
@@ -231,7 +241,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                         {c.usuarioEmail}
                       </td>
                       <td className="px-2 py-2 whitespace-nowrap">
-                        {c.fecha}
+                        {formatearFecha(c.fecha)}
                         {c.hora ? <span className="text-muted-foreground"> · {c.hora}</span> : ""}
                       </td>
                       <td className="px-5 py-2 text-right whitespace-nowrap">
