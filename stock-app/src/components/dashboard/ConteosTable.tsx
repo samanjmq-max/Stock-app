@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Trash2, X, Loader2 } from "lucide-react";
+import { Pencil, Trash2, X, Loader2, Search } from "lucide-react";
 import type { Conteo, EstadoConteo } from "@/types";
 import { conteosService } from "@/services/conteos.service";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 const BADGE_POR_ESTADO: Record<EstadoConteo, "success" | "destructive" | "default"> = {
   coincide: "success",
@@ -31,11 +33,23 @@ interface Props {
 }
 
 export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onEliminado }: Props) {
+  const { isAdmin } = useAuth();
+  const [busqueda, setBusqueda] = useState("");
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [eliminandoLote, setEliminandoLote] = useState(false);
 
-  const todosSeleccionados = conteos.length > 0 && seleccionados.size === conteos.length;
+  // Buscador por código — filtra en vivo sobre lo que ya está cargado,
+  // así encontrar un código puntual entre cientos de conteos es inmediato.
+  const conteosFiltrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return conteos;
+    return conteos.filter(
+      (c) => c.codigo.toLowerCase().includes(q) || c.descripcion.toLowerCase().includes(q)
+    );
+  }, [conteos, busqueda]);
+
+  const todosSeleccionados = conteosFiltrados.length > 0 && seleccionados.size === conteosFiltrados.length;
   const algunoSeleccionado = seleccionados.size > 0;
 
   function toggleUno(id: string) {
@@ -48,7 +62,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
   }
 
   function toggleTodos() {
-    setSeleccionados(todosSeleccionados ? new Set() : new Set(conteos.map((c) => c.id)));
+    setSeleccionados(todosSeleccionados ? new Set() : new Set(conteosFiltrados.map((c) => c.id)));
   }
 
   async function eliminar(conteo: Conteo) {
@@ -94,10 +108,13 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
       <CardHeader className="flex-row items-center justify-between space-y-0 flex-wrap gap-2">
         <CardTitle className="text-sm">
           {filtro ? `Conteos — ${LABEL_FILTRO[filtro] || filtro}` : "Todos los conteos"}
-          <span className="ml-2 text-muted-foreground font-normal">({conteos.length})</span>
+          <span className="ml-2 text-muted-foreground font-normal">
+            ({conteosFiltrados.length}
+            {busqueda ? ` de ${conteos.length}` : ""})
+          </span>
         </CardTitle>
         <div className="flex items-center gap-2">
-          {algunoSeleccionado && (
+          {isAdmin && algunoSeleccionado && (
             <Button
               variant="destructive"
               size="sm"
@@ -122,9 +139,23 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
           )}
         </div>
       </CardHeader>
-      <CardContent className="pt-0">
-        {conteos.length === 0 ? (
-          <p className="text-sm text-muted-foreground py-8 text-center">No hay conteos para mostrar.</p>
+      <CardContent className="pt-0 space-y-3">
+        <div className="relative max-w-xs">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por código o descripción..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="pl-9 h-9"
+          />
+        </div>
+
+        {conteosFiltrados.length === 0 ? (
+          <p className="text-sm text-muted-foreground py-8 text-center">
+            {conteos.length === 0
+              ? "No hay conteos para mostrar."
+              : "Ningún conteo coincide con la búsqueda."}
+          </p>
         ) : (
           <div className="-mx-5">
             {/* Recuadro de alto fijo: las filas scrollean adentro, el resto de la pantalla queda quieto. */}
@@ -132,16 +163,18 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-muted-foreground border-b border-border sticky top-0 bg-background z-10">
-                    <th className="px-5 py-2 font-medium w-8">
-                      <input
-                        type="checkbox"
-                        checked={todosSeleccionados}
-                        onChange={toggleTodos}
-                        aria-label="Seleccionar todos"
-                        className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-                      />
-                    </th>
-                    <th className="px-2 py-2 font-medium">Código</th>
+                    {isAdmin && (
+                      <th className="px-5 py-2 font-medium w-8">
+                        <input
+                          type="checkbox"
+                          checked={todosSeleccionados}
+                          onChange={toggleTodos}
+                          aria-label="Seleccionar todos"
+                          className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                        />
+                      </th>
+                    )}
+                    <th className={`py-2 font-medium ${isAdmin ? "px-2" : "px-5"}`}>Código</th>
                     <th className="px-2 py-2 font-medium">Descripción</th>
                     <th className="px-2 py-2 font-medium">Ubicación</th>
                     <th className="px-2 py-2 font-medium">Ubic. nueva</th>
@@ -155,23 +188,25 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                   </tr>
                 </thead>
                 <tbody>
-                  {conteos.map((c) => (
+                  {conteosFiltrados.map((c) => (
                     <tr
                       key={c.id}
                       className={`border-b border-border last:border-0 hover:bg-muted/30 ${
                         seleccionados.has(c.id) ? "bg-primary/5" : ""
                       }`}
                     >
-                      <td className="px-5 py-2">
-                        <input
-                          type="checkbox"
-                          checked={seleccionados.has(c.id)}
-                          onChange={() => toggleUno(c.id)}
-                          aria-label={`Seleccionar ${c.codigo}`}
-                          className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-                        />
-                      </td>
-                      <td className="px-2 py-2 font-medium whitespace-nowrap">{c.codigo}</td>
+                      {isAdmin && (
+                        <td className="px-5 py-2">
+                          <input
+                            type="checkbox"
+                            checked={seleccionados.has(c.id)}
+                            onChange={() => toggleUno(c.id)}
+                            aria-label={`Seleccionar ${c.codigo}`}
+                            className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                          />
+                        </td>
+                      )}
+                      <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo}</td>
                       <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
                         {c.descripcion}
                       </td>
@@ -203,15 +238,17 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
                           <Pencil size={13} />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 text-destructive hover:text-destructive"
-                          onClick={() => eliminar(c)}
-                          disabled={eliminandoId === c.id}
-                        >
-                          {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
-                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => eliminar(c)}
+                            disabled={eliminandoId === c.id}
+                          >
+                            {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}
