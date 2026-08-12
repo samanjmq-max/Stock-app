@@ -34,6 +34,12 @@ function formatearFecha(valor: string): string {
   return fecha.toLocaleDateString("es-UY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+// Convierte cualquier valor (incluido null/undefined) a texto en minúscula
+// de forma segura — evita que un conteo con un campo vacío rompa el buscador.
+function textoSeguro(valor: unknown): string {
+  return valor ? String(valor).toLowerCase() : "";
+}
+
 interface Props {
   conteos: Conteo[];
   filtro: EstadoConteo | null;
@@ -51,11 +57,13 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
 
   // Buscador por código — filtra en vivo sobre lo que ya está cargado,
   // así encontrar un código puntual entre cientos de conteos es inmediato.
+  // Usa textoSeguro() porque algunos conteos viejos pueden tener el
+  // código o la descripción vacíos, y eso no debe romper la búsqueda.
   const conteosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
     if (!q) return conteos;
     return conteos.filter(
-      (c) => c.codigo.toLowerCase().includes(q) || c.descripcion.toLowerCase().includes(q)
+      (c) => textoSeguro(c.codigo).includes(q) || textoSeguro(c.descripcion).includes(q)
     );
   }, [conteos, busqueda]);
 
@@ -216,9 +224,9 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                           />
                         </td>
                       )}
-                      <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo}</td>
+                      <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo || "—"}</td>
                       <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
-                        {c.descripcion}
+                        {c.descripcion || "—"}
                       </td>
                       <td className="px-2 py-2 whitespace-nowrap">{c.ubicacion || "—"}</td>
                       <td className="px-2 py-2 whitespace-nowrap">
