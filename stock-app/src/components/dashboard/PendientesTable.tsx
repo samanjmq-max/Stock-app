@@ -37,9 +37,14 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
             {busqueda ? ` de ${productos.length}` : ""})
           </span>
         </CardTitle>
-        <Button variant="ghost" size="sm" onClick={onQuitarFiltro} className="h-7 text-xs">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onQuitarFiltro}
+          className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/5"
+        >
           <X size={13} />
-          Cerrar
+          Volver al resumen
         </Button>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
@@ -61,36 +66,39 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
               : "Ningún artículo pendiente coincide con la búsqueda."}
           </p>
         ) : (
-          <div className="overflow-x-auto -mx-5">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-muted-foreground border-b border-border">
-                  <th className="px-5 py-2 font-medium">Código</th>
-                  <th className="px-2 py-2 font-medium">Descripción</th>
-                  <th className="px-2 py-2 font-medium">Ubicación</th>
-                  <th className="px-2 py-2 font-medium">Familia</th>
-                  <th className="px-5 py-2 font-medium text-right">Stock SAP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtrados.slice(0, 300).map((p) => (
-                  <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                    <td className="px-5 py-2 font-medium whitespace-nowrap">{p.codigo}</td>
-                    <td className="px-2 py-2 max-w-[220px] truncate" title={p.descripcion}>
-                      {p.descripcion}
-                    </td>
-                    <td className="px-2 py-2 whitespace-nowrap">{p.ubicacion || "—"}</td>
-                    <td className="px-2 py-2 whitespace-nowrap">{p.familia || "—"}</td>
-                    <td className="px-5 py-2 text-right">{p.stockSap}</td>
+          <div className="-mx-5">
+            {/* Recuadro de alto fijo: las filas scrollean adentro, el resto de la pantalla queda quieto. */}
+            <div className="overflow-auto max-h-[420px]">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-muted-foreground border-b border-border sticky top-0 bg-background z-10">
+                    <th className="px-5 py-2 font-medium">Código</th>
+                    <th className="px-2 py-2 font-medium">Descripción</th>
+                    <th className="px-2 py-2 font-medium">Ubicación</th>
+                    <th className="px-2 py-2 font-medium">Familia</th>
+                    <th className="px-5 py-2 font-medium text-right">Stock SAP</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-            {filtrados.length > 300 && (
-              <p className="text-xs text-muted-foreground text-center pt-3">
-                Mostrando los primeros 300 — seguí escribiendo para acotar la búsqueda.
-              </p>
-            )}
+                </thead>
+                <tbody>
+                  {filtrados.slice(0, 300).map((p) => (
+                    <tr key={p.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                      <td className="px-5 py-2 font-medium whitespace-nowrap">{p.codigo}</td>
+                      <td className="px-2 py-2 max-w-[220px] truncate" title={p.descripcion}>
+                        {p.descripcion}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">{p.ubicacion || "—"}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">{p.familia || "—"}</td>
+                      <td className="px-5 py-2 text-right">{p.stockSap}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {filtrados.length > 300 && (
+                <p className="text-xs text-muted-foreground text-center py-3">
+                  Mostrando los primeros 300 — seguí escribiendo para acotar la búsqueda.
+                </p>
+              )}
+            </div>
           </div>
         )}
       </CardContent>
