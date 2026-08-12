@@ -24,7 +24,7 @@ const COLORS = { coincide: "#16a34a", falta: "#dc2626", sobra: "#2563eb" };
 type Vista = EstadoConteo | "pendientes" | "contados" | null;
 
 // Auto-actualización: cada cuánto se refresca el Dashboard solo, en milisegundos.
-const INTERVALO_AUTO_ACTUALIZACION = 30_000;
+const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 60 * 1000; // 5 horas
 
 export default function DashboardPage() {
   const { isAdmin, agencia: agenciaUsuario } = useAuth();
@@ -35,9 +35,10 @@ export default function DashboardPage() {
   const [vaciando, setVaciando] = useState(false);
   const [actualizando, setActualizando] = useState(false);
 
-  // Auto-actualización silenciosa: refresca el Dashboard solo cada 30s,
+  // Auto-actualización silenciosa: refresca el Dashboard solo cada 5 horas,
   // así todos (administradores y operadores) ven el progreso de sus
-  // compañeros sin tener que cambiar de pestaña y volver.
+  // compañeros sin tener que cambiar de pestaña y volver. El botón
+  // "Actualizar" de abajo permite forzarlo antes, en cualquier momento.
   useEffect(() => {
     const intervalo = setInterval(() => {
       recargar();
