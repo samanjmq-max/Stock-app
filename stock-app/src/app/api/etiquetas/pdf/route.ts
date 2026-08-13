@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import PDFDocument from "pdfkit";
+import { jsPDF } from "jspdf";
 import bwipjs from "bwip-js";
 import { leerHeaderTexto } from "@/lib/headers";
 
-// 1mm en puntos PDF (72 puntos = 1 pulgada = 25.4mm)
-const MM = 72 / 25.4;
-const PAGE_W = 100 * MM; // 10 cm de largo
-const PAGE_H = 50 * MM;  // 5 cm de ancho
+// bwip-js necesita Node (no funciona en Edge Runtime).
+export const runtime = "nodejs";
+
+const PAGE_W_MM = 100; // 10 cm de largo
+const PAGE_H_MM = 50;  // 5 cm de ancho
 
 interface ItemEtiqueta {
   codigo: string;
@@ -14,12 +15,11 @@ interface ItemEtiqueta {
   ubicacion?: string;
 }
 
-function truncar(doc: PDFKit.PDFDocument, texto: string, tam: number, anchoMax: number): string {
+function truncar(doc: jsPDF, texto: string, anchoMaximoMm: number): string {
   if (!texto) return "";
-  doc.fontSize(tam);
-  if (doc.widthOfString(texto) <= anchoMax) return texto;
+  if (doc.getTextWidth(texto) <= anchoMaximoMm) return texto;
   let recortado = texto;
-  while (recortado.length > 0 && doc.widthOfString(recortado + "...") > anchoMax) {
+  while (recortado.length > 0 && doc.getTextWidth(recortado + "...") > anchoMaximoMm) {
     recortado = recortado.slice(0, -1);
   }
   return recortado ? recortado + "..." : "";
@@ -34,51 +34,51 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const items: ItemEtiqueta[] = Array.isArray(body.items) ? body.items : [];
-    const validos = items.filter((i) => i.codigo && i.codigo.trim());
+    const validos = items.filter((i) => i.codigo && String(i.codigo).trim());
 
     if (validos.length === 0) {
       return NextResponse.json({ ok: false, error: "No se recibieron artículos válidos" }, { status: 400 });
     }
 
-    const doc = new PDFDocument({ size: [PAGE_W, PAGE_H], margin: 0, autoFirstPage: false });
-    const chunks: Buffer[] = [];
-    doc.on("data", (c) => chunks.push(c));
-    const listo = new Promise<Buffer>((resolve) => doc.on("end", () => resolve(Buffer.concat(chunks))));
+    const doc = new jsPDF({ unit: "mm", format: [PAGE_W_MM, PAGE_H_MM], orientation: "landscape" });
+    const anchoUtil = PAGE_W_MM - 8;
 
-    for (const item of validos) {
-      doc.addPage({ size: [PAGE_W, PAGE_H], margin: 0 });
+    for (let i = 0; i < validos.length; i++) {
+      const item = validos[i];
+      const codigoLimpio = String(item.codigo).trim();
 
-      const margen = 4 * MM;
-      const anchoUtil = PAGE_W - margen * 2;
+      if (i > 0) doc.addPage([PAGE_W_MM, PAGE_H_MM], "landscape");
 
-      doc.font("Helvetica-Bold");
+      doc.setFont("helvetica", "bold");
 
-      const desc = truncar(doc, item.descripcion || "", 9, anchoUtil);
-      doc.fontSize(9).text(desc, margen, 4 * MM, { width: anchoUtil, align: "center" });
+      doc.setFontSize(9);
+      doc.text(truncar(doc, item.descripcion || "", anchoUtil), PAGE_W_MM / 2, 6, { align: "center" });
 
       if (item.ubicacion) {
-        const ubic = truncar(doc, `Ubic.: ${item.ubicacion}`, 8.5, anchoUtil);
-        doc.fontSize(8.5).text(ubic, margen, 8 * MM, { width: anchoUtil, align: "center" });
+        doc.setFontSize(8.5);
+        doc.text(truncar(doc, `Ubic.: ${item.ubicacion}`, anchoUtil), PAGE_W_MM / 2, 10, { align: "center" });
       }
 
       const png = await bwipjs.toBuffer({
         bcid: "code128",
-        text: item.codigo.trim(),
+        text: codigoLimpio,
         scale: 3,
         height: 12,
         includetext: false,
         backgroundcolor: "FFFFFF",
       });
+      const dataUrl = `data:image/png;base64,${png.toString("base64")}`;
 
-      // "fit" escala el código de barras preservando sus proporciones —
-      // nunca lo deforma, solo lo agranda o achica entero por igual.
-      doc.image(png, margen, 12 * MM, { fit: [anchoUtil, 13 * MM], align: "center" });
+      // Ancho fijo centrado: mantiene todas las etiquetas visualmente
+      // consistentes, sin importar el largo del código.
+      const anchoBarra = 60;
+      doc.addImage(dataUrl, "PNG", (PAGE_W_MM - anchoBarra) / 2, 12, anchoBarra, 13);
 
-      doc.fontSize(11).text(item.codigo.trim(), margen, 27 * MM, { width: anchoUtil, align: "center" });
+      doc.setFontSize(11);
+      doc.text(codigoLimpio, PAGE_W_MM / 2, 29, { align: "center" });
     }
 
-    doc.end();
-    const pdfBuffer = await listo;
+    const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
 
     return new NextResponse(pdfBuffer, {
       status: 200,
