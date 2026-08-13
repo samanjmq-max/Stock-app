@@ -1,10 +1,9 @@
 "use client";
 import { jsPDF } from "jspdf";
-// Import defensivo: según cómo empaquete Next.js la librería, a veces el
-// export por defecto no llega bien y JsBarcode queda undefined — esto
-// cubre los dos casos posibles sin depender de cuál use el bundler.
-import * as JsBarcodeNS from "jsbarcode";
-const JsBarcode: any = (JsBarcodeNS as any).default ?? JsBarcodeNS;
+// Import "todo incluido": evita un bug conocido donde Next.js/Webpack
+// elimina por optimización el registro del formato CODE128 del paquete
+// normal de jsbarcode, causando "Cannot read properties of null (reading '0')".
+import JsBarcode from "jsbarcode/bundles/JsBarcode.all.js";
 
 const PAGE_W_MM = 100; // 10 cm de largo
 const PAGE_H_MM = 50;  // 5 cm de ancho
