@@ -8,11 +8,19 @@ export async function GET(request: NextRequest) {
   try {
     const agencia = leerHeaderTexto(request, "x-user-agencia") as Agencia | null;
     const rol = leerHeaderTexto(request, "x-user-rol");
-    // Administrador puede pedir todas las agencias o filtrar por una específica.
-    // Operador SIEMPRE ve solo su propia agencia.
     const agenciaFiltro = rol === "administrador"
       ? (request.nextUrl.searchParams.get("agencia") as Agencia | null) ?? agencia ?? undefined
       : agencia ?? undefined;
+
+    // Búsqueda puntual por código (usada por "Generar etiqueta" para
+    // autocompletar descripción y ubicación) — devuelve un único producto
+    // o null, en vez de la lista completa.
+    const codigoBuscado = request.nextUrl.searchParams.get("codigo");
+    if (codigoBuscado) {
+      const producto = await getProductoPorCodigo(codigoBuscado, agenciaFiltro as Agencia);
+      return NextResponse.json({ ok: true, data: producto });
+    }
+
     const productos = await getProductos(agenciaFiltro);
     return NextResponse.json({ ok: true, data: productos });
   } catch (err) {
@@ -31,7 +39,6 @@ export async function POST(request: NextRequest) {
   }
   try {
     const body = await request.json();
-    // Si el body no trae agencia explícita, usa la del usuario que hace la petición.
     if (!body.agencia && agenciaHeader) body.agencia = agenciaHeader;
     const parsed = productoSchema.safeParse(body);
     if (!parsed.success) {
