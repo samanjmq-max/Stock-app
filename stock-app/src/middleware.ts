@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { verificarToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { esSuperAdmin } from "@/lib/permisos";
 const RUTAS_PUBLICAS = ["/login", "/api/auth/login"];
-const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios"];
+const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios", "/etiquetas"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const esPublica = RUTAS_PUBLICAS.some((r) => pathname.startsWith(r));
