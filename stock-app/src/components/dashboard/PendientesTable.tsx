@@ -14,18 +14,30 @@ interface Props {
 
 export function PendientesTable({ productos, onQuitarFiltro }: Props) {
   const [busqueda, setBusqueda] = useState("");
+  // Por defecto se ocultan los artículos con stock SAP = 0: no necesitan
+  // contarse porque en teoría no debería haber nada físico. Si aparece
+  // alguno con stock físico igual, el conteo normal lo va a mostrar como
+  // "Diferencias +" en la vista general — no hace falta que aparezca acá.
+  const [ocultarSinStock, setOcultarSinStock] = useState(true);
+
+  const sinStockCount = useMemo(
+    () => productos.filter((p) => Number(p.stockSap) === 0).length,
+    [productos]
+  );
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q) return productos;
-    return productos.filter(
-      (p) =>
+    return productos.filter((p) => {
+      if (ocultarSinStock && Number(p.stockSap) === 0) return false;
+      if (!q) return true;
+      return (
         p.codigo.toLowerCase().includes(q) ||
         p.descripcion.toLowerCase().includes(q) ||
         p.ubicacion.toLowerCase().includes(q) ||
         p.familia.toLowerCase().includes(q)
-    );
-  }, [productos, busqueda]);
+      );
+    });
+  }, [productos, busqueda, ocultarSinStock]);
 
   return (
     <Card>
@@ -34,7 +46,7 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
           Pendientes de contar
           <span className="ml-2 text-muted-foreground font-normal">
             ({filtrados.length}
-            {busqueda ? ` de ${productos.length}` : ""})
+            {busqueda || ocultarSinStock ? ` de ${productos.length}` : ""})
           </span>
         </CardTitle>
         <Button
@@ -48,26 +60,36 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
         </Button>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por código, descripción, ubicación o familia..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9"
-            autoFocus
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por código, descripción, ubicación o familia..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={ocultarSinStock}
+              onChange={(e) => setOcultarSinStock(e.target.checked)}
+              className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+            />
+            Ocultar stock SAP = 0 ({sinStockCount})
+          </label>
         </div>
 
         {filtrados.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
             {productos.length === 0
               ? "¡No queda nada pendiente! Ya se contó todo el catálogo."
-              : "Ningún artículo pendiente coincide con la búsqueda."}
+              : "Ningún artículo pendiente coincide con los filtros."}
           </p>
         ) : (
           <div className="-mx-5">
-            {/* Recuadro de alto fijo: las filas scrollean adentro, el resto de la pantalla queda quieto. */}
             <div className="overflow-auto max-h-[420px]">
               <table className="w-full text-xs">
                 <thead>
