@@ -63,11 +63,11 @@ export default function EtiquetasPage() {
     setLista((prev) => prev.filter((_, i) => i !== index));
   }
 
-  function generarPdf() {
+  async function generarPdf() {
     if (lista.length === 0) return;
     setGenerando(true);
     try {
-      descargarEtiquetas(lista, "etiquetas-nuevas");
+      await descargarEtiquetas(lista, "etiquetas-nuevas");
       toast.success(`${lista.length} etiqueta${lista.length === 1 ? "" : "s"} generada${lista.length === 1 ? "" : "s"}`);
       setLista([]);
     } catch (err) {
@@ -78,7 +78,7 @@ export default function EtiquetasPage() {
     }
   }
 
-  function generarSoloEsta() {
+  async function generarSoloEsta() {
     if (!validar()) return;
     const item: DatosEtiqueta = {
       codigo: codigo.trim(),
@@ -86,7 +86,7 @@ export default function EtiquetasPage() {
       ubicacion: ubicacion.trim() || undefined,
     };
     try {
-      descargarEtiquetas([item], `etiqueta-${item.codigo}`);
+      await descargarEtiquetas([item], `etiqueta-${item.codigo}`);
       setCodigo("");
       setDescripcion("");
       setEstadoBusqueda("idle");
