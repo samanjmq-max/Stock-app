@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ScanBarcode, Package, History, Users, Settings } from "lucide-react";
+import { LayoutDashboard, ScanBarcode, Package, History, Users, Settings, Barcode } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, soloAdmin: false },
   { href: "/conteo", label: "Contar stock", icon: ScanBarcode, soloAdmin: false },
   { href: "/productos", label: "Productos", icon: Package, soloAdmin: false },
+  { href: "/etiquetas", label: "Generar etiqueta", icon: Barcode, soloAdmin: true },
   { href: "/historial", label: "Historial", icon: History, soloAdmin: false },
   { href: "/usuarios", label: "Usuarios", icon: Users, soloAdmin: true },
   { href: "/configuracion", label: "Configuración", icon: Settings, soloAdmin: true },
