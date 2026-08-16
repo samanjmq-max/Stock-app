@@ -36,16 +36,26 @@ export function useDashboardData(agenciaFiltro?: Agencia) {
   return { productos, conteos, stats, loading, error, recargar: cargar };
 }
 
+/**
+ * Normaliza un código a texto comparable. Es imprescindible: Google Sheets
+ * convierte los códigos numéricos a número, así que el mismo código puede
+ * llegar como 50232 desde una hoja y como "50232" desde otra — sin esto,
+ * los cruces entre conteos y catálogo nunca coinciden.
+ */
+export function normalizarCodigo(codigo: unknown): string {
+  return String(codigo ?? "").trim().toLowerCase();
+}
+
 /** Un artículo "hay que contarlo" solo si su stock en SAP es distinto de cero. */
 export function esContable(producto: Producto): boolean {
   return Number(producto.stockSap) !== 0;
 }
 
 function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats {
-  const codigosContados = new Set(conteos.map((c) => c.codigo));
+  const codigosContados = new Set(conteos.map((c) => normalizarCodigo(c.codigo)));
   const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
   for (const c of conteos) {
-    const clave = `${c.codigo}|||${c.ubicacionNueva || c.ubicacion || ""}`;
+    const clave = `${normalizarCodigo(c.codigo)}|||${c.ubicacionNueva || c.ubicacion || ""}`;
     const prev = ultimoPorCodigoUbicacion.get(clave);
     if (!prev || new Date(c.creadoEn) > new Date(prev.creadoEn)) {
       ultimoPorCodigoUbicacion.set(clave, c);
@@ -59,7 +69,7 @@ function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats
   // Los que están en cero no se cuentan (no debería haber nada físico), así
   // que no ensucian ni el conteo de pendientes ni el porcentaje de avance.
   const contables = productos.filter(esContable);
-  const contablesContados = contables.filter((p) => codigosContados.has(p.codigo)).length;
+  const contablesContados = contables.filter((p) => codigosContados.has(normalizarCodigo(p.codigo))).length;
   const pendientes = Math.max(contables.length - contablesContados, 0);
   const porcentajeCompletado = contables.length > 0
     ? Math.round((contablesContados / contables.length) * 100)
