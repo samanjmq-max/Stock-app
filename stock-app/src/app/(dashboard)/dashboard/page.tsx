@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDashboardData } from "@/hooks/useDashboardData";
+import { useDashboardData, esContable } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
@@ -92,7 +92,9 @@ export default function DashboardPage() {
   const todosLosConteos = Array.from(ultimoPorCodigoUbicacion.values());
 
   const codigosContados = new Set(conteos.map((c) => c.codigo));
-  const productosPendientes = productos.filter((p) => !codigosContados.has(p.codigo));
+  // Pendientes = solo artículos con stock distinto de cero que todavía no
+  // se contaron. Los que están en cero no se listan: no hay nada que contar.
+  const productosPendientes = productos.filter((p) => esContable(p) && !codigosContados.has(p.codigo));
 
   const topDiferencias = [...todosLosConteos]
     .filter((c) => c.diferencia !== 0)
@@ -112,9 +114,6 @@ export default function DashboardPage() {
     .sort((a, b) => b.contados - a.contados)
     .slice(0, 8);
 
-  // "Contados" muestra TODOS los conteos, sin filtrar por estado — mismo
-  // listado que la vista por defecto, pero ahora accesible como filtro
-  // explícito desde la tarjeta, con la tarjeta marcada como activa.
   const conteosFiltrados = vista && vista !== "pendientes" && vista !== "contados"
     ? todosLosConteos.filter((c) => c.estado === vista)
     : todosLosConteos;
@@ -217,7 +216,7 @@ export default function DashboardPage() {
         <StatCard label="Productos totales" value={stats.totalProductos} icon={Package} />
         <StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success"
           onClick={() => toggleVista("contados")} activo={vista === "contados"} />
-        <StatCard label="Pendientes" value={stats.pendientes} icon={Clock} tone="warning"
+        <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock} tone="warning"
           onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"} />
         <StatCard label="Avance" value={`${stats.porcentajeCompletado}%`} icon={TrendingUp} />
         <StatCard label="Coincidencias" value={stats.coincidencias} icon={CheckCircle2} tone="success"
