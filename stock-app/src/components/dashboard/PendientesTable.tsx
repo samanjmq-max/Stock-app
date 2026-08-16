@@ -14,79 +14,61 @@ interface Props {
 
 export function PendientesTable({ productos, onQuitarFiltro }: Props) {
   const [busqueda, setBusqueda] = useState("");
-  // Por defecto se ocultan los artículos con stock SAP = 0: no necesitan
-  // contarse porque en teoría no debería haber nada físico. Si aparece
-  // alguno con stock físico igual, el conteo normal lo va a mostrar como
-  // "Diferencias +" en la vista general — no hace falta que aparezca acá.
-  const [ocultarSinStock, setOcultarSinStock] = useState(true);
-
-  const sinStockCount = useMemo(
-    () => productos.filter((p) => Number(p.stockSap) === 0).length,
-    [productos]
-  );
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    return productos.filter((p) => {
-      if (ocultarSinStock && Number(p.stockSap) === 0) return false;
-      if (!q) return true;
-      return (
+    if (!q) return productos;
+    return productos.filter(
+      (p) =>
         p.codigo.toLowerCase().includes(q) ||
         p.descripcion.toLowerCase().includes(q) ||
         p.ubicacion.toLowerCase().includes(q) ||
         p.familia.toLowerCase().includes(q)
-      );
-    });
-  }, [productos, busqueda, ocultarSinStock]);
+    );
+  }, [productos, busqueda]);
 
   return (
     <Card>
-      <CardHeader className="flex-row items-center justify-between space-y-0">
-        <CardTitle className="text-sm">
-          Pendientes de contar
-          <span className="ml-2 text-muted-foreground font-normal">
-            ({filtrados.length}
-            {busqueda || ocultarSinStock ? ` de ${productos.length}` : ""})
-          </span>
-        </CardTitle>
+      <CardHeader className="flex-row items-start justify-between space-y-0 gap-2">
+        <div>
+          <CardTitle className="text-sm">
+            Pendientes de contar
+            <span className="ml-2 text-muted-foreground font-normal">
+              ({filtrados.length}
+              {busqueda ? ` de ${productos.length}` : ""})
+            </span>
+          </CardTitle>
+          <p className="text-xs text-muted-foreground mt-1">
+            Solo artículos con stock en SAP distinto de cero — los que están en cero no se listan.
+          </p>
+        </div>
         <Button
           variant="outline"
           size="sm"
           onClick={onQuitarFiltro}
-          className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/5"
+          className="h-7 text-xs border-primary/40 text-primary hover:bg-primary/5 shrink-0"
         >
           <X size={13} />
           Volver al resumen
         </Button>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative flex-1 min-w-[220px]">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por código, descripción, ubicación o familia..."
-              value={busqueda}
-              onChange={(e) => setBusqueda(e.target.value)}
-              className="pl-9"
-              autoFocus
-            />
-          </div>
-          <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={ocultarSinStock}
-              onChange={(e) => setOcultarSinStock(e.target.checked)}
-              className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-            />
-            Ocultar stock SAP = 0 ({sinStockCount})
-          </label>
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Buscar por código, descripción, ubicación o familia..."
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            className="pl-9"
+            autoFocus
+          />
         </div>
 
         {filtrados.length === 0 ? (
           <p className="text-sm text-muted-foreground py-8 text-center">
             {productos.length === 0
-              ? "¡No queda nada pendiente! Ya se contó todo el catálogo."
-              : "Ningún artículo pendiente coincide con los filtros."}
+              ? "¡No queda nada pendiente! Ya se contaron todos los artículos con stock."
+              : "Ningún artículo pendiente coincide con la búsqueda."}
           </p>
         ) : (
           <div className="-mx-5">
