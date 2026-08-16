@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDashboardData, esContable } from "@/hooks/useDashboardData";
+import { useDashboardData, esContable, normalizarCodigo } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
@@ -85,16 +85,18 @@ export default function DashboardPage() {
 
   const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
   for (const c of conteos) {
-    const clave = `${c.codigo}|||${c.ubicacionNueva || c.ubicacion || ""}`;
+    const clave = `${normalizarCodigo(c.codigo)}|||${c.ubicacionNueva || c.ubicacion || ""}`;
     const prev = ultimoPorCodigoUbicacion.get(clave);
     if (!prev || new Date(c.creadoEn) > new Date(prev.creadoEn)) ultimoPorCodigoUbicacion.set(clave, c);
   }
   const todosLosConteos = Array.from(ultimoPorCodigoUbicacion.values());
 
-  const codigosContados = new Set(conteos.map((c) => c.codigo));
+  const codigosContados = new Set(conteos.map((c) => normalizarCodigo(c.codigo)));
   // Pendientes = solo artículos con stock distinto de cero que todavía no
   // se contaron. Los que están en cero no se listan: no hay nada que contar.
-  const productosPendientes = productos.filter((p) => esContable(p) && !codigosContados.has(p.codigo));
+  const productosPendientes = productos.filter(
+    (p) => esContable(p) && !codigosContados.has(normalizarCodigo(p.codigo))
+  );
 
   const topDiferencias = [...todosLosConteos]
     .filter((c) => c.diferencia !== 0)
