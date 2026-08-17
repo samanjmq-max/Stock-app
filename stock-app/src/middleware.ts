@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verificarToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { esSuperAdmin } from "@/lib/permisos";
-const RUTAS_PUBLICAS = ["/login", "/api/auth/login"];
+const RUTAS_PUBLICAS = ["/login", "/api/auth/login", "/recuperar", "/api/auth/recuperar"];
 const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios", "/etiquetas"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -30,9 +30,6 @@ export async function middleware(request: NextRequest) {
     }
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
-  // Propaga la identidad del usuario (incluyendo agencia) a las API routes
-  // vía headers internos — así cada ruta sabe a qué agencia filtrar sin
-  // que el frontend tenga que mandarlo en cada request.
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-user-id", payload.sub);
   requestHeaders.set("x-user-email", payload.email);
