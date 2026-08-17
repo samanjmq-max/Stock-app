@@ -5,9 +5,6 @@ import { hashPassword } from "@/lib/password";
 import { esSuperAdmin } from "@/lib/permisos";
 import type { Rol, Agencia } from "@/types";
 
-// El middleware ya restringe /api/usuarios a administradores (RUTAS_SOLO_ADMIN),
-// pero se revalida acá también por defensa en profundidad.
-
 export async function GET(request: NextRequest) {
   try {
     const email = request.headers.get("x-user-email");
@@ -15,8 +12,6 @@ export async function GET(request: NextRequest) {
 
     const usuarios = await getUsuarios();
 
-    // El super administrador ve todas las agencias. Un jefe de planta
-    // (administrador normal) solo ve los usuarios de su propia agencia.
     const visibles = esSuperAdmin(email)
       ? usuarios
       : usuarios.filter((u) => u.agencia === agenciaPropia);
@@ -48,9 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "La contraseña es obligatoria para un usuario nuevo" }, { status: 400 });
     }
 
-    // Un administrador que NO es el super administrador solo puede crear
-    // usuarios (operadores o administradores) para su propia agencia.
     const esSuper = esSuperAdmin(email);
+    // Un nuevo usuario creado desde el formulario NUNCA es el super
+    // administrador (ese es fijo, por variable de entorno) — así que
+    // la agencia siempre es obligatoria acá, sin excepción.
+    if (!parsed.data.agencia) {
+      return NextResponse.json({ ok: false, error: "La agencia es obligatoria" }, { status: 400 });
+    }
+
     if (!esSuper && parsed.data.agencia !== agenciaPropia) {
       return NextResponse.json(
         { ok: false, error: "Solo podés crear usuarios para tu propia agencia" },
