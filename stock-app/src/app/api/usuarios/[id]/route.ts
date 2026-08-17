@@ -19,17 +19,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const { id } = await params;
     const esSuper = esSuperAdmin(email);
 
+    const usuarios = await getUsuarios();
+    const objetivo = usuarios.find((u) => u.id === id);
+    if (!objetivo) {
+      return NextResponse.json({ ok: false, error: "Usuario no encontrado" }, { status: 404 });
+    }
+
     // Un administrador que no es el super administrador solo puede editar
     // usuarios que pertenezcan a su propia agencia.
-    if (!esSuper) {
-      const usuarios = await getUsuarios();
-      const objetivo = usuarios.find((u) => u.id === id);
-      if (!objetivo || objetivo.agencia !== agenciaPropia) {
-        return NextResponse.json(
-          { ok: false, error: "Solo podés editar usuarios de tu propia agencia" },
-          { status: 403 }
-        );
-      }
+    if (!esSuper && objetivo.agencia !== agenciaPropia) {
+      return NextResponse.json(
+        { ok: false, error: "Solo podés editar usuarios de tu propia agencia" },
+        { status: 403 }
+      );
     }
 
     const body = await request.json();
@@ -38,7 +40,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ ok: false, error: parsed.error.errors[0]?.message }, { status: 400 });
     }
 
-    // Tampoco puede "mover" un usuario a otra agencia.
+    // La agencia es obligatoria para cualquier usuario, EXCEPTO si la
+    // cuenta que se está editando es la del propio super administrador
+    // (identificado por su email, no por lo que mande el formulario) —
+    // esa cuenta no pertenece a una sola agencia.
+    const objetivoEsSuperAdmin = esSuperAdmin(objetivo.email);
+    if (!objetivoEsSuperAdmin && parsed.data.agencia !== undefined && !parsed.data.agencia) {
+      return NextResponse.json({ ok: false, error: "La agencia es obligatoria" }, { status: 400 });
+    }
+
+    // Tampoco puede "mover" un usuario a otra agencia (salvo el propio super admin editándose).
     if (!esSuper && parsed.data.agencia && parsed.data.agencia !== agenciaPropia) {
       return NextResponse.json(
         { ok: false, error: "No podés asignar usuarios a otra agencia" },
@@ -48,7 +59,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const cambios: Record<string, unknown> = { ...parsed.data };
     delete cambios.password;
-    // Si viene una contraseña nueva, se hashea acá (nunca en el cliente ni en Sheets en texto plano).
     if (parsed.data.password) {
       cambios.passwordHash = await hashPassword(parsed.data.password);
     }
