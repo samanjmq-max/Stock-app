@@ -22,7 +22,13 @@ interface Props {
 }
 
 export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuardar }: Props) {
-  const { esSuperAdmin, agencia: agenciaPropia } = useAuth();
+  const { esSuperAdmin, agencia: agenciaPropia, user } = useAuth();
+
+  // Solo se oculta el campo cuando el super administrador edita SU PROPIA
+  // cuenta — el resto de los usuarios (incluso otros administradores)
+  // siempre necesita una agencia asignada.
+  const esPropiaCuentaDeSuperAdmin = esSuperAdmin && usuarioEditando?.email === user?.email;
+
   const {
     register,
     handleSubmit,
@@ -47,7 +53,6 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
               nombre: "",
               email: "",
               rol: "operador",
-              // Un jefe de planta (no super admin) siempre arranca con su propia agencia.
               agencia: esSuperAdmin ? "Centro Logístico" : (agenciaPropia ?? "Centro Logístico"),
               activo: true,
               password: "",
@@ -57,9 +62,9 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
   }, [open, usuarioEditando, reset, esSuperAdmin, agenciaPropia]);
 
   async function onSubmit(data: UsuarioInput) {
-    // Refuerzo del lado del cliente: un jefe de planta nunca manda otra
-    // agencia distinta a la suya, aunque el backend ya lo bloquea igual.
-    const datosFinales = esSuperAdmin || !agenciaPropia
+    const datosFinales = esPropiaCuentaDeSuperAdmin
+      ? { ...data, agencia: "" } // el super admin no queda atado a ninguna agencia
+      : esSuperAdmin || !agenciaPropia
       ? data
       : { ...data, agencia: agenciaPropia };
     await onGuardar(datosFinales);
@@ -105,33 +110,47 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
               )}
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>Agencia / Planta</Label>
-            {esSuperAdmin ? (
-              <>
-                <Controller
-                  control={control}
-                  name="agencia"
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue placeholder="Seleccioná la agencia..." /></SelectTrigger>
-                      <SelectContent>
-                        {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.agencia && <p className="text-xs text-destructive">{errors.agencia.message}</p>}
-              </>
-            ) : (
-              <Input value={agenciaPropia ?? ""} disabled />
-            )}
-            <p className="text-xs text-muted-foreground">
-              {esSuperAdmin
-                ? "El operador solo podrá ver y contar los productos de esta agencia."
-                : "Como administrador de planta, solo podés crear usuarios para tu propia agencia."}
-            </p>
-          </div>
+
+          {!esPropiaCuentaDeSuperAdmin && (
+            <div className="space-y-1.5">
+              <Label>Agencia / Planta</Label>
+              {esSuperAdmin ? (
+                <>
+                  <Controller
+                    control={control}
+                    name="agencia"
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger><SelectValue placeholder="Seleccioná la agencia..." /></SelectTrigger>
+                        <SelectContent>
+                          {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.agencia && <p className="text-xs text-destructive">{errors.agencia.message}</p>}
+                </>
+              ) : (
+                <Input value={agenciaPropia ?? ""} disabled />
+              )}
+              <p className="text-xs text-muted-foreground">
+                {esSuperAdmin
+                  ? "El operador solo podrá ver y contar los productos de esta agencia."
+                  : "Como administrador de planta, solo podés crear usuarios para tu propia agencia."}
+              </p>
+            </div>
+          )}
+
+          {esPropiaCuentaDeSuperAdmin && (
+            <div className="space-y-1.5">
+              <Label>Agencia / Planta</Label>
+              <Input value="Todas las agencias (super administrador)" disabled />
+              <p className="text-xs text-muted-foreground">
+                Como super administrador no pertenecés a una sola agencia — administrás todas.
+              </p>
+            </div>
+          )}
+
           <DialogFooter>
             <Button type="button" variant="secondary" onClick={() => onOpenChange(false)}>
               Cancelar
