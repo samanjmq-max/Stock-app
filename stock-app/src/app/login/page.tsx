@@ -1,6 +1,6 @@
 "use client";
-
 import { useState } from "react";
+import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { motion } from "framer-motion";
@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-
 export default function LoginPage() {
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +19,6 @@ export default function LoginPage() {
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginInput>({ resolver: zodResolver(loginSchema) });
-
   async function onSubmit(data: LoginInput) {
     setError(null);
     try {
@@ -29,7 +27,6 @@ export default function LoginPage() {
       setError(err instanceof Error ? err.message : "Error al iniciar sesión");
     }
   }
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <motion.div
@@ -45,7 +42,6 @@ export default function LoginPage() {
           <h1 className="text-lg font-semibold">StockApp</h1>
           <p className="text-sm text-muted-foreground">Conteo de inventario</p>
         </div>
-
         <Card>
           <CardHeader>
             <p className="text-sm font-medium text-foreground">Iniciar sesión</p>
@@ -57,21 +53,23 @@ export default function LoginPage() {
                 <Input id="email" type="email" placeholder="tu@empresa.com" {...register("email")} />
                 {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
               </div>
-
               <div className="space-y-1.5">
                 <Label htmlFor="password">Contraseña</Label>
                 <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
                 {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
               </div>
-
               {error && (
                 <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>
               )}
-
               <Button type="submit" className="w-full" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : null}
                 {isSubmitting ? "Ingresando..." : "Ingresar"}
               </Button>
+              <p className="text-center text-sm">
+                <Link href="/recuperar" className="text-muted-foreground hover:text-primary underline underline-offset-2">
+                  ¿Olvidaste tu contraseña?
+                </Link>
+              </p>
             </form>
           </CardContent>
         </Card>
