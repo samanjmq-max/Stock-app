@@ -18,10 +18,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { exportarExcel, exportarPDF } from "@/lib/exportacion";
 import { conteosService } from "@/services/conteos.service";
 import { AGENCIAS } from "@/types";
-import type { Conteo, EstadoConteo, Agencia } from "@/types";
+import type { Conteo, Producto, EstadoConteo, Agencia } from "@/types";
 
 const COLORS = { coincide: "#16a34a", falta: "#dc2626", sobra: "#2563eb" };
 type Vista = EstadoConteo | "pendientes" | "contados" | null;
+
+const LABEL_VISTA: Record<string, string> = {
+  coincide: "Coincidencias",
+  sobra: "Diferencias +",
+  falta: "Diferencias −",
+  contados: "Contados",
+  pendientes: "Pendientes",
+};
 
 // Auto-actualización: cada cuánto se refresca el Dashboard solo, en milisegundos.
 const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 60 * 1000; // 5 horas
@@ -35,10 +43,6 @@ export default function DashboardPage() {
   const [vaciando, setVaciando] = useState(false);
   const [actualizando, setActualizando] = useState(false);
 
-  // Auto-actualización silenciosa: refresca el Dashboard solo cada 5 horas,
-  // así todos (administradores y operadores) ven el progreso de sus
-  // compañeros sin tener que cambiar de pestaña y volver. El botón
-  // "Actualizar" de abajo permite forzarlo antes, en cualquier momento.
   useEffect(() => {
     const intervalo = setInterval(() => {
       recargar();
@@ -92,8 +96,6 @@ export default function DashboardPage() {
   const todosLosConteos = Array.from(ultimoPorCodigoUbicacion.values());
 
   const codigosContados = new Set(conteos.map((c) => normalizarCodigo(c.codigo)));
-  // Pendientes = solo artículos con stock distinto de cero que todavía no
-  // se contaron. Los que están en cero no se listan: no hay nada que contar.
   const productosPendientes = productos.filter(
     (p) => esContable(p) && !codigosContados.has(normalizarCodigo(p.codigo))
   );
@@ -124,8 +126,8 @@ export default function DashboardPage() {
     setVista((actual) => (actual === v ? null : v));
   }
 
-  function exportarReporte(formato: "xlsx" | "pdf") {
-    const datos = todosLosConteos.map((c) => ({
+  function datosConteosParaExportar(lista: Conteo[]) {
+    return lista.map((c) => ({
       Agencia: c.agencia,
       Código: c.codigo,
       Descripción: c.descripcion,
@@ -138,23 +140,67 @@ export default function DashboardPage() {
       Usuario: c.usuarioEmail,
       Fecha: c.fecha,
     }));
-    if (formato === "xlsx") exportarExcel(datos, "Reporte", "reporte-inventario");
-    if (formato === "pdf") exportarPDF(
-      datos,
-      [
-        { header: "Agencia", key: "Agencia" },
-        { header: "Código", key: "Código" },
-        { header: "Descripción", key: "Descripción" },
-        { header: "Ubicación", key: "Ubicación" },
-        { header: "SAP", key: "Stock SAP" },
-        { header: "Contado", key: "Stock Contado" },
-        { header: "Dif.", key: "Diferencia" },
-        { header: "Estado", key: "Estado" },
-        { header: "Ubic. nueva", key: "Ubicación (nueva)" },
-      ],
-      `Reporte ${agenciaFiltro || agenciaUsuario || "general"}`,
-      "reporte-inventario"
-    );
+  }
+
+  function datosProductosParaExportar(lista: Producto[]) {
+    return lista.map((p) => ({
+      Agencia: p.agencia,
+      Código: p.codigo,
+      Descripción: p.descripcion,
+      Ubicación: p.ubicacion,
+      Familia: p.familia,
+      "Stock SAP": p.stockSap,
+    }));
+  }
+
+  const COLUMNAS_CONTEOS = [
+    { header: "Agencia", key: "Agencia" },
+    { header: "Código", key: "Código" },
+    { header: "Descripción", key: "Descripción" },
+    { header: "Ubicación", key: "Ubicación" },
+    { header: "SAP", key: "Stock SAP" },
+    { header: "Contado", key: "Stock Contado" },
+    { header: "Dif.", key: "Diferencia" },
+    { header: "Estado", key: "Estado" },
+    { header: "Ubic. nueva", key: "Ubicación (nueva)" },
+  ];
+
+  const COLUMNAS_PENDIENTES = [
+    { header: "Agencia", key: "Agencia" },
+    { header: "Código", key: "Código" },
+    { header: "Descripción", key: "Descripción" },
+    { header: "Ubicación", key: "Ubicación" },
+    { header: "Familia", key: "Familia" },
+    { header: "SAP", key: "Stock SAP" },
+  ];
+
+  // alcance "vista" respeta el filtro actual (incluido Pendientes, que
+  // exporta productos en vez de conteos); alcance "todo" ignora el
+  // filtro y exporta siempre el conteo completo.
+  function exportarReporte(formato: "xlsx" | "pdf", alcance: "vista" | "todo") {
+    const esPendientes = alcance === "vista" && vista === "pendientes";
+    const tituloVista = alcance === "todo" ? "Todos los conteos" : vista ? LABEL_VISTA[vista] || vista : "Todos los conteos";
+    const sufijoArchivo = alcance === "todo" ? "todo" : (vista || "todos");
+
+    if (esPendientes) {
+      const datos = datosProductosParaExportar(productosPendientes);
+      if (datos.length === 0) {
+        toast.error("No hay artículos pendientes para exportar");
+        return;
+      }
+      if (formato === "xlsx") exportarExcel(datos, "Pendientes", `pendientes-${sufijoArchivo}`);
+      if (formato === "pdf") exportarPDF(datos, COLUMNAS_PENDIENTES, `Pendientes — ${agenciaFiltro || agenciaUsuario || "general"}`, `pendientes-${sufijoArchivo}`);
+      return;
+    }
+
+    const lista = alcance === "todo" ? todosLosConteos : conteosFiltrados;
+    const datos = datosConteosParaExportar(lista);
+    if (datos.length === 0) {
+      toast.error("No hay conteos para exportar");
+      return;
+    }
+    if (formato === "xlsx") exportarExcel(datos, "Reporte", `reporte-${sufijoArchivo}`);
+    if (formato === "pdf") exportarPDF(datos, COLUMNAS_CONTEOS, `${tituloVista} — ${agenciaFiltro || agenciaUsuario || "general"}`, `reporte-${sufijoArchivo}`);
   }
 
   async function vaciarConteos() {
@@ -179,6 +225,7 @@ export default function DashboardPage() {
   }
 
   const tituloAgencia = agenciaFiltro || agenciaUsuario || "Todas las agencias";
+  const hayFiltroActivo = vista !== null;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="p-4 md:p-6 space-y-5">
@@ -294,20 +341,48 @@ export default function DashboardPage() {
             onQuitarFiltro={() => setVista(null)} onEditar={setConteoAEditar} onEliminado={recargar} />}
 
       <Card>
-        <CardHeader><CardTitle>Reporte — {tituloAgencia}</CardTitle></CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => exportarReporte("xlsx")} disabled={todosLosConteos.length === 0}>
-            <Download size={15} /> Exportar Excel
-          </Button>
-          <Button variant="secondary" onClick={() => exportarReporte("pdf")} disabled={todosLosConteos.length === 0}>
-            <Download size={15} /> Exportar PDF
-          </Button>
+        <CardHeader>
+          <CardTitle>Reporte — {tituloAgencia}</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-1.5">
+            <p className="text-xs text-muted-foreground">
+              {hayFiltroActivo
+                ? `Vista actual: ${LABEL_VISTA[vista as string] || vista} — exporta solo lo que ves en la tabla de arriba`
+                : "Sin filtro activo — exporta todos los conteos"}
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => exportarReporte("xlsx", "vista")}>
+                <Download size={15} /> Exportar Excel {hayFiltroActivo ? "(vista actual)" : ""}
+              </Button>
+              <Button variant="secondary" onClick={() => exportarReporte("pdf", "vista")}>
+                <Download size={15} /> Exportar PDF {hayFiltroActivo ? "(vista actual)" : ""}
+              </Button>
+            </div>
+          </div>
+
+          {hayFiltroActivo && (
+            <div className="space-y-1.5 pt-1 border-t border-border">
+              <p className="text-xs text-muted-foreground pt-2">Ignorando el filtro — todo el conteo:</p>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => exportarReporte("xlsx", "todo")}>
+                  <Download size={13} /> Exportar todo (Excel)
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportarReporte("pdf", "todo")}>
+                  <Download size={13} /> Exportar todo (PDF)
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isAdmin && (
-            <Button variant="destructive" className="ml-auto" onClick={vaciarConteos}
-              disabled={vaciando || conteos.length === 0}>
-              {vaciando ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
-              Vaciar conteos {agenciaFiltro ? `(${agenciaFiltro})` : agenciaUsuario ? `(${agenciaUsuario})` : "(todas)"}
-            </Button>
+            <div className="pt-2 border-t border-border flex justify-end">
+              <Button variant="destructive" onClick={vaciarConteos}
+                disabled={vaciando || conteos.length === 0}>
+                {vaciando ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
+                Vaciar conteos {agenciaFiltro ? `(${agenciaFiltro})` : agenciaUsuario ? `(${agenciaUsuario})` : "(todas)"}
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>
