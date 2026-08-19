@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
-import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw } from "lucide-react";
+import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -35,12 +35,13 @@ const LABEL_VISTA: Record<string, string> = {
 const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 60 * 1000; // 5 horas
 
 export default function DashboardPage() {
-  const { isAdmin, agencia: agenciaUsuario } = useAuth();
+  const { isAdmin, esSuperAdmin, agencia: agenciaUsuario } = useAuth();
   const [agenciaFiltro, setAgenciaFiltro] = useState<Agencia | undefined>(undefined);
   const { stats, conteos, productos, loading, error, recargar } = useDashboardData(agenciaFiltro);
   const [vista, setVista] = useState<Vista>(null);
   const [conteoAEditar, setConteoAEditar] = useState<Conteo | null>(null);
   const [vaciando, setVaciando] = useState(false);
+  const [vaciandoTodas, setVaciandoTodas] = useState(false);
   const [actualizando, setActualizando] = useState(false);
 
   useEffect(() => {
@@ -174,9 +175,6 @@ export default function DashboardPage() {
     { header: "SAP", key: "Stock SAP" },
   ];
 
-  // alcance "vista" respeta el filtro actual (incluido Pendientes, que
-  // exporta productos en vez de conteos); alcance "todo" ignora el
-  // filtro y exporta siempre el conteo completo.
   function exportarReporte(formato: "xlsx" | "pdf", alcance: "vista" | "todo") {
     const esPendientes = alcance === "vista" && vista === "pendientes";
     const tituloVista = alcance === "todo" ? "Todos los conteos" : vista ? LABEL_VISTA[vista] || vista : "Todos los conteos";
@@ -203,24 +201,48 @@ export default function DashboardPage() {
     if (formato === "pdf") exportarPDF(datos, COLUMNAS_CONTEOS, `${tituloVista} — ${agenciaFiltro || agenciaUsuario || "general"}`, `reporte-${sufijoArchivo}`);
   }
 
+  // Agencia puntual a vaciar: la que esté filtrada en "Ver agencia", o si no
+  // hay filtro, la propia del usuario (para un jefe de planta, siempre la
+  // suya). Si ninguna de las dos existe (super admin con "Todas las
+  // agencias" seleccionado), NO hay agencia puntual — el botón normal de
+  // vaciar queda deshabilitado a propósito, para que nunca borre todo por
+  // default. Vaciar TODAS las agencias es una acción aparte, explícita.
+  const agenciaParaVaciar = (agenciaFiltro || agenciaUsuario || "") as Agencia | "";
+
   async function vaciarConteos() {
-    const agenciaTarget = agenciaFiltro || agenciaUsuario;
-    const msg = agenciaTarget
-      ? `Esto va a eliminar TODOS los conteos de ${agenciaTarget} (${conteos.length} en total). ¿Continuar?`
-      : `Esto va a eliminar TODOS los conteos de TODAS las agencias (${conteos.length} en total). ¿Continuar?`;
+    if (!agenciaParaVaciar) return; // el botón ya debería estar deshabilitado en este caso
+
+    const msg = `Esto va a eliminar TODOS los conteos de ${agenciaParaVaciar} (${conteos.length} en total, según lo cargado ahora). ¿Continuar?`;
     if (!window.confirm(msg)) return;
-    if (!window.confirm("Confirmá de nuevo: esta acción NO se puede deshacer.")) return;
+    if (!window.confirm(`Confirmá de nuevo: se van a borrar los conteos de ${agenciaParaVaciar}. Esta acción NO se puede deshacer.`)) return;
 
     setVaciando(true);
     try {
-      const res = await conteosService.resetear(agenciaTarget as Agencia | null);
-      toast.success(`${res.eliminados} conteos eliminados`);
+      const res = await conteosService.resetear(agenciaParaVaciar);
+      toast.success(`${res.eliminados} conteos eliminados de ${agenciaParaVaciar}`);
       setVista(null);
       recargar();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo vaciar");
     } finally {
       setVaciando(false);
+    }
+  }
+
+  async function vaciarTodasLasAgencias() {
+    if (!window.confirm(`⚠️ Esto va a eliminar TODOS los conteos de TODAS LAS AGENCIAS (${conteos.length}+ registros en total). ¿Estás seguro?`)) return;
+    if (!window.confirm('Última confirmación: se borra el historial de conteos de TODA la empresa, no de una agencia. Esta acción NO se puede deshacer. ¿Continuar?')) return;
+
+    setVaciandoTodas(true);
+    try {
+      const res = await conteosService.resetear(null);
+      toast.success(`${res.eliminados} conteos eliminados (todas las agencias)`);
+      setVista(null);
+      recargar();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo vaciar");
+    } finally {
+      setVaciandoTodas(false);
     }
   }
 
@@ -376,12 +398,41 @@ export default function DashboardPage() {
           )}
 
           {isAdmin && (
-            <div className="pt-2 border-t border-border flex justify-end">
-              <Button variant="destructive" onClick={vaciarConteos}
-                disabled={vaciando || conteos.length === 0}>
-                {vaciando ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
-                Vaciar conteos {agenciaFiltro ? `(${agenciaFiltro})` : agenciaUsuario ? `(${agenciaUsuario})` : "(todas)"}
-              </Button>
+            <div className="pt-2 border-t border-border space-y-2">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {agenciaParaVaciar
+                    ? `Vacía solo los conteos de: ${agenciaParaVaciar}`
+                    : "Elegí una agencia específica arriba (\"Ver agencia\") para poder vaciar sus conteos"}
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={vaciarConteos}
+                  disabled={vaciando || !agenciaParaVaciar || conteos.length === 0}
+                >
+                  {vaciando ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
+                  Vaciar conteos {agenciaParaVaciar ? `(${agenciaParaVaciar})` : ""}
+                </Button>
+              </div>
+
+              {esSuperAdmin && (
+                <div className="flex items-center justify-between flex-wrap gap-2 bg-destructive/5 rounded-lg px-3 py-2">
+                  <p className="text-xs text-destructive flex items-center gap-1.5">
+                    <AlertTriangle size={13} />
+                    Acción global — borra el historial de TODAS las agencias a la vez
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={vaciarTodasLasAgencias}
+                    disabled={vaciandoTodas}
+                  >
+                    {vaciandoTodas ? <Loader2 className="animate-spin" size={13} /> : <AlertTriangle size={13} />}
+                    Vaciar TODAS las agencias
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
