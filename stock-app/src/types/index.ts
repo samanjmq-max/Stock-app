@@ -112,6 +112,7 @@ export interface DashboardStats {
   // precioUnitario del producto (cuando existe; los productos sin precio
   // cargado no suman al importe, no rompen el cálculo).
   importePendientes: number;
+  importeContados: number;
   importeCoincidencias: number;
   importeDiferenciasPositivas: number;
   importeDiferenciasNegativas: number;
