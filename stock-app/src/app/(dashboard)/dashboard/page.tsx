@@ -6,9 +6,7 @@ import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-<StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success"
-  onClick={() => toggleVista("contados")} activo={vista === "contados"}
-  importe={stats.importeContados} />;
+import { useDashboardData, esContable, normalizarCodigo, mapaPrecios } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
@@ -294,7 +292,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatCard label="Productos totales" value={stats.totalProductos} icon={Package} />
         <StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success"
-          onClick={() => toggleVista("contados")} activo={vista === "contados"} />
+          onClick={() => toggleVista("contados")} activo={vista === "contados"}
+          importe={stats.importeContados} />
         <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock} tone="warning"
           onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
           importe={stats.importePendientes} />
