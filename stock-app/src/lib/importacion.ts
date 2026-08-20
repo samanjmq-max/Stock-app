@@ -7,10 +7,14 @@ export interface ResultadoLectura {
   totalFilas: number;
 }
 
-const COLUMNAS_ESPERADAS = ["codigo", "descripcion", "ubicacion", "familia", "proveedor", "stockSap"];
+const COLUMNAS_ESPERADAS = ["codigo", "descripcion", "ubicacion", "familia", "proveedor", "stockSap", "precioUnitario"];
 
 // Acepta variantes comunes de encabezado (con/sin tilde, mayúsculas, español)
+// — incluye tanto el formato simplificado que se usa a diario como los
+// nombres de columna tal cual vienen en el export crudo de SAP, para poder
+// importar cualquiera de los dos sin convertir nada a mano.
 const ALIAS_COLUMNAS: Record<string, string> = {
+  // Formato simplificado (uso diario)
   codigo: "codigo",
   código: "codigo",
   descripcion: "descripcion",
@@ -22,6 +26,19 @@ const ALIAS_COLUMNAS: Record<string, string> = {
   stocksap: "stockSap",
   "stock sap": "stockSap",
   stock: "stockSap",
+  preciounitario: "precioUnitario",
+  "precio unitario": "precioUnitario",
+  precio: "precioUnitario",
+
+  // Export crudo de SAP
+  material: "codigo",
+  "texto breve de material": "descripcion",
+  "libre utilización": "stockSap",
+  "libre utilizacion": "stockSap",
+  "grupo de artículos": "familia",
+  "grupo de articulos": "familia",
+  "valor libre util.": "valorLibreUtil", // interno: sirve para calcular precioUnitario, no es un campo final
+  "valor libre util": "valorLibreUtil",
 };
 
 function normalizarEncabezado(h: string): string {
@@ -62,6 +79,20 @@ export async function leerArchivoProductos(file: File): Promise<ResultadoLectura
       filasInvalidas.push({ fila: i + 2, motivo: `Stock SAP inválido: "${stockSapRaw}"` });
       return;
     }
+    const stockSapFinal = isNaN(stockSap) ? 0 : stockSap;
+
+    // Precio unitario: si vino una columna de precio directa, se usa esa.
+    // Si no, pero vino "Valor libre util." (el total en pesos de esa línea
+    // de stock, tal como lo exporta SAP), se calcula dividiendo por la
+    // cantidad — nunca se divide por cero.
+    let precioUnitario: number | undefined;
+    if (fila.precioUnitario !== undefined && fila.precioUnitario !== "") {
+      const p = Number(fila.precioUnitario);
+      if (!isNaN(p)) precioUnitario = p;
+    } else if (fila.valorLibreUtil !== undefined && fila.valorLibreUtil !== "" && stockSapFinal > 0) {
+      const valorTotal = Number(fila.valorLibreUtil);
+      if (!isNaN(valorTotal)) precioUnitario = valorTotal / stockSapFinal;
+    }
 
     filasValidas.push({
       codigo,
@@ -69,7 +100,8 @@ export async function leerArchivoProductos(file: File): Promise<ResultadoLectura
       ubicacion: String(fila.ubicacion ?? ""),
       familia: String(fila.familia ?? ""),
       proveedor: String(fila.proveedor ?? ""),
-      stockSap: isNaN(stockSap) ? 0 : stockSap,
+      stockSap: stockSapFinal,
+      ...(precioUnitario !== undefined ? { precioUnitario } : {}),
     });
   });
 
