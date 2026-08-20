@@ -14,6 +14,8 @@ export interface FilaImportacion {
   familia?: string;
   proveedor?: string;
   stockSap: number;
+  /** Precio de una sola unidad, en pesos. Si no viene, no se toca el precio ya cargado. */
+  precioUnitario?: number;
 }
 
 export const productosService = {
@@ -22,29 +24,24 @@ export const productosService = {
     const url = agencia ? `/api/productos?agencia=${encodeURIComponent(agencia)}` : "/api/productos";
     return fetch(url).then((r) => parseOrThrow<Producto[]>(r));
   },
-
   buscarPorCodigo: async (codigo: string, agencia?: Agencia): Promise<Producto | undefined> => {
     const productos = await productosService.listar(agencia);
     return productos.find((p) => p.codigo.toLowerCase() === codigo.toLowerCase());
   },
-
   crear: (input: ProductoInput): Promise<Producto> =>
     fetch("/api/productos", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }).then((r) => parseOrThrow<Producto>(r)),
-
   actualizar: (id: string, input: Partial<ProductoInput>): Promise<Producto> =>
     fetch(`/api/productos/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     }).then((r) => parseOrThrow<Producto>(r)),
-
   eliminar: (id: string): Promise<{ id: string }> =>
     fetch(`/api/productos/${id}`, { method: "DELETE" }).then((r) => parseOrThrow<{ id: string }>(r)),
-
   /** Importa productos para una agencia específica — obligatoria. */
   importar: (productos: FilaImportacion[], agencia: Agencia): Promise<{ importados: number; actualizados: number; agencia: string }> =>
     fetch("/api/productos/importar", {
