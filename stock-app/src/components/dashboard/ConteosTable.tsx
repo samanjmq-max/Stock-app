@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Pencil, Trash2, X, Loader2, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { Conteo, EstadoConteo } from "@/types";
 import { conteosService } from "@/services/conteos.service";
-import { normalizarCodigo } from "@/hooks/useDashboardData";
+import { normalizarCodigo, importeRelevante } from "@/hooks/useDashboardData";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +64,7 @@ interface Props {
   onQuitarFiltro: () => void;
   onEditar: (conteo: Conteo) => void;
   onEliminado: () => void;
-  /** Mapa código normalizado -> precio unitario, para el "monitor" de importe junto al buscador. */
+  /** Mapa código normalizado -> precio unitario, para el monitor de importe. */
   precios?: Record<string, number>;
 }
 
@@ -115,13 +115,14 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
     return lista;
   }, [conteos, busqueda, ordenColumna, ordenDireccion]);
 
-  // "Monitor" junto al buscador: total e importe de lo que está visible
-  // en la tabla ahora mismo (respeta la búsqueda por código/descripción).
+  // "Monitor" junto al buscador: usa la misma regla que las tarjetas del
+  // Dashboard (importeRelevante) — así el número de acá y el de arriba
+  // siempre coinciden, sea cual sea el filtro activo.
   const resumenVisible = useMemo(() => {
     let importe = 0;
     conteosFiltrados.forEach((c) => {
       const precio = precios[normalizarCodigo(c.codigo)] || 0;
-      importe += precio * Number(c.stockContado || 0);
+      importe += importeRelevante(c, precio);
     });
     return { total: conteosFiltrados.length, importe };
   }, [conteosFiltrados, precios]);
@@ -227,7 +228,6 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
               className="pl-9 h-9"
             />
           </div>
-          {/* Monitor: total contado e importe de lo visible en la tabla */}
           <div className="flex items-center gap-3 text-xs bg-muted rounded-lg px-3 py-1.5">
             <span className="text-muted-foreground">
               Total: <span className="font-semibold text-foreground">{resumenVisible.total}</span>
