@@ -6,7 +6,9 @@ import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDashboardData, esContable, normalizarCodigo, mapaPrecios } from "@/hooks/useDashboardData";
+<StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success"
+  onClick={() => toggleVista("contados")} activo={vista === "contados"}
+  importe={stats.importeContados} />;
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
