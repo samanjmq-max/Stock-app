@@ -289,3 +289,72 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                     <tr
                       key={c.id}
                       className={`border-b border-border last:border-0 hover:bg-muted/30 ${
+                        seleccionados.has(c.id) ? "bg-primary/5" : ""
+                      }`}
+                    >
+                      {isAdmin && (
+                        <td className="px-5 py-2">
+                          <input
+                            type="checkbox"
+                            checked={seleccionados.has(c.id)}
+                            onChange={() => toggleUno(c.id)}
+                            aria-label={`Seleccionar ${c.codigo}`}
+                            className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                          />
+                        </td>
+                      )}
+                      <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo || "—"}</td>
+                      <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
+                        {c.descripcion || "—"}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">{c.ubicacion || "—"}</td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {c.ubicacionNueva ? (
+                          <span className="text-warning-foreground font-medium">{c.ubicacionNueva}</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="px-2 py-2 text-right">{c.stockSap}</td>
+                      <td className="px-2 py-2 text-right">{c.stockContado}</td>
+                      <td className="px-2 py-2 text-right">
+                        {c.diferencia > 0 ? "+" : ""}
+                        {c.diferencia}
+                      </td>
+                      <td className="px-2 py-2">
+                        <Badge variant={BADGE_POR_ESTADO[c.estado]}>{c.estado}</Badge>
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={c.usuarioEmail}>
+                        {c.usuarioEmail}
+                      </td>
+                      <td className="px-2 py-2 whitespace-nowrap">
+                        {formatearFecha(c.fecha)}
+                        {c.hora ? <span className="text-muted-foreground"> · {c.hora}</span> : ""}
+                      </td>
+                      <td className="px-5 py-2 text-right whitespace-nowrap">
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
+                          <Pencil size={13} />
+                        </Button>
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive"
+                            onClick={() => eliminar(c)}
+                            disabled={eliminandoId === c.id}
+                          >
+                            {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
