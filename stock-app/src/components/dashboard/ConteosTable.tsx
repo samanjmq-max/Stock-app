@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Pencil, Trash2, X, Loader2, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { Conteo, EstadoConteo } from "@/types";
 import { conteosService } from "@/services/conteos.service";
+import { normalizarCodigo } from "@/hooks/useDashboardData";
 import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,10 @@ function textoSeguro(valor: unknown): string {
   return valor ? String(valor).toLowerCase() : "";
 }
 
+function formatearImporte(valor: number): string {
+  return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+}
+
 type Columna = "codigo" | "descripcion" | "ubicacion" | "ubicacionNueva" | "stockSap" | "stockContado" | "diferencia" | "estado" | "usuarioEmail" | "fecha";
 type Direccion = "asc" | "desc";
 
@@ -59,9 +64,11 @@ interface Props {
   onQuitarFiltro: () => void;
   onEditar: (conteo: Conteo) => void;
   onEliminado: () => void;
+  /** Mapa código normalizado -> precio unitario, para el "monitor" de importe junto al buscador. */
+  precios?: Record<string, number>;
 }
 
-export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onEliminado }: Props) {
+export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onEliminado, precios = {} }: Props) {
   const { isAdmin } = useAuth();
   const [busqueda, setBusqueda] = useState("");
   const [ordenColumna, setOrdenColumna] = useState<Columna | null>(null);
@@ -92,8 +99,6 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
       const factor = ordenDireccion === "asc" ? 1 : -1;
       lista = [...lista].sort((a, b) => {
         if (ordenColumna === "fecha") {
-          // Se ordena por la marca de tiempo real (creadoEn), más confiable
-          // que comparar fecha/hora como texto.
           const at = new Date(a.creadoEn).getTime();
           const bt = new Date(b.creadoEn).getTime();
           return (at - bt) * factor;
@@ -109,6 +114,17 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
 
     return lista;
   }, [conteos, busqueda, ordenColumna, ordenDireccion]);
+
+  // "Monitor" junto al buscador: total e importe de lo que está visible
+  // en la tabla ahora mismo (respeta la búsqueda por código/descripción).
+  const resumenVisible = useMemo(() => {
+    let importe = 0;
+    conteosFiltrados.forEach((c) => {
+      const precio = precios[normalizarCodigo(c.codigo)] || 0;
+      importe += precio * Number(c.stockContado || 0);
+    });
+    return { total: conteosFiltrados.length, importe };
+  }, [conteosFiltrados, precios]);
 
   const todosSeleccionados = conteosFiltrados.length > 0 && seleccionados.size === conteosFiltrados.length;
   const algunoSeleccionado = seleccionados.size > 0;
@@ -201,14 +217,26 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
         </div>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        <div className="relative max-w-xs">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por código o descripción..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9 h-9"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative max-w-xs flex-1 min-w-[220px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por código o descripción..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          {/* Monitor: total contado e importe de lo visible en la tabla */}
+          <div className="flex items-center gap-3 text-xs bg-muted rounded-lg px-3 py-1.5">
+            <span className="text-muted-foreground">
+              Total: <span className="font-semibold text-foreground">{resumenVisible.total}</span>
+            </span>
+            <span className="w-px h-3 bg-border" />
+            <span className="text-muted-foreground">
+              Importe: <span className="font-semibold text-foreground">{formatearImporte(resumenVisible.importe)}</span>
+            </span>
+          </div>
         </div>
 
         {conteosFiltrados.length === 0 ? (
@@ -261,72 +289,3 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                     <tr
                       key={c.id}
                       className={`border-b border-border last:border-0 hover:bg-muted/30 ${
-                        seleccionados.has(c.id) ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      {isAdmin && (
-                        <td className="px-5 py-2">
-                          <input
-                            type="checkbox"
-                            checked={seleccionados.has(c.id)}
-                            onChange={() => toggleUno(c.id)}
-                            aria-label={`Seleccionar ${c.codigo}`}
-                            className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-                          />
-                        </td>
-                      )}
-                      <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo || "—"}</td>
-                      <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
-                        {c.descripcion || "—"}
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">{c.ubicacion || "—"}</td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {c.ubicacionNueva ? (
-                          <span className="text-warning-foreground font-medium">{c.ubicacionNueva}</span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-right">{c.stockSap}</td>
-                      <td className="px-2 py-2 text-right">{c.stockContado}</td>
-                      <td className="px-2 py-2 text-right">
-                        {c.diferencia > 0 ? "+" : ""}
-                        {c.diferencia}
-                      </td>
-                      <td className="px-2 py-2">
-                        <Badge variant={BADGE_POR_ESTADO[c.estado]}>{c.estado}</Badge>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={c.usuarioEmail}>
-                        {c.usuarioEmail}
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {formatearFecha(c.fecha)}
-                        {c.hora ? <span className="text-muted-foreground"> · {c.hora}</span> : ""}
-                      </td>
-                      <td className="px-5 py-2 text-right whitespace-nowrap">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
-                          <Pencil size={13} />
-                        </Button>
-                        {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => eliminar(c)}
-                            disabled={eliminandoId === c.id}
-                          >
-                            {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
-                          </Button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
