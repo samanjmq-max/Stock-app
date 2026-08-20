@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDashboardData, esContable, normalizarCodigo } from "@/hooks/useDashboardData";
+import { useDashboardData, esContable, normalizarCodigo, mapaPrecios } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
@@ -30,6 +30,10 @@ const LABEL_VISTA: Record<string, string> = {
   contados: "Contados",
   pendientes: "Pendientes",
 };
+
+function formatearImporte(valor: number): string {
+  return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+}
 
 // Auto-actualización: cada cuánto se refresca el Dashboard solo, en milisegundos.
 const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 60 * 1000; // 5 horas
@@ -82,10 +86,18 @@ export default function DashboardPage() {
     );
   }
 
+  const precios = mapaPrecios(productos);
+
   const pieData = [
     { name: "Coinciden", value: stats.coincidencias, color: COLORS.coincide },
     { name: "Faltan", value: stats.diferenciasNegativas, color: COLORS.falta },
     { name: "Sobran", value: stats.diferenciasPositivas, color: COLORS.sobra },
+  ];
+
+  const importeData = [
+    { name: "Coincidencias", value: stats.importeCoincidencias, color: COLORS.coincide },
+    { name: "Diferencias +", value: stats.importeDiferenciasPositivas, color: COLORS.sobra },
+    { name: "Diferencias −", value: stats.importeDiferenciasNegativas, color: COLORS.falta },
   ];
 
   const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
@@ -201,16 +213,10 @@ export default function DashboardPage() {
     if (formato === "pdf") exportarPDF(datos, COLUMNAS_CONTEOS, `${tituloVista} — ${agenciaFiltro || agenciaUsuario || "general"}`, `reporte-${sufijoArchivo}`);
   }
 
-  // Agencia puntual a vaciar: la que esté filtrada en "Ver agencia", o si no
-  // hay filtro, la propia del usuario (para un jefe de planta, siempre la
-  // suya). Si ninguna de las dos existe (super admin con "Todas las
-  // agencias" seleccionado), NO hay agencia puntual — el botón normal de
-  // vaciar queda deshabilitado a propósito, para que nunca borre todo por
-  // default. Vaciar TODAS las agencias es una acción aparte, explícita.
   const agenciaParaVaciar = (agenciaFiltro || agenciaUsuario || "") as Agencia | "";
 
   async function vaciarConteos() {
-    if (!agenciaParaVaciar) return; // el botón ya debería estar deshabilitado en este caso
+    if (!agenciaParaVaciar) return;
 
     const msg = `Esto va a eliminar TODOS los conteos de ${agenciaParaVaciar} (${conteos.length} en total, según lo cargado ahora). ¿Continuar?`;
     if (!window.confirm(msg)) return;
@@ -288,20 +294,28 @@ export default function DashboardPage() {
         <StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success"
           onClick={() => toggleVista("contados")} activo={vista === "contados"} />
         <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock} tone="warning"
-          onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"} />
+          onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
+          importe={stats.importePendientes} />
         <StatCard label="Avance" value={`${stats.porcentajeCompletado}%`} icon={TrendingUp} />
         <StatCard label="Coincidencias" value={stats.coincidencias} icon={CheckCircle2} tone="success"
-          onClick={() => toggleVista("coincide")} activo={vista === "coincide"} />
+          onClick={() => toggleVista("coincide")} activo={vista === "coincide"}
+          importe={stats.importeCoincidencias} />
         <StatCard label="Diferencias +" value={stats.diferenciasPositivas} icon={ArrowUpCircle} tone="success"
-          onClick={() => toggleVista("sobra")} activo={vista === "sobra"} />
+          onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
+          importe={stats.importeDiferenciasPositivas} />
         <StatCard label="Diferencias −" value={stats.diferenciasNegativas} icon={ArrowDownCircle} tone="destructive"
-          onClick={() => toggleVista("falta")} activo={vista === "falta"} />
+          onClick={() => toggleVista("falta")} activo={vista === "falta"}
+          importe={stats.importeDiferenciasNegativas} />
         <StatCard label="Última sincronización"
           value={stats.ultimaSincronizacion
             ? new Date(stats.ultimaSincronizacion).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" })
             : "—"}
           icon={Clock} />
       </div>
+
+      <p className="text-xs text-muted-foreground -mt-2">
+        $ → Importe total en pesos (calculado con el precio unitario cargado en cada producto; los que todavía no tienen precio no suman).
+      </p>
 
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
@@ -316,6 +330,25 @@ export default function DashboardPage() {
                     </Pie>
                     <Tooltip />
                   </PieChart>
+                </ResponsiveContainer>}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle>Importe contado (en pesos)</CardTitle></CardHeader>
+          <CardContent>
+            {stats.importeCoincidencias === 0 && stats.importeDiferenciasPositivas === 0 && stats.importeDiferenciasNegativas === 0
+              ? <p className="text-sm text-muted-foreground py-8 text-center">Sin importes para mostrar — cargá precios unitarios en el catálogo.</p>
+              : <ResponsiveContainer width="100%" height={220}>
+                  <BarChart data={importeData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                    <XAxis dataKey="name" fontSize={11} tickLine={false} />
+                    <YAxis fontSize={10} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                    <Tooltip formatter={(v: number) => formatearImporte(v)} />
+                    <Bar dataKey="value" radius={[6, 6, 0, 0]}>
+                      {importeData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                    </Bar>
+                  </BarChart>
                 </ResponsiveContainer>}
           </CardContent>
         </Card>
@@ -339,7 +372,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="md:col-span-2">
+        <Card>
           <CardHeader><CardTitle>Progreso por ubicación</CardTitle></CardHeader>
           <CardContent>
             {progresoUbicacion.length === 0
@@ -360,7 +393,7 @@ export default function DashboardPage() {
       {vista === "pendientes"
         ? <PendientesTable productos={productosPendientes} onQuitarFiltro={() => setVista(null)} />
         : <ConteosTable conteos={conteosFiltrados} filtro={vista === "contados" ? null : (vista as EstadoConteo | null)}
-            onQuitarFiltro={() => setVista(null)} onEditar={setConteoAEditar} onEliminado={recargar} />}
+            onQuitarFiltro={() => setVista(null)} onEditar={setConteoAEditar} onEliminado={recargar} precios={precios} />}
 
       <Card>
         <CardHeader>
@@ -401,45 +434,3 @@ export default function DashboardPage() {
             <div className="pt-2 border-t border-border space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-xs text-muted-foreground">
-                  {agenciaParaVaciar
-                    ? `Vacía solo los conteos de: ${agenciaParaVaciar}`
-                    : "Elegí una agencia específica arriba (\"Ver agencia\") para poder vaciar sus conteos"}
-                </p>
-                <Button
-                  variant="destructive"
-                  onClick={vaciarConteos}
-                  disabled={vaciando || !agenciaParaVaciar || conteos.length === 0}
-                >
-                  {vaciando ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
-                  Vaciar conteos {agenciaParaVaciar ? `(${agenciaParaVaciar})` : ""}
-                </Button>
-              </div>
-
-              {esSuperAdmin && (
-                <div className="flex items-center justify-between flex-wrap gap-2 bg-destructive/5 rounded-lg px-3 py-2">
-                  <p className="text-xs text-destructive flex items-center gap-1.5">
-                    <AlertTriangle size={13} />
-                    Acción global — borra el historial de TODAS las agencias a la vez
-                  </p>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
-                    onClick={vaciarTodasLasAgencias}
-                    disabled={vaciandoTodas}
-                  >
-                    {vaciandoTodas ? <Loader2 className="animate-spin" size={13} /> : <AlertTriangle size={13} />}
-                    Vaciar TODAS las agencias
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <EditarConteoDialog key={conteoAEditar?.id || "none"} conteo={conteoAEditar}
-        onClose={() => setConteoAEditar(null)} onGuardado={recargar} />
-    </motion.div>
-  );
-}
