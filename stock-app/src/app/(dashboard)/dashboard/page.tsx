@@ -434,3 +434,45 @@ export default function DashboardPage() {
             <div className="pt-2 border-t border-border space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-xs text-muted-foreground">
+                  {agenciaParaVaciar
+                    ? `Vacía solo los conteos de: ${agenciaParaVaciar}`
+                    : "Elegí una agencia específica arriba (\"Ver agencia\") para poder vaciar sus conteos"}
+                </p>
+                <Button
+                  variant="destructive"
+                  onClick={vaciarConteos}
+                  disabled={vaciando || !agenciaParaVaciar || conteos.length === 0}
+                >
+                  {vaciando ? <Loader2 className="animate-spin" size={15} /> : <RotateCcw size={15} />}
+                  Vaciar conteos {agenciaParaVaciar ? `(${agenciaParaVaciar})` : ""}
+                </Button>
+              </div>
+
+              {esSuperAdmin && (
+                <div className="flex items-center justify-between flex-wrap gap-2 bg-destructive/5 rounded-lg px-3 py-2">
+                  <p className="text-xs text-destructive flex items-center gap-1.5">
+                    <AlertTriangle size={13} />
+                    Acción global — borra el historial de TODAS las agencias a la vez
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={vaciarTodasLasAgencias}
+                    disabled={vaciandoTodas}
+                  >
+                    {vaciandoTodas ? <Loader2 className="animate-spin" size={13} /> : <AlertTriangle size={13} />}
+                    Vaciar TODAS las agencias
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <EditarConteoDialog key={conteoAEditar?.id || "none"} conteo={conteoAEditar}
+        onClose={() => setConteoAEditar(null)} onGuardado={recargar} />
+    </motion.div>
+  );
+}
