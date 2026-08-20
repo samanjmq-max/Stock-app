@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Pencil, Trash2, X, Loader2, Search } from "lucide-react";
+import { Pencil, Trash2, X, Loader2, Search, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { Conteo, EstadoConteo } from "@/types";
 import { conteosService } from "@/services/conteos.service";
 import { useAuth } from "@/contexts/AuthContext";
@@ -24,21 +24,34 @@ const LABEL_FILTRO: Record<string, string> = {
   falta: "Diferencias −",
 };
 
-// La columna "fecha" a veces llega como fecha simple y a veces como ISO
-// completo (con hora incluida) — esto la muestra siempre prolija, en
-// formato dd/mm/aaaa, sin importar cuál de los dos formatos llegó.
 function formatearFecha(valor: string): string {
   if (!valor) return "—";
   const fecha = new Date(valor);
-  if (isNaN(fecha.getTime())) return valor; // si no es una fecha válida, se muestra tal cual
+  if (isNaN(fecha.getTime())) return valor;
   return fecha.toLocaleDateString("es-UY", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-// Convierte cualquier valor (incluido null/undefined) a texto en minúscula
-// de forma segura — evita que un conteo con un campo vacío rompa el buscador.
 function textoSeguro(valor: unknown): string {
   return valor ? String(valor).toLowerCase() : "";
 }
+
+type Columna = "codigo" | "descripcion" | "ubicacion" | "ubicacionNueva" | "stockSap" | "stockContado" | "diferencia" | "estado" | "usuarioEmail" | "fecha";
+type Direccion = "asc" | "desc";
+
+const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
+  { key: "codigo", label: "Código" },
+  { key: "descripcion", label: "Descripción" },
+  { key: "ubicacion", label: "Ubicación" },
+  { key: "ubicacionNueva", label: "Ubic. nueva" },
+  { key: "stockSap", label: "SAP", alineacion: "right" },
+  { key: "stockContado", label: "Contado", alineacion: "right" },
+  { key: "diferencia", label: "Dif.", alineacion: "right" },
+  { key: "estado", label: "Estado" },
+  { key: "usuarioEmail", label: "Usuario" },
+  { key: "fecha", label: "Fecha y hora" },
+];
+
+const COLUMNAS_NUMERICAS = new Set<Columna>(["stockSap", "stockContado", "diferencia"]);
 
 interface Props {
   conteos: Conteo[];
@@ -51,21 +64,51 @@ interface Props {
 export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onEliminado }: Props) {
   const { isAdmin } = useAuth();
   const [busqueda, setBusqueda] = useState("");
+  const [ordenColumna, setOrdenColumna] = useState<Columna | null>(null);
+  const [ordenDireccion, setOrdenDireccion] = useState<Direccion>("asc");
   const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
   const [eliminandoLote, setEliminandoLote] = useState(false);
 
-  // Buscador por código — filtra en vivo sobre lo que ya está cargado,
-  // así encontrar un código puntual entre cientos de conteos es inmediato.
-  // Usa textoSeguro() porque algunos conteos viejos pueden tener el
-  // código o la descripción vacíos, y eso no debe romper la búsqueda.
+  function toggleOrden(col: Columna) {
+    if (ordenColumna !== col) {
+      setOrdenColumna(col);
+      setOrdenDireccion("asc");
+    } else {
+      setOrdenDireccion((d) => (d === "asc" ? "desc" : "asc"));
+    }
+  }
+
   const conteosFiltrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q) return conteos;
-    return conteos.filter(
-      (c) => textoSeguro(c.codigo).includes(q) || textoSeguro(c.descripcion).includes(q)
-    );
-  }, [conteos, busqueda]);
+    let lista = conteos;
+    if (q) {
+      lista = lista.filter(
+        (c) => textoSeguro(c.codigo).includes(q) || textoSeguro(c.descripcion).includes(q)
+      );
+    }
+
+    if (ordenColumna) {
+      const factor = ordenDireccion === "asc" ? 1 : -1;
+      lista = [...lista].sort((a, b) => {
+        if (ordenColumna === "fecha") {
+          // Se ordena por la marca de tiempo real (creadoEn), más confiable
+          // que comparar fecha/hora como texto.
+          const at = new Date(a.creadoEn).getTime();
+          const bt = new Date(b.creadoEn).getTime();
+          return (at - bt) * factor;
+        }
+        if (COLUMNAS_NUMERICAS.has(ordenColumna)) {
+          return (Number(a[ordenColumna] ?? 0) - Number(b[ordenColumna] ?? 0)) * factor;
+        }
+        const av = textoSeguro(a[ordenColumna]);
+        const bv = textoSeguro(b[ordenColumna]);
+        return av.localeCompare(bv, "es") * factor;
+      });
+    }
+
+    return lista;
+  }, [conteos, busqueda, ordenColumna, ordenDireccion]);
 
   const todosSeleccionados = conteosFiltrados.length > 0 && seleccionados.size === conteosFiltrados.length;
   const algunoSeleccionado = seleccionados.size > 0;
@@ -176,7 +219,6 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
           </p>
         ) : (
           <div className="-mx-5">
-            {/* Recuadro de alto fijo: las filas scrollean adentro, el resto de la pantalla queda quieto. */}
             <div className="overflow-auto max-h-[420px]">
               <table className="w-full text-xs">
                 <thead>
@@ -192,16 +234,25 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                         />
                       </th>
                     )}
-                    <th className={`py-2 font-medium ${isAdmin ? "px-2" : "px-5"}`}>Código</th>
-                    <th className="px-2 py-2 font-medium">Descripción</th>
-                    <th className="px-2 py-2 font-medium">Ubicación</th>
-                    <th className="px-2 py-2 font-medium">Ubic. nueva</th>
-                    <th className="px-2 py-2 font-medium text-right">SAP</th>
-                    <th className="px-2 py-2 font-medium text-right">Contado</th>
-                    <th className="px-2 py-2 font-medium text-right">Dif.</th>
-                    <th className="px-2 py-2 font-medium">Estado</th>
-                    <th className="px-2 py-2 font-medium">Usuario</th>
-                    <th className="px-2 py-2 font-medium">Fecha y hora</th>
+                    {COLUMNAS.map((col, i) => {
+                      const activa = ordenColumna === col.key;
+                      const Icono = activa ? (ordenDireccion === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                      const esPrimera = i === 0 && !isAdmin;
+                      return (
+                        <th
+                          key={col.key}
+                          className={`py-2 font-medium select-none cursor-pointer hover:text-foreground transition-colors ${
+                            esPrimera ? "px-5" : "px-2"
+                          } ${col.alineacion === "right" ? "text-right" : "text-left"}`}
+                          onClick={() => toggleOrden(col.key)}
+                        >
+                          <span className={`inline-flex items-center gap-1 ${col.alineacion === "right" ? "flex-row-reverse" : ""}`}>
+                            {col.label}
+                            <Icono size={12} className={activa ? "text-primary" : "text-muted-foreground/50"} />
+                          </span>
+                        </th>
+                      );
+                    })}
                     <th className="px-5 py-2 font-medium text-right">Acciones</th>
                   </tr>
                 </thead>
