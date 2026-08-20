@@ -10,8 +10,6 @@ export function useDashboardData(agenciaFiltro?: Agencia) {
   const [conteos, setConteos] = useState<Conteo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // Qué agencia cargar: si es admin y se pasa un filtro, usa ese.
-  // Si es operador, siempre su propia agencia.
   const agenciaEfectiva = isAdmin
     ? agenciaFiltro ?? undefined
     : agenciaUsuario ?? undefined;
@@ -36,33 +34,36 @@ export function useDashboardData(agenciaFiltro?: Agencia) {
   return { productos, conteos, stats, loading, error, recargar: cargar };
 }
 
-/**
- * Normaliza un código a texto comparable. Es imprescindible: Google Sheets
- * convierte los códigos numéricos a número, así que el mismo código puede
- * llegar como 50232 desde una hoja y como "50232" desde otra — sin esto,
- * los cruces entre conteos y catálogo nunca coinciden.
- */
 export function normalizarCodigo(codigo: unknown): string {
   return String(codigo ?? "").trim().toLowerCase();
 }
 
-/** Un artículo "hay que contarlo" solo si su stock en SAP es distinto de cero. */
 export function esContable(producto: Producto): boolean {
   return Number(producto.stockSap) !== 0;
 }
 
-/**
- * Arma un mapa código normalizado -> precio unitario, para poder calcular
- * importes en pesos sin tener que buscar en el array de productos cada vez.
- * Productos sin precio cargado (todavía) valen 0 — no rompen la suma, solo
- * no aportan importe hasta que se les cargue un precio real.
- */
 export function mapaPrecios(productos: Producto[]): Record<string, number> {
   const mapa: Record<string, number> = {};
   productos.forEach((p) => {
     mapa[normalizarCodigo(p.codigo)] = Number(p.precioUnitario) || 0;
   });
   return mapa;
+}
+
+/**
+ * Da el importe "relevante" de un conteo según su estado — la misma regla
+ * se usa acá y en el monitor de ConteosTable, para que los números del
+ * Dashboard y de la tabla siempre coincidan:
+ *   - Diferencias (sobra/falta): el valor de la DIFERENCIA (lo de más o
+ *     de menos), no de lo contado — es lo que le importa a un gerente
+ *     para dimensionar el impacto de un faltante o sobrante.
+ *   - Coincide (y no_existe): el valor de lo efectivamente contado.
+ */
+export function importeRelevante(conteo: Conteo, precio: number): number {
+  if (conteo.estado === "sobra" || conteo.estado === "falta") {
+    return precio * Math.abs(Number(conteo.diferencia || 0));
+  }
+  return precio * Number(conteo.stockContado || 0);
 }
 
 function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats {
@@ -81,7 +82,6 @@ function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats
   const totalProductos = productos.length;
   const totalContados = codigosContados.size;
 
-  // Universo real de trabajo: solo los artículos con stock distinto de cero.
   const contables = productos.filter(esContable);
   const contablesContados = contables.filter((p) => codigosContados.has(normalizarCodigo(p.codigo))).length;
   const pendientes = Math.max(contables.length - contablesContados, 0);
@@ -90,17 +90,20 @@ function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats
     : 0;
 
   let coincidencias = 0, diferenciasPositivas = 0, diferenciasNegativas = 0;
-  let importeCoincidencias = 0, importeDiferenciasPositivas = 0, importeDiferenciasNegativas = 0;
+  let importeContados = 0, importeCoincidencias = 0, importeDiferenciasPositivas = 0, importeDiferenciasNegativas = 0;
 
   ultimoPorCodigoUbicacion.forEach((c) => {
     const precio = precios[normalizarCodigo(c.codigo)] || 0;
+
+    // "Contados": valor total de TODO lo físicamente contado, coincida o
+    // no — cuánto stock ya quedó verificado, en pesos.
+    importeContados += precio * Number(c.stockContado || 0);
+
     if (c.estado === "coincide") {
       coincidencias++;
       importeCoincidencias += precio * Number(c.stockContado || 0);
     } else if (c.estado === "sobra") {
       diferenciasPositivas++;
-      // La diferencia ya viene en positivo para "sobra" — es el excedente
-      // encontrado por encima de lo que decía SAP.
       importeDiferenciasPositivas += precio * Math.abs(Number(c.diferencia || 0));
     } else if (c.estado === "falta") {
       diferenciasNegativas++;
@@ -108,8 +111,6 @@ function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats
     }
   });
 
-  // Importe pendiente: el valor en pesos del stock SAP de los artículos
-  // contables que todavía no se contaron — cuánto valor hay "sin verificar".
   const importePendientes = contables
     .filter((p) => !codigosContados.has(normalizarCodigo(p.codigo)))
     .reduce((acc, p) => acc + (precios[normalizarCodigo(p.codigo)] || 0) * Number(p.stockSap || 0), 0);
@@ -123,6 +124,7 @@ function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats
     conDiferencias: diferenciasPositivas + diferenciasNegativas,
     ultimaSincronizacion, coincidencias, diferenciasPositivas, diferenciasNegativas,
     importePendientes: Math.round(importePendientes),
+    importeContados: Math.round(importeContados),
     importeCoincidencias: Math.round(importeCoincidencias),
     importeDiferenciasPositivas: Math.round(importeDiferenciasPositivas),
     importeDiferenciasNegativas: Math.round(importeDiferenciasNegativas),
