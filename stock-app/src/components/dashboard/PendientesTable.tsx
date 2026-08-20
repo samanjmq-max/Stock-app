@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { Producto } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,20 +12,58 @@ interface Props {
   onQuitarFiltro: () => void;
 }
 
+type Columna = "codigo" | "descripcion" | "ubicacion" | "familia" | "stockSap";
+type Direccion = "asc" | "desc";
+
+const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
+  { key: "codigo", label: "Código" },
+  { key: "descripcion", label: "Descripción" },
+  { key: "ubicacion", label: "Ubicación" },
+  { key: "familia", label: "Familia" },
+  { key: "stockSap", label: "Stock SAP", alineacion: "right" },
+];
+
 export function PendientesTable({ productos, onQuitarFiltro }: Props) {
   const [busqueda, setBusqueda] = useState("");
+  const [ordenColumna, setOrdenColumna] = useState<Columna | null>(null);
+  const [ordenDireccion, setOrdenDireccion] = useState<Direccion>("asc");
+
+  function toggleOrden(col: Columna) {
+    if (ordenColumna !== col) {
+      setOrdenColumna(col);
+      setOrdenDireccion("asc");
+    } else {
+      setOrdenDireccion((d) => (d === "asc" ? "desc" : "asc"));
+    }
+  }
 
   const filtrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q) return productos;
-    return productos.filter(
-      (p) =>
-        p.codigo.toLowerCase().includes(q) ||
-        p.descripcion.toLowerCase().includes(q) ||
-        p.ubicacion.toLowerCase().includes(q) ||
-        p.familia.toLowerCase().includes(q)
-    );
-  }, [productos, busqueda]);
+    let lista = productos;
+    if (q) {
+      lista = lista.filter(
+        (p) =>
+          p.codigo.toLowerCase().includes(q) ||
+          p.descripcion.toLowerCase().includes(q) ||
+          p.ubicacion.toLowerCase().includes(q) ||
+          p.familia.toLowerCase().includes(q)
+      );
+    }
+
+    if (ordenColumna) {
+      const factor = ordenDireccion === "asc" ? 1 : -1;
+      lista = [...lista].sort((a, b) => {
+        if (ordenColumna === "stockSap") {
+          return (Number(a.stockSap) - Number(b.stockSap)) * factor;
+        }
+        const av = String(a[ordenColumna] ?? "").toLowerCase();
+        const bv = String(b[ordenColumna] ?? "").toLowerCase();
+        return av.localeCompare(bv, "es") * factor;
+      });
+    }
+
+    return lista;
+  }, [productos, busqueda, ordenColumna, ordenDireccion]);
 
   return (
     <Card>
@@ -76,11 +114,24 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-muted-foreground border-b border-border sticky top-0 bg-background z-10">
-                    <th className="px-5 py-2 font-medium">Código</th>
-                    <th className="px-2 py-2 font-medium">Descripción</th>
-                    <th className="px-2 py-2 font-medium">Ubicación</th>
-                    <th className="px-2 py-2 font-medium">Familia</th>
-                    <th className="px-5 py-2 font-medium text-right">Stock SAP</th>
+                    {COLUMNAS.map((col, i) => {
+                      const activa = ordenColumna === col.key;
+                      const Icono = activa ? (ordenDireccion === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
+                      return (
+                        <th
+                          key={col.key}
+                          className={`py-2 font-medium select-none cursor-pointer hover:text-foreground transition-colors ${
+                            i === 0 ? "px-5" : i === COLUMNAS.length - 1 ? "px-5" : "px-2"
+                          } ${col.alineacion === "right" ? "text-right" : "text-left"}`}
+                          onClick={() => toggleOrden(col.key)}
+                        >
+                          <span className={`inline-flex items-center gap-1 ${col.alineacion === "right" ? "flex-row-reverse" : ""}`}>
+                            {col.label}
+                            <Icono size={12} className={activa ? "text-primary" : "text-muted-foreground/50"} />
+                          </span>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
