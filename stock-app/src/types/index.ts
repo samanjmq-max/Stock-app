@@ -36,6 +36,11 @@ export interface Producto {
   familia: string;
   proveedor: string;
   stockSap: number;
+  // Precio de una sola unidad, en pesos. Se calcula al importar como
+  // (Valor libre util. ÷ Libre utilización) del export de SAP, o se puede
+  // cargar directo si el Excel ya trae una columna de precio. Puede no
+  // existir todavía para productos importados antes de tener esta función.
+  precioUnitario?: number;
   agencia: Agencia;
   actualizadoEn: string;
 }
@@ -74,7 +79,8 @@ export type AccionHistorial =
   | "guardar_conteo"
   | "resetear_conteos"
   | "importar_productos"
-  | "exportar_datos";
+  | "exportar_datos"
+  | "recuperar_password";
 
 export interface HistorialEntry {
   id: string;
@@ -102,6 +108,13 @@ export interface DashboardStats {
   coincidencias: number;
   diferenciasPositivas: number;
   diferenciasNegativas: number;
+  // Importes en pesos — se calculan multiplicando cantidades por el
+  // precioUnitario del producto (cuando existe; los productos sin precio
+  // cargado no suman al importe, no rompen el cálculo).
+  importePendientes: number;
+  importeCoincidencias: number;
+  importeDiferenciasPositivas: number;
+  importeDiferenciasNegativas: number;
 }
 
 export interface JwtPayload {
