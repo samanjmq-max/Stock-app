@@ -2,6 +2,10 @@ import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
+function formatearImporte(valor: number): string {
+  return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+}
+
 export function StatCard({
   label,
   value,
@@ -9,6 +13,7 @@ export function StatCard({
   tone = "default",
   onClick,
   activo = false,
+  importe,
 }: {
   label: string;
   value: string | number;
@@ -18,6 +23,8 @@ export function StatCard({
   onClick?: () => void;
   /** Resalta la tarjeta cuando el filtro que representa está activo. */
   activo?: boolean;
+  /** Importe en pesos a mostrar como chip chico — se omite si no se pasa. */
+  importe?: number;
 }) {
   const toneClasses = {
     default: "text-primary bg-primary/10",
@@ -47,8 +54,13 @@ export function StatCard({
         <div>
           <CardTitle className="mb-1.5">{label}</CardTitle>
           <p className="text-2xl font-semibold tracking-tight">{value}</p>
+          {importe !== undefined && (
+            <span className="inline-block mt-1 text-[11px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+              {formatearImporte(importe)}
+            </span>
+          )}
         </div>
-        <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center", toneClasses)}>
+        <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center shrink-0", toneClasses)}>
           <Icon size={17} />
         </div>
       </CardContent>
