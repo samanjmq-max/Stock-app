@@ -10,9 +10,6 @@ export const usuarioSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.union([z.literal(""), z.string().min(6, "Mínimo 6 caracteres")]).optional(),
   rol: z.enum(["administrador", "operador"]),
-  // Vacía es válida a nivel de formato — el backend decide si es
-  // obligatoria según si el usuario es el super administrador o no
-  // (el super administrador no pertenece a una sola agencia).
   agencia: z.union([z.literal(""), z.enum(AGENCIAS as unknown as [string, ...string[]])]).optional().default(""),
   activo: z.boolean().default(true),
 });
@@ -24,6 +21,7 @@ export const productoSchema = z.object({
   familia: z.string().optional().default(""),
   proveedor: z.string().optional().default(""),
   stockSap: z.coerce.number().min(0, "No puede ser negativo"),
+  precioUnitario: z.coerce.number().min(0, "No puede ser negativo").optional().default(0),
   agencia: z.enum(AGENCIAS as unknown as [string, ...string[]]),
 });
 export type ProductoInput = z.infer<typeof productoSchema>;
