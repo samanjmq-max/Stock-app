@@ -12,7 +12,7 @@ interface Props {
   onQuitarFiltro: () => void;
 }
 
-type Columna = "codigo" | "descripcion" | "ubicacion" | "familia" | "stockSap";
+type Columna = "codigo" | "descripcion" | "ubicacion" | "familia" | "stockSap" | "importe";
 type Direccion = "asc" | "desc";
 
 const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
@@ -21,7 +21,19 @@ const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
   { key: "ubicacion", label: "Ubicación" },
   { key: "familia", label: "Familia" },
   { key: "stockSap", label: "Stock SAP", alineacion: "right" },
+  { key: "importe", label: "Importe", alineacion: "right" },
 ];
+
+function formatearImporte(valor: number): string {
+  return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+}
+
+/** Valor en pesos de lo que hay en SAP para este producto — todavía no se
+ * contó, así que no hay "diferencia": el importe relevante acá es
+ * simplemente precio × stock SAP (lo que hay que ir a verificar). */
+function importeProducto(p: Producto): number {
+  return (Number(p.precioUnitario) || 0) * Number(p.stockSap || 0);
+}
 
 export function PendientesTable({ productos, onQuitarFiltro }: Props) {
   const [busqueda, setBusqueda] = useState("");
@@ -31,7 +43,7 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
   function toggleOrden(col: Columna) {
     if (ordenColumna !== col) {
       setOrdenColumna(col);
-      setOrdenDireccion("asc");
+      setOrdenDireccion(col === "importe" || col === "stockSap" ? "desc" : "asc");
     } else {
       setOrdenDireccion((d) => (d === "asc" ? "desc" : "asc"));
     }
@@ -53,6 +65,9 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
     if (ordenColumna) {
       const factor = ordenDireccion === "asc" ? 1 : -1;
       lista = [...lista].sort((a, b) => {
+        if (ordenColumna === "importe") {
+          return (importeProducto(a) - importeProducto(b)) * factor;
+        }
         if (ordenColumna === "stockSap") {
           return (Number(a.stockSap) - Number(b.stockSap)) * factor;
         }
@@ -64,6 +79,11 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
 
     return lista;
   }, [productos, busqueda, ordenColumna, ordenDireccion]);
+
+  const resumenVisible = useMemo(() => {
+    const importe = filtrados.reduce((acc, p) => acc + importeProducto(p), 0);
+    return { total: filtrados.length, importe };
+  }, [filtrados]);
 
   return (
     <Card>
@@ -91,15 +111,26 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
         </Button>
       </CardHeader>
       <CardContent className="pt-0 space-y-3">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Buscar por código, descripción, ubicación o familia..."
-            value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)}
-            className="pl-9"
-            autoFocus
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por código, descripción, ubicación o familia..."
+              value={busqueda}
+              onChange={(e) => setBusqueda(e.target.value)}
+              className="pl-9"
+              autoFocus
+            />
+          </div>
+          <div className="flex items-center gap-3 text-xs bg-muted rounded-lg px-3 py-1.5">
+            <span className="text-muted-foreground">
+              Total: <span className="font-semibold text-foreground">{resumenVisible.total}</span>
+            </span>
+            <span className="w-px h-3 bg-border" />
+            <span className="text-muted-foreground">
+              Importe: <span className="font-semibold text-foreground">{formatearImporte(resumenVisible.importe)}</span>
+            </span>
+          </div>
         </div>
 
         {filtrados.length === 0 ? (
@@ -143,7 +174,10 @@ export function PendientesTable({ productos, onQuitarFiltro }: Props) {
                       </td>
                       <td className="px-2 py-2 whitespace-nowrap">{p.ubicacion || "—"}</td>
                       <td className="px-2 py-2 whitespace-nowrap">{p.familia || "—"}</td>
-                      <td className="px-5 py-2 text-right">{p.stockSap}</td>
+                      <td className="px-2 py-2 text-right">{p.stockSap}</td>
+                      <td className="px-5 py-2 text-right font-medium whitespace-nowrap">
+                        {formatearImporte(importeProducto(p))}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
