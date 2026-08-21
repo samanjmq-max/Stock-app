@@ -40,7 +40,10 @@ function formatearImporte(valor: number): string {
   return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
 }
 
-type Columna = "codigo" | "descripcion" | "ubicacion" | "ubicacionNueva" | "stockSap" | "stockContado" | "diferencia" | "estado" | "usuarioEmail" | "fecha";
+// "importe" no es un campo real de Conteo — se calcula por fila con
+// importeRelevante(), así que se maneja aparte del resto de las columnas
+// (que sí leen directo de c[key]).
+type Columna = "codigo" | "descripcion" | "ubicacion" | "ubicacionNueva" | "stockSap" | "stockContado" | "diferencia" | "importe" | "estado" | "usuarioEmail" | "fecha";
 type Direccion = "asc" | "desc";
 
 const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
@@ -51,6 +54,7 @@ const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
   { key: "stockSap", label: "SAP", alineacion: "right" },
   { key: "stockContado", label: "Contado", alineacion: "right" },
   { key: "diferencia", label: "Dif.", alineacion: "right" },
+  { key: "importe", label: "Importe", alineacion: "right" },
   { key: "estado", label: "Estado" },
   { key: "usuarioEmail", label: "Usuario" },
   { key: "fecha", label: "Fecha y hora" },
@@ -64,7 +68,7 @@ interface Props {
   onQuitarFiltro: () => void;
   onEditar: (conteo: Conteo) => void;
   onEliminado: () => void;
-  /** Mapa código normalizado -> precio unitario, para el monitor de importe. */
+  /** Mapa código normalizado -> precio unitario, para el importe por fila y el monitor. */
   precios?: Record<string, number>;
 }
 
@@ -80,7 +84,9 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
   function toggleOrden(col: Columna) {
     if (ordenColumna !== col) {
       setOrdenColumna(col);
-      setOrdenDireccion("asc");
+      // El importe interesa de mayor a menor por defecto — así el primer
+      // click ya muestra arriba lo que más hay que analizar.
+      setOrdenDireccion(col === "importe" ? "desc" : "asc");
     } else {
       setOrdenDireccion((d) => (d === "asc" ? "desc" : "asc"));
     }
@@ -103,6 +109,11 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
           const bt = new Date(b.creadoEn).getTime();
           return (at - bt) * factor;
         }
+        if (ordenColumna === "importe") {
+          const ia = importeRelevante(a, precios[normalizarCodigo(a.codigo)] || 0);
+          const ib = importeRelevante(b, precios[normalizarCodigo(b.codigo)] || 0);
+          return (ia - ib) * factor;
+        }
         if (COLUMNAS_NUMERICAS.has(ordenColumna)) {
           return (Number(a[ordenColumna] ?? 0) - Number(b[ordenColumna] ?? 0)) * factor;
         }
@@ -113,11 +124,8 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
     }
 
     return lista;
-  }, [conteos, busqueda, ordenColumna, ordenDireccion]);
+  }, [conteos, busqueda, ordenColumna, ordenDireccion, precios]);
 
-  // "Monitor" junto al buscador: usa la misma regla que las tarjetas del
-  // Dashboard (importeRelevante) — así el número de acá y el de arriba
-  // siempre coinciden, sea cual sea el filtro activo.
   const resumenVisible = useMemo(() => {
     let importe = 0;
     conteosFiltrados.forEach((c) => {
@@ -285,70 +293,77 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                   </tr>
                 </thead>
                 <tbody>
-                  {conteosFiltrados.map((c) => (
-                    <tr
-                      key={c.id}
-                      className={`border-b border-border last:border-0 hover:bg-muted/30 ${
-                        seleccionados.has(c.id) ? "bg-primary/5" : ""
-                      }`}
-                    >
-                      {isAdmin && (
-                        <td className="px-5 py-2">
-                          <input
-                            type="checkbox"
-                            checked={seleccionados.has(c.id)}
-                            onChange={() => toggleUno(c.id)}
-                            aria-label={`Seleccionar ${c.codigo}`}
-                            className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
-                          />
-                        </td>
-                      )}
-                      <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo || "—"}</td>
-                      <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
-                        {c.descripcion || "—"}
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">{c.ubicacion || "—"}</td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {c.ubicacionNueva ? (
-                          <span className="text-warning-foreground font-medium">{c.ubicacionNueva}</span>
-                        ) : (
-                          "—"
-                        )}
-                      </td>
-                      <td className="px-2 py-2 text-right">{c.stockSap}</td>
-                      <td className="px-2 py-2 text-right">{c.stockContado}</td>
-                      <td className="px-2 py-2 text-right">
-                        {c.diferencia > 0 ? "+" : ""}
-                        {c.diferencia}
-                      </td>
-                      <td className="px-2 py-2">
-                        <Badge variant={BADGE_POR_ESTADO[c.estado]}>{c.estado}</Badge>
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={c.usuarioEmail}>
-                        {c.usuarioEmail}
-                      </td>
-                      <td className="px-2 py-2 whitespace-nowrap">
-                        {formatearFecha(c.fecha)}
-                        {c.hora ? <span className="text-muted-foreground"> · {c.hora}</span> : ""}
-                      </td>
-                      <td className="px-5 py-2 text-right whitespace-nowrap">
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
-                          <Pencil size={13} />
-                        </Button>
+                  {conteosFiltrados.map((c) => {
+                    const precio = precios[normalizarCodigo(c.codigo)] || 0;
+                    const importeFila = importeRelevante(c, precio);
+                    return (
+                      <tr
+                        key={c.id}
+                        className={`border-b border-border last:border-0 hover:bg-muted/30 ${
+                          seleccionados.has(c.id) ? "bg-primary/5" : ""
+                        }`}
+                      >
                         {isAdmin && (
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-destructive hover:text-destructive"
-                            onClick={() => eliminar(c)}
-                            disabled={eliminandoId === c.id}
-                          >
-                            {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
-                          </Button>
+                          <td className="px-5 py-2">
+                            <input
+                              type="checkbox"
+                              checked={seleccionados.has(c.id)}
+                              onChange={() => toggleUno(c.id)}
+                              aria-label={`Seleccionar ${c.codigo}`}
+                              className="h-3.5 w-3.5 rounded border-border accent-primary cursor-pointer"
+                            />
+                          </td>
                         )}
-                      </td>
-                    </tr>
-                  ))}
+                        <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo || "—"}</td>
+                        <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
+                          {c.descripcion || "—"}
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap">{c.ubicacion || "—"}</td>
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          {c.ubicacionNueva ? (
+                            <span className="text-warning-foreground font-medium">{c.ubicacionNueva}</span>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-right">{c.stockSap}</td>
+                        <td className="px-2 py-2 text-right">{c.stockContado}</td>
+                        <td className="px-2 py-2 text-right">
+                          {c.diferencia > 0 ? "+" : ""}
+                          {c.diferencia}
+                        </td>
+                        <td className="px-2 py-2 text-right font-medium whitespace-nowrap">
+                          {formatearImporte(importeFila)}
+                        </td>
+                        <td className="px-2 py-2">
+                          <Badge variant={BADGE_POR_ESTADO[c.estado]}>{c.estado}</Badge>
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={c.usuarioEmail}>
+                          {c.usuarioEmail}
+                        </td>
+                        <td className="px-2 py-2 whitespace-nowrap">
+                          {formatearFecha(c.fecha)}
+                          {c.hora ? <span className="text-muted-foreground"> · {c.hora}</span> : ""}
+                        </td>
+                        <td className="px-5 py-2 text-right whitespace-nowrap">
+                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
+                            <Pencil size={13} />
+                          </Button>
+                          {isAdmin && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              onClick={() => eliminar(c)}
+                              disabled={eliminandoId === c.id}
+                            >
+                              {eliminandoId === c.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
