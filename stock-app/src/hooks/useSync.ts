@@ -1,7 +1,10 @@
 "use client";
-
 import { useCallback, useEffect, useState } from "react";
-import { getConteosPendientes, marcarConteosSincronizados } from "@/db/offlineDb";
+import {
+  getConteosPendientes,
+  marcarConteosSincronizados,
+  limpiarConteosSincronizados,
+} from "@/db/offlineDb";
 
 export function useSync() {
   const [isOnline, setIsOnline] = useState(true);
@@ -45,7 +48,20 @@ export function useSync() {
 
   useEffect(() => {
     setIsOnline(navigator.onLine);
-    refrescarPendientes();
+
+    // Al abrir la app, se limpian los conteos que ya fueron subidos al
+    // servidor y quedaron acumulados localmente de sesiones anteriores —
+    // eran los que hacían "reaparecer" datos ya borrados o editados.
+    limpiarConteosSincronizados()
+      .then((cantidad) => {
+        if (cantidad > 0) {
+          console.info(`Limpieza local: ${cantidad} conteos ya sincronizados eliminados del dispositivo.`);
+        }
+      })
+      .catch((err) => console.error("Error al limpiar conteos locales:", err))
+      .finally(() => {
+        refrescarPendientes();
+      });
 
     function goOnline() {
       setIsOnline(true);
@@ -54,7 +70,6 @@ export function useSync() {
     function goOffline() {
       setIsOnline(false);
     }
-
     window.addEventListener("online", goOnline);
     window.addEventListener("offline", goOffline);
     return () => {
