@@ -41,7 +41,6 @@ function getDb() {
 }
 
 /* ---------- STOCK (cache local de productos) ---------- */
-
 export async function cachearProductos(productos: Producto[]) {
   const db = await getDb();
   const tx = db.transaction("stock", "readwrite");
@@ -64,7 +63,6 @@ export async function getProductoCachePorCodigo(codigo: string): Promise<Product
 }
 
 /* ---------- CONTEOS (cola offline) ---------- */
-
 export async function encolarConteo(conteo: Omit<ConteoLocal, "localId" | "synced" | "createdAt">) {
   const db = await getDb();
   return db.add("counts", { ...conteo, synced: false, createdAt: Date.now() });
@@ -80,17 +78,41 @@ export async function getConteosPendientes(): Promise<ConteoLocal[]> {
   return todos.filter((c) => !c.synced);
 }
 
+/**
+ * Una vez que un conteo se subió al servidor, se ELIMINA de la base local.
+ * Antes solo se marcaba como sincronizado y quedaba guardado para siempre,
+ * lo que hacía que la app siguiera mostrando conteos viejos (incluso ya
+ * borrados del servidor) al recargar la página. El servidor es la única
+ * fuente de verdad: lo local es solo una cola temporal de lo que falta subir.
+ */
 export async function marcarConteosSincronizados(localIds: number[]) {
   const db = await getDb();
   const tx = db.transaction("counts", "readwrite");
   for (const id of localIds) {
-    const item = await tx.store.get(id);
-    if (item) {
-      item.synced = true;
-      await tx.store.put(item);
-    }
+    await tx.store.delete(id);
   }
   await tx.done;
+}
+
+/**
+ * Limpia de la base local todos los conteos que ya fueron sincronizados en
+ * algún momento (registros viejos que quedaron acumulados antes de la
+ * corrección). No toca los pendientes de subir.
+ */
+export async function limpiarConteosSincronizados(): Promise<number> {
+  const db = await getDb();
+  const todos: ConteoLocal[] = await db.getAll("counts");
+  const yaSincronizados = todos.filter((c) => c.synced && c.localId !== undefined);
+
+  if (yaSincronizados.length === 0) return 0;
+
+  const tx = db.transaction("counts", "readwrite");
+  for (const c of yaSincronizados) {
+    await tx.store.delete(c.localId!);
+  }
+  await tx.done;
+
+  return yaSincronizados.length;
 }
 
 export async function getHistorialLocalDeProducto(codigo: string): Promise<ConteoLocal[]> {
