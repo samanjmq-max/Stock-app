@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { useDashboardData, esContable, normalizarCodigo, mapaPrecios } from "@/hooks/useDashboardData";
+import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
@@ -140,30 +140,43 @@ export default function DashboardPage() {
   }
 
   function datosConteosParaExportar(lista: Conteo[]) {
-    return lista.map((c) => ({
-      Agencia: c.agencia,
-      Código: c.codigo,
-      Descripción: c.descripcion,
-      Ubicación: c.ubicacion,
-      "Stock SAP": c.stockSap,
-      "Stock Contado": c.stockContado,
-      Diferencia: c.diferencia,
-      Estado: c.estado,
-      "Ubicación (nueva)": c.ubicacionNueva || "",
-      Usuario: c.usuarioEmail,
-      Fecha: c.fecha,
-    }));
+    return lista.map((c) => {
+      const precio = precios[normalizarCodigo(c.codigo)] || 0;
+      return {
+        Agencia: c.agencia,
+        Código: c.codigo,
+        Descripción: c.descripcion,
+        Ubicación: c.ubicacion,
+        "Stock SAP": c.stockSap,
+        "Stock Contado": c.stockContado,
+        Diferencia: c.diferencia,
+        // Precio de una unidad y valor total de la línea — mismo criterio
+        // que la tabla: para diferencias es el valor de la diferencia,
+        // para coincidencias el valor de lo contado.
+        "Precio unitario": precio,
+        Importe: Math.round(importeRelevante(c, precio)),
+        Estado: c.estado,
+        "Ubicación (nueva)": c.ubicacionNueva || "",
+        Usuario: c.usuarioEmail,
+        Fecha: c.fecha,
+      };
+    });
   }
 
   function datosProductosParaExportar(lista: Producto[]) {
-    return lista.map((p) => ({
-      Agencia: p.agencia,
-      Código: p.codigo,
-      Descripción: p.descripcion,
-      Ubicación: p.ubicacion,
-      Familia: p.familia,
-      "Stock SAP": p.stockSap,
-    }));
+    return lista.map((p) => {
+      const precio = Number(p.precioUnitario) || 0;
+      return {
+        Agencia: p.agencia,
+        Código: p.codigo,
+        Descripción: p.descripcion,
+        Ubicación: p.ubicacion,
+        Familia: p.familia,
+        "Stock SAP": p.stockSap,
+        "Precio unitario": precio,
+        Importe: Math.round(precio * Number(p.stockSap || 0)),
+      };
+    });
   }
 
   const COLUMNAS_CONTEOS = [
@@ -174,6 +187,7 @@ export default function DashboardPage() {
     { header: "SAP", key: "Stock SAP" },
     { header: "Contado", key: "Stock Contado" },
     { header: "Dif.", key: "Diferencia" },
+    { header: "Importe", key: "Importe" },
     { header: "Estado", key: "Estado" },
     { header: "Ubic. nueva", key: "Ubicación (nueva)" },
   ];
@@ -185,6 +199,7 @@ export default function DashboardPage() {
     { header: "Ubicación", key: "Ubicación" },
     { header: "Familia", key: "Familia" },
     { header: "SAP", key: "Stock SAP" },
+    { header: "Importe", key: "Importe" },
   ];
 
   function exportarReporte(formato: "xlsx" | "pdf", alcance: "vista" | "todo") {
