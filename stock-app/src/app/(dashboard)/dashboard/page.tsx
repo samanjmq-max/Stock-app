@@ -20,7 +20,13 @@ import { conteosService } from "@/services/conteos.service";
 import { AGENCIAS } from "@/types";
 import type { Conteo, Producto, EstadoConteo, Agencia } from "@/types";
 
-const COLORS = { coincide: "#16a34a", falta: "#dc2626", sobra: "#2563eb" };
+// Paleta cálida via tokens de globals.css (design-system/stockapp-saman/MASTER.md §2.3):
+// coincide -> success (verde grano), sobra -> warning (dorado), falta -> destructive (rojo semántico).
+const COLORS = {
+  coincide: "hsl(var(--success))",
+  falta: "hsl(var(--destructive))",
+  sobra: "hsl(var(--warning))",
+};
 type Vista = EstadoConteo | "pendientes" | "contados" | null;
 
 const LABEL_VISTA: Record<string, string> = {
@@ -34,6 +40,21 @@ const LABEL_VISTA: Record<string, string> = {
 function formatearImporte(valor: number): string {
   return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
 }
+
+// Estilo compartido de tooltip de recharts, alineado a la card cálida (globals.css)
+// en vez del tooltip blanco/negro por defecto.
+const tooltipStyle = {
+  contentStyle: {
+    background: "hsl(var(--popover))",
+    color: "hsl(var(--popover-foreground))",
+    border: "1px solid hsl(var(--border))",
+    borderRadius: "0.5rem",
+    fontSize: "12px",
+    boxShadow: "0 4px 10px rgba(20,10,5,0.08)",
+  },
+  labelStyle: { color: "hsl(var(--popover-foreground))" },
+  cursor: { fill: "hsl(var(--muted))" },
+};
 
 // Auto-actualización: cada cuánto se refresca el Dashboard solo, en milisegundos.
 const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 60 * 1000; // 5 horas
@@ -344,7 +365,7 @@ export default function DashboardPage() {
                     <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip />
+                    <Tooltip {...tooltipStyle} />
                   </PieChart>
                 </ResponsiveContainer>}
           </CardContent>
@@ -360,7 +381,7 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" fontSize={11} tickLine={false} />
                     <YAxis fontSize={10} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(v: number) => formatearImporte(v)} />
+                    <Tooltip formatter={(v: number) => formatearImporte(v)} {...tooltipStyle} />
                     <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                       {importeData.map((d, i) => <Cell key={i} fill={d.color} />)}
                     </Bar>
@@ -379,7 +400,7 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis dataKey="codigo" fontSize={10} tickLine={false} />
                     <YAxis fontSize={10} tickLine={false} />
-                    <Tooltip />
+                    <Tooltip {...tooltipStyle} />
                     <Bar dataKey="diferencia" radius={[6, 6, 0, 0]}>
                       {topDiferencias.map((d, i) => <Cell key={i} fill={d.diferencia > 0 ? COLORS.sobra : COLORS.falta} />)}
                     </Bar>
@@ -398,8 +419,8 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                     <XAxis type="number" fontSize={10} tickLine={false} />
                     <YAxis dataKey="ubicacion" type="category" fontSize={11} width={110} tickLine={false} />
-                    <Tooltip />
-                    <Bar dataKey="contados" radius={[0, 6, 6, 0]} fill="#2f5fed" />
+                    <Tooltip {...tooltipStyle} />
+                    <Bar dataKey="contados" radius={[0, 6, 6, 0]} fill="hsl(var(--primary))" />
                   </BarChart>
                 </ResponsiveContainer>}
           </CardContent>
