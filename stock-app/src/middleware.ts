@@ -3,6 +3,12 @@ import { verificarToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { esSuperAdmin } from "@/lib/permisos";
 const RUTAS_PUBLICAS = ["/login", "/api/auth/login", "/recuperar", "/api/auth/recuperar"];
 const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios", "/etiquetas"];
+// Carpetas de estáticos públicos en /public (imágenes, video, fuentes, audio, etc.)
+// servidas directamente por Next — nunca requieren sesión, sin importar la ruta.
+const ES_ASSET_DIR = /^\/(?:videos|images|img|fonts|audio)\//;
+// Fallback por extensión: cualquier archivo estático típico, esté donde esté
+// dentro de /public, queda exento aunque se agregue una carpeta nueva a futuro.
+const ES_ASSET_EXT = /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|mp4|webm|mov|m4v|ogg|ogv|mp3|wav|m4a|woff2?|ttf|otf|eot)$/i;
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const esPublica = RUTAS_PUBLICAS.some((r) => pathname.startsWith(r));
@@ -11,7 +17,9 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith("/icons") ||
     pathname === "/manifest.json" ||
     pathname === "/sw.js" ||
-    pathname === "/favicon.ico";
+    pathname === "/favicon.ico" ||
+    ES_ASSET_DIR.test(pathname) ||
+    ES_ASSET_EXT.test(pathname);
   if (esPublica || esAsset) return NextResponse.next();
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
   const payload = token ? await verificarToken(token) : null;

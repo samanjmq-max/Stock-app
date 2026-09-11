@@ -3,47 +3,50 @@
 @tailwind utilities;
 
 /*
-  Sistema de diseño "Depósito" — inspirado en Notion/Linear/Stripe pero con
-  identidad propia: base neutra fría (slate), acento "cobalto de planta"
-  (azul saturado, no violeta genérico), y semáforos de estado nítidos
-  (verde esmeralda / ámbar / rojo) porque en un conteo físico el color
-  ES la información (coincide / sobra / falta).
+  Sistema de diseño "Depósito v2" — evolución cálida del sistema original.
+  Misma arquitectura de tokens (shadcn-style, HSL), mismo --radius, mismo
+  darkMode por clase. Solo cambia la temperatura de marca: de azul cobalto
+  frío a terracota/siena + verde grano + dorado cosecha, inspirado en el
+  arroz y la cosecha. Los semáforos de estado siguen siendo nítidos
+  (verde / ámbar / rojo) porque en un conteo físico el color ES la
+  información (coincide / sobra / falta). Ver design-system/stockapp-saman/
+  MASTER.md §2 para la tabla de migración token por token.
 */
 
 :root {
-  --background: 210 20% 98%;
-  --foreground: 222 30% 11%;
+  --background: 38 30% 97%;
+  --foreground: 20 25% 12%;
 
   --card: 0 0% 100%;
-  --card-foreground: 222 30% 11%;
+  --card-foreground: 20 25% 12%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 222 30% 11%;
+  --popover-foreground: 20 25% 12%;
 
-  --primary: 221 83% 53%;
+  --primary: 28 68% 33%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 210 20% 94%;
-  --secondary-foreground: 222 30% 15%;
+  --secondary: 38 22% 93%;
+  --secondary-foreground: 20 25% 18%;
 
-  --muted: 210 20% 94%;
-  --muted-foreground: 215 16% 47%;
+  --muted: 38 20% 94%;
+  --muted-foreground: 30 12% 42%;
 
-  --accent: 221 83% 96%;
-  --accent-foreground: 221 83% 40%;
+  --accent: 142 45% 94%;
+  --accent-foreground: 142 60% 22%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 152 60% 36%;
+  --success: 142 60% 32%;
   --success-foreground: 0 0% 100%;
 
-  --warning: 38 92% 50%;
-  --warning-foreground: 26 40% 15%;
+  --warning: 38 90% 46%;
+  --warning-foreground: 26 45% 14%;
 
-  --border: 214 20% 90%;
-  --input: 214 20% 88%;
-  --ring: 221 83% 53%;
+  --border: 34 22% 88%;
+  --input: 34 22% 85%;
+  --ring: 28 68% 33%;
 
   --radius: 0.75rem;
 
@@ -53,39 +56,39 @@
 }
 
 .dark {
-  --background: 222 30% 7%;
-  --foreground: 210 20% 96%;
+  --background: 20 18% 8%;
+  --foreground: 38 25% 94%;
 
-  --card: 222 26% 10%;
-  --card-foreground: 210 20% 96%;
+  --card: 20 16% 11%;
+  --card-foreground: 38 25% 94%;
 
-  --popover: 222 26% 10%;
-  --popover-foreground: 210 20% 96%;
+  --popover: 20 16% 11%;
+  --popover-foreground: 38 25% 94%;
 
-  --primary: 221 83% 60%;
-  --primary-foreground: 222 30% 8%;
+  --primary: 28 70% 52%;
+  --primary-foreground: 20 25% 10%;
 
-  --secondary: 222 20% 15%;
-  --secondary-foreground: 210 20% 92%;
+  --secondary: 22 14% 16%;
+  --secondary-foreground: 38 20% 90%;
 
-  --muted: 222 20% 15%;
-  --muted-foreground: 215 16% 60%;
+  --muted: 22 14% 16%;
+  --muted-foreground: 30 10% 62%;
 
-  --accent: 221 40% 18%;
-  --accent-foreground: 221 83% 75%;
+  --accent: 142 30% 16%;
+  --accent-foreground: 142 55% 76%;
 
   --destructive: 0 72% 55%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 152 55% 45%;
-  --success-foreground: 152 60% 8%;
+  --success: 142 50% 46%;
+  --success-foreground: 142 60% 8%;
 
-  --warning: 38 92% 55%;
+  --warning: 38 88% 55%;
   --warning-foreground: 26 40% 10%;
 
-  --border: 222 20% 18%;
-  --input: 222 20% 18%;
-  --ring: 221 83% 60%;
+  --border: 22 14% 19%;
+  --input: 22 14% 19%;
+  --ring: 28 70% 52%;
 }
 
 * {
@@ -115,4 +118,58 @@ body {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/*
+  Decoración de fondo del Login (design-system/stockapp-saman/pages/login.md):
+  espigas de trigo con leve balanceo de viento. Motion bajo (dial 3/10):
+  una sola animación de rotación suave, sin scroll-jacking ni partículas.
+  La regla de prefers-reduced-motion de arriba ya la neutraliza (duración
+  0.01ms, 1 iteración) sin lógica adicional.
+*/
+@keyframes wheat-sway {
+  0%, 100% { transform: rotate(-2.5deg); }
+  50% { transform: rotate(2.5deg); }
+}
+.wheat-stalk {
+  transform-origin: 50% 100%;
+  animation-name: wheat-sway;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/*
+  Efecto "shiny" del botón Ingresar del login (design-system/stockapp-saman/
+  pages/login.md) -- solo esa instancia por ahora, no el Button global
+  (components/ui/button.tsx sigue igual para el resto de la app). El fondo
+  --primary del botón no cambia; el brillo es un ::after encima, en loop,
+  con overflow:hidden en el botón para que no se salga del border-radius.
+
+  El keyframe barre rápido (0% -> 28% del ciclo) y después queda "aparcado"
+  fuera de vista el resto del tiempo (28% -> 100%), para que sea un destello
+  periódico -- no un brillo constante tipo casino/slot machine.
+
+  La regla de prefers-reduced-motion de arriba ya lo neutraliza (duración
+  0.01ms, 1 iteración): el ::after queda congelado en el último frame, que
+  es justo el estado "barrido y aparcado fuera de vista" -- el botón se ve
+  sólido, sin lógica adicional.
+*/
+@keyframes btn-shiny-sweep {
+  0% { background-position: -100% 0; }
+  28% { background-position: 200% 0; }
+  100% { background-position: 200% 0; }
+}
+.btn-shiny {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shiny::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, 0.35) 50%, transparent 70%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: btn-shiny-sweep 3.5s ease-in-out infinite;
+  pointer-events: none;
 }

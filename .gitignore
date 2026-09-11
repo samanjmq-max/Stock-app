@@ -1,1 +1,5 @@
 graphify-out/
+
+# Librería global de skills de Claude Code (entorno/tooling, no específico
+# de este proyecto -- CLAUDE.md sí queda versionado, esto no).
+.claude/
