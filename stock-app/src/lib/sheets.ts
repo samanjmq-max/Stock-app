@@ -10,27 +10,86 @@ if (!GAS_URL && process.env.NODE_ENV === "production") {
 
 interface GasResponse<T> { ok: boolean; data?: T; error?: string; }
 
+/**
+ * Tiempo máximo de espera para una llamada a Apps Script.
+ *
+ * Sin esto, `fetch` espera indefinidamente: si Apps Script se demora, está
+ * saturado o quedó una ejecución trabada tomando el candado del script, la
+ * función de Vercel se queda colgada sin responder nunca y el usuario ve la
+ * rueda girando para siempre, sin ningún mensaje. Con el timeout, la espera
+ * siempre termina en un error legible que dice qué pasó.
+ *
+ * 15s es holgado para una operación normal (suelen tardar 1-4s) y queda por
+ * debajo del límite de duración de una función serverless.
+ */
+const TIMEOUT_GAS_MS = 15000;
+
+async function fetchGas(url: string, init: RequestInit, accion: string): Promise<Response> {
+  const controlador = new AbortController();
+  const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_GAS_MS);
+  try {
+    return await fetch(url, { ...init, signal: controlador.signal });
+  } catch (err) {
+    // Se mira el .name y no `instanceof Error` porque al abortar un fetch se
+    // tira un DOMException, que no siempre hereda de Error.
+    if ((err as { name?: string } | null)?.name === "AbortError") {
+      throw new Error(
+        `El backend (Apps Script) no respondió en ${TIMEOUT_GAS_MS / 1000} segundos al ejecutar "${accion}". ` +
+        `Puede estar saturado o con una ejecución trabada. Revisá las Ejecuciones del proyecto de Apps Script.`
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(temporizador);
+  }
+}
+
+/**
+ * Lee la respuesta de Apps Script tolerando que no sea JSON.
+ *
+ * Apps Script devuelve HTML (una página de login o de error de Google) cuando
+ * la implementación no está publicada con acceso "Cualquier persona" o cuando
+ * la URL quedó apuntando a una implementación vieja. Sin este manejo, el
+ * `res.json()` explota con un "Unexpected token '<'" que no le dice nada a
+ * nadie; acá se convierte en un mensaje que apunta a la causa real.
+ */
+async function leerRespuestaGas<T>(res: Response, accion: string): Promise<T> {
+  const texto = await res.text();
+  let json: GasResponse<T>;
+  try {
+    json = JSON.parse(texto);
+  } catch {
+    throw new Error(
+      `Apps Script no devolvió JSON al ejecutar "${accion}" (HTTP ${res.status}). ` +
+      `Suele pasar cuando el Web App no está publicado con acceso "Cualquier persona" ` +
+      `o cuando GAS_WEB_APP_URL apunta a una implementación que ya no existe.`
+    );
+  }
+  if (!json.ok) throw new Error(json.error || `Error al llamar a Apps Script (${accion})`);
+  return json.data as T;
+}
+
 async function gasGet<T>(action: string, params: Record<string, string> = {}): Promise<T> {
   const url = new URL(GAS_URL as string);
   url.searchParams.set("action", action);
   url.searchParams.set("apiKey", GAS_API_KEY || "");
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
-  const res = await fetch(url.toString(), { method: "GET", cache: "no-store" });
-  const json: GasResponse<T> = await res.json();
-  if (!json.ok) throw new Error(json.error || `Error al llamar a Apps Script (${action})`);
-  return json.data as T;
+  const res = await fetchGas(url.toString(), { method: "GET", cache: "no-store" }, action);
+  return leerRespuestaGas<T>(res, action);
 }
 
 async function gasPost<T>(action: string, body: Record<string, unknown>): Promise<T> {
-  const res = await fetch(GAS_URL as string, {
-    method: "POST",
-    headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action, apiKey: GAS_API_KEY, ...body }),
-    cache: "no-store",
-  });
-  const json: GasResponse<T> = await res.json();
-  if (!json.ok) throw new Error(json.error || `Error al llamar a Apps Script (${action})`);
-  return json.data as T;
+  const res = await fetchGas(
+    GAS_URL as string,
+    {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, apiKey: GAS_API_KEY, ...body }),
+      cache: "no-store",
+    },
+    action
+  );
+  return leerRespuestaGas<T>(res, action);
 }
 
 /* ==================== USUARIOS ==================== */
