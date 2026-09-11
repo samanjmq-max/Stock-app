@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getUsuarios, crearUsuario, getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
+import { getUsuarios, crearUsuario, registrarHistorial } from "@/lib/sheets";
 import { usuarioSchema } from "@/lib/validations";
 import { hashPassword } from "@/lib/password";
 import { esSuperAdmin } from "@/lib/permisos";
-import type { Rol, Agencia } from "@/types";
+import type { Rol, Agencia, Usuario } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
@@ -58,28 +58,46 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const existente = await getUsuarioPorEmail(parsed.data.email.toLowerCase().trim());
-    if (existente) {
-      return NextResponse.json({ ok: false, error: "Ya existe un usuario con ese email" }, { status: 409 });
+    const passwordHash = await hashPassword(parsed.data.password);
+
+    // Nota: NO se consulta antes si el email ya existe. Esa verificación
+    // previa era un viaje extra a Apps Script (lento) y además no evitaba
+    // nada: entre la consulta y el alta puede colarse otra creación. La
+    // validación buena es la que hace `crearUsuario_` en Apps Script, que
+    // corre dentro del candado del script. Acá solo se traduce ese error
+    // al código HTTP que corresponde.
+    let usuario: Usuario;
+    try {
+      usuario = await crearUsuario({
+        nombre: parsed.data.nombre,
+        email: parsed.data.email.toLowerCase().trim(),
+        passwordHash,
+        rol: parsed.data.rol,
+        agencia: parsed.data.agencia,
+      });
+    } catch (err) {
+      const mensaje = err instanceof Error ? err.message : "No se pudo crear el usuario";
+      if (/ya existe/i.test(mensaje)) {
+        return NextResponse.json({ ok: false, error: "Ya existe un usuario con ese email" }, { status: 409 });
+      }
+      throw err;
     }
 
-    const passwordHash = await hashPassword(parsed.data.password);
-    const usuario = await crearUsuario({
-      nombre: parsed.data.nombre,
-      email: parsed.data.email.toLowerCase().trim(),
-      passwordHash,
-      rol: parsed.data.rol,
-      agencia: parsed.data.agencia,
-    });
-
-    await registrarHistorial({
-      usuarioId: userId,
-      usuarioEmail: email,
-      rol,
-      accion: "crear_usuario",
-      entidad: `usuario:${usuario.email}`,
-      valorNuevo: `rol:${usuario.rol}, agencia:${usuario.agencia}`,
-    });
+    // El historial es auditoría, no parte del alta: si falla o se demora,
+    // el usuario ya quedó creado y no tiene sentido devolverle un error al
+    // administrador por eso. Se registra el fallo en los logs de Vercel.
+    try {
+      await registrarHistorial({
+        usuarioId: userId,
+        usuarioEmail: email,
+        rol,
+        accion: "crear_usuario",
+        entidad: `usuario:${usuario.email}`,
+        valorNuevo: `rol:${usuario.rol}, agencia:${usuario.agencia}`,
+      });
+    } catch (err) {
+      console.error("Usuario creado, pero falló el registro en historial:", err);
+    }
 
     return NextResponse.json({ ok: true, data: usuario }, { status: 201 });
   } catch (err) {
