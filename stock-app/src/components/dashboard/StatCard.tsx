@@ -53,7 +53,7 @@ export function StatCard({
       <CardContent className="pt-5 flex items-center justify-between">
         <div>
           <CardTitle className="mb-1.5">{label}</CardTitle>
-          <p className="text-2xl font-semibold tracking-tight">{value}</p>
+          <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
           {importe !== undefined && (
             <span className="inline-block mt-1 text-[11px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
               {formatearImporte(importe)}
