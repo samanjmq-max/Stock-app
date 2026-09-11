@@ -11,6 +11,20 @@ import { Label } from "@/components/ui/label";
 import { AGENCIAS } from "@/types";
 import type { Agencia } from "@/types";
 
+/**
+ * Cuántos productos se mandan por viaje al backend.
+ *
+ * Mandar el catálogo entero de una (10.000+ productos) no funciona: Apps
+ * Script tiene que leer toda la hoja para saber cuáles ya existen y después
+ * escribir miles de filas, y eso no entra en el tiempo que una función de
+ * Vercel puede estar esperando. Cortado en lotes, cada viaje es corto y
+ * previsible, se puede mostrar avance real, y si algo falla se sabe dónde.
+ *
+ * Si alguna vez vuelve a dar timeout, bajar este número (por ejemplo a 500)
+ * es el primer ajuste a probar.
+ */
+const TAMANO_LOTE = 1000;
+
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -23,6 +37,7 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
   const [nombreArchivo, setNombreArchivo] = useState("");
   const [leyendo, setLeyendo] = useState(false);
   const [importando, setImportando] = useState(false);
+  const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
@@ -47,16 +62,41 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
 
   async function confirmarImportacion() {
     if (!resultado || resultado.filasValidas.length === 0 || !agenciaSeleccionada) return;
+
+    const filas = resultado.filasValidas;
     setImportando(true);
     setError(null);
+    setProgreso({ hechos: 0, total: filas.length });
+
+    let importados = 0;
+    let actualizados = 0;
+    let procesados = 0;
+
     try {
-      const res = await productosService.importar(resultado.filasValidas, agenciaSeleccionada);
-      onImportado(res.importados + res.actualizados);
+      for (let desde = 0; desde < filas.length; desde += TAMANO_LOTE) {
+        const lote = filas.slice(desde, desde + TAMANO_LOTE);
+        const res = await productosService.importar(lote, agenciaSeleccionada);
+        importados += res.importados ?? 0;
+        actualizados += res.actualizados ?? 0;
+        procesados += lote.length;
+        setProgreso({ hechos: procesados, total: filas.length });
+      }
+      onImportado(importados + actualizados);
       cerrar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo importar");
+      const motivo = err instanceof Error ? err.message : "No se pudo importar";
+      // Se avisa cuántos alcanzaron a entrar: sin esto, ante un corte a mitad
+      // de camino no hay forma de saber si conviene reintentar o si se van a
+      // duplicar los productos. Reintentar es seguro — los códigos que ya
+      // están se actualizan, no se duplican.
+      setError(
+        procesados > 0
+          ? `Se importaron ${procesados} de ${filas.length} productos y ahí se cortó. ${motivo} — Podés volver a intentar con el mismo archivo: los que ya entraron se actualizan, no se duplican.`
+          : motivo
+      );
     } finally {
       setImportando(false);
+      setProgreso(null);
     }
   }
 
@@ -64,6 +104,7 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
     setResultado(null);
     setNombreArchivo("");
     setError(null);
+    setProgreso(null);
     setAgenciaSeleccionada("");
     onOpenChange(false);
   }
@@ -84,6 +125,7 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
             <Label>Agencia destino</Label>
             <Select
               value={agenciaSeleccionada}
+              disabled={importando}
               onValueChange={(v) => {
                 setAgenciaSeleccionada(v as Agencia);
                 setResultado(null);
@@ -136,6 +178,26 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
                   </ul>
                 </div>
               )}
+
+              {progreso && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span>Importando en lotes de {TAMANO_LOTE}...</span>
+                    <span className="tabular-nums font-medium text-foreground">
+                      {progreso.hechos} / {progreso.total}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${Math.round((progreso.hechos / progreso.total) * 100)}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    No cierres esta ventana hasta que termine.
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -143,11 +205,13 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
         {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2 mt-3">{error}</p>}
 
         <DialogFooter>
-          <Button variant="secondary" onClick={cerrar}>Cancelar</Button>
+          <Button variant="secondary" onClick={cerrar} disabled={importando}>Cancelar</Button>
           {resultado && (
             <Button onClick={confirmarImportacion} disabled={importando || resultado.filasValidas.length === 0 || !agenciaSeleccionada}>
               {importando && <Loader2 className="animate-spin" size={15} />}
-              Importar {resultado.filasValidas.length} productos → {agenciaSeleccionada}
+              {importando
+                ? `Importando ${progreso?.hechos ?? 0} de ${progreso?.total ?? resultado.filasValidas.length}...`
+                : `Importar ${resultado.filasValidas.length} productos → ${agenciaSeleccionada}`}
             </Button>
           )}
         </DialogFooter>
