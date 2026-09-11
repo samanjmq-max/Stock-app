@@ -11,7 +11,7 @@ const NAV_ITEMS = [
   { href: "/conteo", label: "Contar stock", icon: ScanBarcode, soloAdmin: false },
   { href: "/productos", label: "Productos", icon: Package, soloAdmin: false },
   { href: "/etiquetas", label: "Generar etiqueta", icon: Barcode, soloAdmin: true },
-  { href: "/historial", label: "Historial", icon: History, soloAdmin: false },
+  { href: "/historial", label: "Historial", icon: History, soloAdmin: true },
   { href: "/usuarios", label: "Usuarios", icon: Users, soloAdmin: true },
   { href: "/configuracion", label: "Configuración", icon: Settings, soloAdmin: true },
 ];

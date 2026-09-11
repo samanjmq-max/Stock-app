@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
 import { productoSchema, type ProductoInput } from "@/lib/validations";
-import type { Producto } from "@/types";
+import type { Agencia, Producto } from "@/types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,9 +16,16 @@ interface Props {
   onOpenChange: (open: boolean) => void;
   productoEditando: Producto | null;
   onGuardar: (input: ProductoInput) => Promise<void>;
+  /**
+   * Agencia a asignar cuando se crea un producto NUEVO (para editar, se
+   * mantiene la del producto existente). `productoSchema.agencia` es
+   * obligatorio y sin default -- sin esto, el submit queda bloqueado en
+   * silencio por Zod porque el form nunca junta un valor válido.
+   */
+  agenciaPorDefecto: Agencia;
 }
 
-export function ProductoFormDialog({ open, onOpenChange, productoEditando, onGuardar }: Props) {
+export function ProductoFormDialog({ open, onOpenChange, productoEditando, onGuardar, agenciaPorDefecto }: Props) {
   const {
     register,
     handleSubmit,
@@ -37,11 +44,12 @@ export function ProductoFormDialog({ open, onOpenChange, productoEditando, onGua
               familia: productoEditando.familia,
               proveedor: productoEditando.proveedor,
               stockSap: productoEditando.stockSap,
+              agencia: productoEditando.agencia,
             }
-          : { codigo: "", descripcion: "", ubicacion: "", familia: "", proveedor: "", stockSap: 0 }
+          : { codigo: "", descripcion: "", ubicacion: "", familia: "", proveedor: "", stockSap: 0, agencia: agenciaPorDefecto }
       );
     }
-  }, [open, productoEditando, reset]);
+  }, [open, productoEditando, agenciaPorDefecto, reset]);
 
   async function onSubmit(data: ProductoInput) {
     await onGuardar(data);

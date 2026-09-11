@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getProductos, crearProducto, getProductoPorCodigo, registrarHistorial } from "@/lib/sheets";
 import { productoSchema } from "@/lib/validations";
 import { leerHeaderTexto } from "@/lib/headers";
+import { esSuperAdmin } from "@/lib/permisos";
 import type { Agencia } from "@/types";
 
 export async function GET(request: NextRequest) {
@@ -40,6 +41,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     if (!body.agencia && agenciaHeader) body.agencia = agenciaHeader;
+    // Solo el super-admin puede crear un producto en una agencia distinta de
+    // la suya propia (operar en nombre de otra planta, ej. Lascano). Para
+    // cualquier otro administrador, se corrige a su propia agencia en vez de
+    // confiar ciegamente en lo que mandó el cliente.
+    if (agenciaHeader && body.agencia !== agenciaHeader && !esSuperAdmin(email)) {
+      body.agencia = agenciaHeader;
+    }
     const parsed = productoSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: parsed.error.errors[0]?.message }, { status: 400 });

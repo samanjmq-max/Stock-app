@@ -8,10 +8,11 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Save, Loader2, PackageX, Camera, Clock, WifiOff, ScanText, MapPin, MapPinOff } from "lucide-react";
 import { conteoSchema, type ConteoInput } from "@/lib/validations";
-import type { Producto } from "@/types";
+import { AGENCIAS, type Agencia, type Producto } from "@/types";
 import { calcularDiferencia, estadoDesdeDiferencia } from "@/lib/utils";
 import { productosService } from "@/services/productos.service";
 import { useAuth } from "@/contexts/AuthContext";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useHardwareScanner } from "@/hooks/useHardwareScanner";
 import { useSync } from "@/hooks/useSync";
 import {
@@ -40,8 +41,16 @@ const OcrScanner = dynamic(
 );
 
 export default function ConteoPage() {
-  const { user, agencia } = useAuth();
+  const { user, agencia, esSuperAdmin } = useAuth();
   const { isOnline, sincronizarAhora } = useSync();
+
+  // Excepción exclusiva del super-admin: puede elegir contar para cualquier
+  // planta (ej. Lascano) en vez de quedar fijo a la agencia de su propio
+  // usuario (Centro Logístico). Para cualquier otro usuario esto nunca se
+  // usa -- agenciaOperativa siempre termina siendo `agencia`, sin cambios
+  // de comportamiento.
+  const [agenciaSeleccionada, setAgenciaSeleccionada] = useState<Agencia | undefined>(undefined);
+  const agenciaOperativa: Agencia = (esSuperAdmin ? agenciaSeleccionada : undefined) ?? agencia ?? "Centro Logístico";
 
   const [codigoBuscado, setCodigoBuscado] = useState("");
   const [producto, setProducto] = useState<Producto | null>(null);
@@ -64,12 +73,13 @@ export default function ConteoPage() {
   const cantidadActual = watch("stockContado");
 
   useEffect(() => {
-    // Cachea SOLO los productos de la agencia del usuario logueado.
+    // Cachea los productos de la agencia operativa actual (la del usuario,
+    // salvo que el super-admin haya elegido otra planta arriba).
     productosService
-      .listar(agencia ?? undefined)
+      .listar(agenciaOperativa)
       .then((productos) => cachearProductos(productos))
       .catch(() => { /* trabaja con lo que ya esté cacheado */ });
-  }, [agencia]);
+  }, [agenciaOperativa]);
 
   const buscarCodigo = useCallback(
     async (codigo: string) => {
@@ -86,8 +96,8 @@ export default function ConteoPage() {
       try {
         let encontrado = await getProductoCachePorCodigo(c);
         if (!encontrado) {
-          // Si no está en caché, busca contra el servidor (solo la agencia del usuario).
-          const todos = await productosService.listar(agencia ?? undefined);
+          // Si no está en caché, busca contra el servidor (agencia operativa actual).
+          const todos = await productosService.listar(agenciaOperativa);
           encontrado = todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase()) ?? null;
         }
 
@@ -105,7 +115,7 @@ export default function ConteoPage() {
         setBuscando(false);
       }
     },
-    [reset, agencia]
+    [reset, agenciaOperativa]
   );
 
   useHardwareScanner((codigo) => buscarCodigo(codigo), true);
@@ -129,7 +139,7 @@ export default function ConteoPage() {
         descripcion: producto?.descripcion || "(no existe en SAP)",
         ubicacion: producto?.ubicacion || "",
         ubicacionNueva: ubicacionIncorrecta ? ubicacionNueva.trim() : "",
-        agencia: agencia || "Centro Logístico",
+        agencia: agenciaOperativa,
         stockSap,
         diferencia,
         estado,
@@ -180,7 +190,22 @@ export default function ConteoPage() {
         </div>
       )}
 
-      {agencia && (
+      {esSuperAdmin ? (
+        <div className="flex items-center gap-2 text-xs bg-muted/40 rounded-lg px-3 py-1.5">
+          <span className="text-muted-foreground shrink-0">Contando para:</span>
+          <Select
+            value={agenciaOperativa}
+            onValueChange={(v) => setAgenciaSeleccionada(v as Agencia)}
+          >
+            <SelectTrigger className="h-7 w-auto min-w-40 border-none bg-transparent px-2 font-medium text-foreground shadow-none">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : agencia && (
         <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-1.5">
           Contando para: <span className="font-medium text-foreground">{agencia}</span>
         </div>
@@ -221,7 +246,7 @@ export default function ConteoPage() {
               <CardContent className="pt-5 flex items-start gap-3">
                 <PackageX className="text-warning-foreground shrink-0 mt-0.5" size={18} />
                 <div>
-                  <p className="text-sm font-medium">Este código no existe en SAP para {agencia || "tu agencia"}</p>
+                  <p className="text-sm font-medium">Este código no existe en SAP para {agenciaOperativa}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     Podés registrarlo igual — quedará marcado como "No existe en SAP".
                   </p>

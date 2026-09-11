@@ -4,14 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
 import { LayoutDashboard, ScanBarcode, Package, History, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
 const ITEMS = [
-  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
-  { href: "/conteo", label: "Contar", icon: ScanBarcode },
-  { href: "/productos", label: "Productos", icon: Package },
-  { href: "/historial", label: "Historial", icon: History },
-  { href: "/usuarios", label: "Perfil", icon: User },
+  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard, soloAdmin: false },
+  { href: "/conteo", label: "Contar", icon: ScanBarcode, soloAdmin: false },
+  { href: "/productos", label: "Productos", icon: Package, soloAdmin: false },
+  // Historial es el log de auditoría de toda la empresa (ver middleware.ts,
+  // RUTAS_SOLO_ADMIN) -- si un operador lo ve acá, el link lo rebota.
+  { href: "/historial", label: "Historial", icon: History, soloAdmin: true },
+  { href: "/usuarios", label: "Perfil", icon: User, soloAdmin: false },
 ];
 
 // Nav inferior interactivo: el fondo del ítem activo se desliza entre tabs
@@ -21,12 +24,13 @@ const ITEMS = [
 // el color cálido --primary ya aporta la identidad de marca.
 export function MobileNav() {
   const pathname = usePathname();
+  const { isAdmin } = useAuth();
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 z-30 flex justify-around border-t border-border bg-background/95 backdrop-blur px-1 py-2"
       style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
-      {ITEMS.map((item) => {
+      {ITEMS.filter((item) => !item.soloAdmin || isAdmin).map((item) => {
         const active = pathname === item.href || pathname.startsWith(item.href + "/");
         const Icon = item.icon;
         return (

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Loader2, Plus, Upload, Download, Pencil, Trash2, Search } from "lucide-react";
 import { productosService } from "@/services/productos.service";
 import type { ProductoInput } from "@/lib/validations";
-import type { Producto } from "@/types";
+import { AGENCIAS, type Agencia, type Producto } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfirm } from "@/hooks/useConfirm";
 import { exportarExcel, exportarCSV, exportarPDF } from "@/lib/exportacion";
@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 const POR_PAGINA = 15;
 
 export default function ProductosPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, esSuperAdmin, agencia } = useAuth();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -33,11 +33,18 @@ export default function ProductosPage() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [productoEditando, setProductoEditando] = useState<Producto | null>(null);
 
-  async function cargar() {
+  // Excepción exclusiva del super-admin: puede elegir gestionar el catálogo
+  // de cualquier planta (ej. Lascano) en vez de quedar fijo a la agencia de
+  // su propio usuario. Para cualquier otro admin esto nunca se usa --
+  // agenciaOperativa siempre es `undefined` (= su propia agencia, sin cambios).
+  const [agenciaSeleccionada, setAgenciaSeleccionada] = useState<Agencia | undefined>(undefined);
+  const agenciaOperativa = esSuperAdmin ? agenciaSeleccionada : undefined;
+
+  async function cargar(agenciaParaCargar?: Agencia) {
     setLoading(true);
     setError(null);
     try {
-      setProductos(await productosService.listar());
+      setProductos(await productosService.listar(agenciaParaCargar));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar productos");
     } finally {
@@ -46,8 +53,9 @@ export default function ProductosPage() {
   }
 
   useEffect(() => {
-    cargar();
-  }, []);
+    cargar(agenciaOperativa);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agenciaOperativa]);
 
   const familias = useMemo(
     () => Array.from(new Set(productos.map((p) => p.familia).filter(Boolean))).sort(),
@@ -74,10 +82,12 @@ export default function ProductosPage() {
         await productosService.actualizar(productoEditando.id, input);
         toast.success("Producto actualizado");
       } else {
+        // input.agencia ya viene correcto desde ProductoFormDialog
+        // (agenciaPorDefecto = la planta que se está viendo ahora).
         await productosService.crear(input);
         toast.success("Producto creado");
       }
-      await cargar();
+      await cargar(agenciaOperativa);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar");
     }
@@ -95,7 +105,7 @@ export default function ProductosPage() {
     try {
       await productosService.eliminar(p.id);
       toast.success("Producto eliminado");
-      await cargar();
+      await cargar(agenciaOperativa);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al eliminar");
     }
@@ -152,6 +162,18 @@ export default function ProductosPage() {
         </div>
 
         <div className="flex gap-2 flex-wrap">
+          {esSuperAdmin && (
+            <Select
+              value={agenciaOperativa ?? "propia"}
+              onValueChange={(v) => setAgenciaSeleccionada(v === "propia" ? undefined : v as Agencia)}
+            >
+              <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="propia">Mi agencia ({agencia})</SelectItem>
+                {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={familiaFiltro} onValueChange={(v) => { setFamiliaFiltro(v); setPagina(1); }}>
             <SelectTrigger className="w-40"><SelectValue placeholder="Familia" /></SelectTrigger>
             <SelectContent>
@@ -230,13 +252,14 @@ export default function ProductosPage() {
         onOpenChange={setDialogOpen}
         productoEditando={productoEditando}
         onGuardar={guardarProducto}
+        agenciaPorDefecto={agenciaOperativa ?? agencia ?? "Centro Logístico"}
       />
       <ImportarProductosDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onImportado={(cantidad) => {
           toast.success(`${cantidad} productos importados`);
-          cargar();
+          cargar(agenciaOperativa);
         }}
       />
       {ConfirmDialogElement}

@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { verificarToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { esSuperAdmin } from "@/lib/permisos";
 const RUTAS_PUBLICAS = ["/login", "/api/auth/login", "/recuperar", "/api/auth/recuperar"];
-const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios", "/etiquetas"];
+// /historial y /api/historial: el log de auditoría es de toda la empresa
+// (login/logout, altas/bajas, ediciones de productos y usuarios de TODAS
+// las plantas) y hoy no tiene forma de filtrarse por agencia porque
+// HistorialEntry no guarda ese dato -- se restringe a admin para no
+// exponer actividad de otras plantas a un operador.
+const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios", "/etiquetas", "/historial", "/api/historial"];
 // Carpetas de estáticos públicos en /public (imágenes, video, fuentes, audio, etc.)
 // servidas directamente por Next — nunca requieren sesión, sin importar la ruta.
 const ES_ASSET_DIR = /^\/(?:videos|images|img|fonts|audio)\//;
