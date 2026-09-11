@@ -24,9 +24,30 @@ interface GasResponse<T> { ok: boolean; data?: T; error?: string; }
  */
 const TIMEOUT_GAS_MS = 15000;
 
+/**
+ * Operaciones de lote que legítimamente tardan más que una operación suelta.
+ *
+ * Apps Script, para estas, tiene que leer la hoja entera y después escribir
+ * miles de filas — 15s no alcanza y no es un síntoma de que algo ande mal.
+ * El grueso del problema igual se resuelve del lado del cliente, mandando la
+ * importación en lotes (ver ImportarProductosDialog); esto es el margen extra
+ * para que un lote grande no se corte al pedo.
+ */
+const TIMEOUT_POR_ACCION: Record<string, number> = {
+  importarProductos: 60000,
+  guardarConteosLote: 45000,
+  eliminarConteos: 45000,
+  resetearConteos: 45000,
+};
+
+function timeoutDe(accion: string): number {
+  return TIMEOUT_POR_ACCION[accion] ?? TIMEOUT_GAS_MS;
+}
+
 async function fetchGas(url: string, init: RequestInit, accion: string): Promise<Response> {
+  const limite = timeoutDe(accion);
   const controlador = new AbortController();
-  const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_GAS_MS);
+  const temporizador = setTimeout(() => controlador.abort(), limite);
   try {
     return await fetch(url, { ...init, signal: controlador.signal });
   } catch (err) {
@@ -34,7 +55,7 @@ async function fetchGas(url: string, init: RequestInit, accion: string): Promise
     // tira un DOMException, que no siempre hereda de Error.
     if ((err as { name?: string } | null)?.name === "AbortError") {
       throw new Error(
-        `El backend (Apps Script) no respondió en ${TIMEOUT_GAS_MS / 1000} segundos al ejecutar "${accion}". ` +
+        `El backend (Apps Script) no respondió en ${limite / 1000} segundos al ejecutar "${accion}". ` +
         `Puede estar saturado o con una ejecución trabada. Revisá las Ejecuciones del proyecto de Apps Script.`
       );
     }
