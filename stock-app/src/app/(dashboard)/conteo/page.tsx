@@ -6,18 +6,22 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Save, Loader2, PackageX, Camera, Clock, WifiOff, ScanText, MapPin, MapPinOff } from "lucide-react";
+import { Search, Save, Loader2, PackageX, Camera, Clock, WifiOff, ScanText, MapPin, MapPinOff, Filter, ListChecks } from "lucide-react";
 import { conteoSchema, type ConteoInput } from "@/lib/validations";
 import { AGENCIAS, type Agencia, type Producto } from "@/types";
 import { calcularDiferencia, estadoDesdeDiferencia } from "@/lib/utils";
 import { productosService } from "@/services/productos.service";
+import { conteosService } from "@/services/conteos.service";
+import { esContable, normalizarCodigo } from "@/hooks/useDashboardData";
 import { useAuth } from "@/contexts/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PendientesTable } from "@/components/dashboard/PendientesTable";
 import { useHardwareScanner } from "@/hooks/useHardwareScanner";
 import { useSync } from "@/hooks/useSync";
 import {
   cachearProductos,
   getProductoCachePorCodigo,
+  getConteosLocales,
   encolarConteo,
   getHistorialLocalDeProducto,
   type ConteoLocal,
@@ -52,6 +56,20 @@ export default function ConteoPage() {
   const [agenciaSeleccionada, setAgenciaSeleccionada] = useState<Agencia | undefined>(undefined);
   const agenciaOperativa: Agencia = (esSuperAdmin ? agenciaSeleccionada : undefined) ?? agencia ?? "Centro Logístico";
 
+  // Filtro por ubicación/familia para conteo cíclico: acota qué hay que
+  // contar en vez de manejar el catálogo entero de la agencia de una.
+  // Nota: hoy sigue trayendo el catálogo completo del servidor (el backend
+  // de Apps Script todavía no filtra por ubicación/familia) -- lo que este
+  // filtro ya resuelve es la parte que se puede hacer sin tocar Apps Script:
+  // acotar qué se cuenta y mostrar el avance real de la zona, no de toda
+  // la agencia.
+  const [ubicacionFiltro, setUbicacionFiltro] = useState("todas");
+  const [familiaFiltro, setFamiliaFiltro] = useState("todas");
+  const [catalogoAgencia, setCatalogoAgencia] = useState<Producto[]>([]);
+  const [conteosAgencia, setConteosAgencia] = useState<{ codigo: string }[]>([]);
+  const [localesPendientes, setLocalesPendientes] = useState<{ codigo: string }[]>([]);
+  const [mostrarPendientesZona, setMostrarPendientesZona] = useState(false);
+
   const [codigoBuscado, setCodigoBuscado] = useState("");
   const [producto, setProducto] = useState<Producto | null>(null);
   const [noExiste, setNoExiste] = useState(false);
@@ -73,13 +91,51 @@ export default function ConteoPage() {
   const cantidadActual = watch("stockContado");
 
   useEffect(() => {
+    // Al cambiar de agencia, las ubicaciones/familias de la planta anterior
+    // ya no aplican -- se resetea el filtro para no dejarlo "vacío" en
+    // silencio mostrando cero productos.
+    setUbicacionFiltro("todas");
+    setFamiliaFiltro("todas");
+
     // Cachea los productos de la agencia operativa actual (la del usuario,
-    // salvo que el super-admin haya elegido otra planta arriba).
+    // salvo que el super-admin haya elegido otra planta arriba), y de paso
+    // trae los conteos ya registrados en el servidor para poder calcular el
+    // avance real de una zona (ubicación/familia), no solo de toda la agencia.
     productosService
       .listar(agenciaOperativa)
-      .then((productos) => cachearProductos(productos))
+      .then((productos) => {
+        setCatalogoAgencia(productos);
+        cachearProductos(productos);
+      })
       .catch(() => { /* trabaja con lo que ya esté cacheado */ });
+
+    conteosService
+      .listar(agenciaOperativa)
+      .then(setConteosAgencia)
+      .catch(() => { /* el avance de zona queda con lo local nomás */ });
   }, [agenciaOperativa]);
+
+  // Conteos todavía sin sincronizar en este dispositivo -- se suman a los
+  // del servidor para que el avance de la zona no "olvide" lo recién
+  // contado offline hasta que se sincronice.
+  useEffect(() => {
+    getConteosLocales().then(setLocalesPendientes).catch(() => {});
+  }, [producto, noExiste]);
+
+  const opcionesUbicacion = Array.from(new Set(catalogoAgencia.map((p) => p.ubicacion).filter(Boolean))).sort();
+  const opcionesFamilia = Array.from(new Set(catalogoAgencia.map((p) => p.familia).filter(Boolean))).sort();
+
+  const productosZona = catalogoAgencia.filter(
+    (p) =>
+      esContable(p) &&
+      (ubicacionFiltro === "todas" || p.ubicacion === ubicacionFiltro) &&
+      (familiaFiltro === "todas" || p.familia === familiaFiltro)
+  );
+  const codigosContadosZona = new Set(
+    [...conteosAgencia, ...localesPendientes].map((c) => normalizarCodigo(c.codigo))
+  );
+  const pendientesZona = productosZona.filter((p) => !codigosContadosZona.has(normalizarCodigo(p.codigo)));
+  const hayFiltroZona = ubicacionFiltro !== "todas" || familiaFiltro !== "todas";
 
   const buscarCodigo = useCallback(
     async (codigo: string) => {
@@ -209,6 +265,65 @@ export default function ConteoPage() {
         <div className="text-xs text-muted-foreground bg-muted/40 rounded-lg px-3 py-1.5">
           Contando para: <span className="font-medium text-foreground">{agencia}</span>
         </div>
+      )}
+
+      {/* Filtro por ubicación/familia para conteo cíclico -- acota qué hace
+          falta contar en vez de manejar toda la agencia de una. */}
+      <Card>
+        <CardContent className="pt-4 pb-4 space-y-2.5">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+            <Filter size={13} />
+            Conteo cíclico — acotar por zona
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <Select value={ubicacionFiltro} onValueChange={setUbicacionFiltro}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Ubicación" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas las ubicaciones</SelectItem>
+                {opcionesUbicacion.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={familiaFiltro} onValueChange={setFamiliaFiltro}>
+              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Familia" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas las familias</SelectItem>
+                {opcionesFamilia.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs text-muted-foreground">
+              {hayFiltroZona ? (
+                <>
+                  <span className="font-medium text-foreground">{productosZona.length - pendientesZona.length}</span>
+                  {" de "}
+                  <span className="font-medium text-foreground">{productosZona.length}</span>
+                  {" contados en esta zona"}
+                </>
+              ) : (
+                <>
+                  <span className="font-medium text-foreground">{productosZona.length}</span> productos contables en {agenciaOperativa}
+                </>
+              )}
+            </p>
+            {productosZona.length > 0 && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-7 text-xs"
+                onClick={() => setMostrarPendientesZona((v) => !v)}
+              >
+                <ListChecks size={13} />
+                {mostrarPendientesZona ? "Ocultar pendientes" : `Ver pendientes (${pendientesZona.length})`}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {mostrarPendientesZona && (
+        <PendientesTable productos={pendientesZona} onQuitarFiltro={() => setMostrarPendientesZona(false)} />
       )}
 
       <Card>

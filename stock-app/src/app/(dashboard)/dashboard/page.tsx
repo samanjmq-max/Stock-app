@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
-import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle } from "lucide-react";
+import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -319,10 +320,22 @@ export default function DashboardPage() {
           </div>
         ) : <div />}
 
-        <Button variant="outline" size="sm" onClick={actualizarManual} disabled={actualizando} className="h-8">
-          {actualizando ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
-          Actualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={actualizarManual} disabled={actualizando} className="h-8">
+            {actualizando ? <Loader2 className="animate-spin" size={14} /> : <RefreshCw size={14} />}
+            Actualizar
+          </Button>
+          {/* Acceso rápido más prominente entre los accesos de la página
+              (design-system/stockapp-saman/pages/dashboard.md) -- no es el
+              único CTA (esto es un resumen, no un formulario), pero sí el
+              más destacado. */}
+          <Button asChild size="sm" className="h-8">
+            <Link href="/conteo">
+              <ScanBarcode size={14} />
+              Nuevo conteo
+            </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -362,7 +375,19 @@ export default function DashboardPage() {
               ? <p className="text-sm text-muted-foreground py-8 text-center">Todavía no hay conteos. Andá a "Contar stock" para empezar.</p>
               : <ResponsiveContainer width="100%" height={220}>
                   <PieChart>
-                    <Pie data={pieData} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                    <Pie
+                      data={pieData}
+                      dataKey="value"
+                      nameKey="name"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      // Etiqueta directa (nombre + valor) en vez de depender
+                      // solo del color para distinguir las porciones -- se
+                      // omiten las de valor 0 para no ensuciar el gráfico.
+                      label={({ name, value }) => (value ? `${name}: ${value}` : "")}
+                      labelLine={false}
+                    >
                       {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                     </Pie>
                     <Tooltip {...tooltipStyle} />

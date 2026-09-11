@@ -1,5 +1,5 @@
 import { openDB, type IDBPDatabase } from "idb";
-import type { Producto } from "@/types";
+import type { Agencia, Producto } from "@/types";
 import type { ConteoInput } from "@/lib/validations";
 
 const DB_NAME = "stockapp-db";
@@ -7,6 +7,7 @@ const DB_VERSION = 1;
 
 export interface ConteoLocal extends ConteoInput {
   localId?: number;
+  agencia: Agencia;
   descripcion: string;
   ubicacion: string;
   stockSap: number;

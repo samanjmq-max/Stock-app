@@ -25,7 +25,13 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
         <Sidebar />
         <div className="flex-1 min-w-0 pb-16 md:pb-0">
           <Topbar title={titulo} />
-          {children}
+          {/* Centra y limita a 1400px en desktop -- sin esto el contenido se
+              estira sin límite en monitores grandes. Se usa max-w directo
+              (no la clase `container`) para no sumarle su padding propio al
+              p-4/md:p-6 que cada página ya trae, que aflojaría la densidad
+              alta que pide Dashboard. Conteo mantiene su propio max-w-xl
+              más angosto adentro, sin cambios visuales para esa página. */}
+          <div className="max-w-[1400px] mx-auto">{children}</div>
         </div>
         <MobileNav />
       </div>

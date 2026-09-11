@@ -33,6 +33,12 @@ export function StatCard({
     destructive: "text-destructive bg-destructive/10",
   }[tone];
 
+  // El semáforo de estado va también en el número, no solo en el ícono
+  // (design-system/stockapp-saman/pages/dashboard.md §Color) -- para
+  // "default" el número queda en el color de texto normal, no en --primary,
+  // para no gritar en cards que no representan un estado.
+  const valorToneClass = { default: "", success: "text-success", warning: "text-warning-foreground", destructive: "text-destructive" }[tone];
+
   return (
     <Card
       onClick={onClick}
@@ -53,7 +59,7 @@ export function StatCard({
       <CardContent className="pt-5 flex items-center justify-between">
         <div>
           <CardTitle className="mb-1.5">{label}</CardTitle>
-          <p className="text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
+          <p className={cn("text-2xl font-semibold tracking-tight tabular-nums", valorToneClass)}>{value}</p>
           {importe !== undefined && (
             <span className="inline-block mt-1 text-[11px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
               {formatearImporte(importe)}
