@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid } from "recharts";
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, CartesianGrid, LabelList, ReferenceLine } from "recharts";
 import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
@@ -141,23 +141,37 @@ export default function DashboardPage() {
     (p) => esContable(p) && !codigosContados.has(normalizarCodigo(p.codigo))
   );
 
-  const topDiferencias = [...todosLosConteos]
-    .filter((c) => c.diferencia !== 0)
-    .sort((a, b) => Math.abs(b.diferencia) - Math.abs(a.diferencia))
-    .slice(0, 8)
-    .map((c) => ({ codigo: c.codigo, diferencia: c.diferencia }));
+  // Top 20 más costosos en stock (precio unitario × Stock SAP) de lo que se
+  // está viendo ahora mismo -- respeta la agencia y el filtro de zona ya
+  // aplicados arriba, así que siempre tiene datos reales para mostrar (no
+  // depende de que todas las plantas estén cargadas, a diferencia del
+  // intento anterior con "más pedidos" multi-planta).
+  const topValorStock = [...productos]
+    .map((p) => ({ codigo: p.codigo, descripcion: p.descripcion, valor: (Number(p.precioUnitario) || 0) * Number(p.stockSap || 0) }))
+    .filter((p) => p.valor > 0)
+    .sort((a, b) => b.valor - a.valor)
+    .slice(0, 20);
 
-  const porUbicacion = new Map<string, { contados: number }>();
-  todosLosConteos.forEach((c) => {
-    const key = c.ubicacionNueva || c.ubicacion || "Sin ubicación";
-    const actual = porUbicacion.get(key) || { contados: 0 };
-    actual.contados += 1;
-    porUbicacion.set(key, actual);
+  // Progreso del conteo en el tiempo: cuántos códigos únicos distintos ya se
+  // contaron, acumulado a medida que van entrando los conteos (orden
+  // cronológico real, no deduplicado por ubicación como `todosLosConteos`).
+  // Reemplaza al viejo gráfico "por ubicación" (barras por zona, sin
+  // relación temporal) que no se entendía como progreso.
+  const totalContable = productos.filter(esContable).length;
+  const conteosOrdenados = [...conteos].sort(
+    (a, b) => new Date(a.creadoEn).getTime() - new Date(b.creadoEn).getTime()
+  );
+  const codigosVistos = new Set<string>();
+  const progresoTiempo = conteosOrdenados.map((c) => {
+    codigosVistos.add(normalizarCodigo(c.codigo));
+    return {
+      momento: new Date(c.creadoEn).toLocaleString("es-UY", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }),
+      acumulado: codigosVistos.size,
+    };
   });
-  const progresoUbicacion = Array.from(porUbicacion.entries())
-    .map(([ubicacion, v]) => ({ ubicacion, contados: v.contados }))
-    .sort((a, b) => b.contados - a.contados)
-    .slice(0, 8);
+  // Espaciado de ticks del eje X para no amontonar etiquetas cuando hay
+  // muchos conteos -- muestra ~8 como máximo, sin importar cuántos puntos haya.
+  const saltoTicksTiempo = Math.max(0, Math.ceil(progresoTiempo.length / 8) - 1);
 
   const conteosFiltrados = vista && vista !== "pendientes" && vista !== "contados"
     ? todosLosConteos.filter((c) => c.estado === vista)
@@ -444,48 +458,100 @@ export default function DashboardPage() {
                     <Tooltip formatter={(v: number) => formatearImporte(v)} {...tooltipStyle} />
                     <Bar dataKey="value" radius={[6, 6, 0, 0]}>
                       {importeData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      <LabelList
+                        dataKey="value"
+                        position="top"
+                        formatter={(v: number) => formatearImporte(v)}
+                        style={{ fill: "hsl(var(--foreground))", fontSize: 11, fontWeight: 500 }}
+                      />
                     </Bar>
                   </BarChart>
                 </ResponsiveContainer>}
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle>Top diferencias</CardTitle></CardHeader>
-          <CardContent>
-            {topDiferencias.length === 0
-              ? <p className="text-sm text-muted-foreground py-8 text-center">Sin diferencias registradas todavía.</p>
-              : <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={topDiferencias}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                    <XAxis dataKey="codigo" fontSize={10} tickLine={false} />
-                    <YAxis fontSize={10} tickLine={false} />
-                    <Tooltip {...tooltipStyle} />
-                    <Bar dataKey="diferencia" radius={[6, 6, 0, 0]}>
-                      {topDiferencias.map((d, i) => <Cell key={i} fill={d.diferencia > 0 ? COLORS.sobra : COLORS.falta} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader><CardTitle>Progreso por ubicación</CardTitle></CardHeader>
-          <CardContent>
-            {progresoUbicacion.length === 0
-              ? <p className="text-sm text-muted-foreground py-8 text-center">Sin datos todavía.</p>
-              : <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={progresoUbicacion} layout="vertical" margin={{ left: 24 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
-                    <XAxis type="number" fontSize={10} tickLine={false} />
-                    <YAxis dataKey="ubicacion" type="category" fontSize={11} width={110} tickLine={false} />
-                    <Tooltip {...tooltipStyle} />
-                    <Bar dataKey="contados" radius={[0, 6, 6, 0]} fill="hsl(var(--primary))" />
-                  </BarChart>
-                </ResponsiveContainer>}
-          </CardContent>
-        </Card>
       </div>
+
+      {/* Ancho completo, no parte de la grilla de 2 columnas -- una serie de
+          tiempo se lee mejor con espacio horizontal de sobra. Area chart con
+          degradado (en vez de línea simple) para un look más actual;
+          --success porque es, literalmente, progreso positivo acumulándose. */}
+      <Card>
+        <CardHeader><CardTitle>Progreso del conteo (en el tiempo)</CardTitle></CardHeader>
+        <CardContent>
+          {progresoTiempo.length === 0
+            ? <p className="text-sm text-muted-foreground py-8 text-center">Todavía no hay conteos registrados.</p>
+            : <ResponsiveContainer width="100%" height={320}>
+                <AreaChart data={progresoTiempo} margin={{ right: 16, top: 8 }}>
+                  <defs>
+                    <linearGradient id="gradienteProgreso" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                  <XAxis dataKey="momento" fontSize={10} tickLine={false} interval={saltoTicksTiempo} />
+                  <YAxis fontSize={10} tickLine={false} allowDecimals={false} />
+                  <Tooltip {...tooltipStyle} formatter={(v: number) => [v, "Códigos contados (acumulado)"]} />
+                  {totalContable > 0 && (
+                    <ReferenceLine
+                      y={totalContable}
+                      stroke="hsl(var(--muted-foreground))"
+                      strokeDasharray="4 4"
+                      label={{ value: `Total a contar (${totalContable})`, position: "insideTopRight", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                    />
+                  )}
+                  <Area
+                    type="monotone"
+                    dataKey="acumulado"
+                    stroke="hsl(var(--success))"
+                    strokeWidth={2.5}
+                    fill="url(#gradienteProgreso)"
+                    dot={progresoTiempo.length <= 30}
+                    activeDot={{ r: 5 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>}
+        </CardContent>
+      </Card>
+
+      {/* Ancho completo, no parte de la grilla de 2 columnas -- con 20
+          barras necesita más aire que una card a media pantalla, y
+          horizontal (en vez de vertical como el resto) porque con esa
+          cantidad de categorías y valores en pesos, las etiquetas de barras
+          verticales angostas se pisan entre sí. Dorado (--warning) en vez
+          de --primary/--success, ya usados en los gráficos vecinos, para
+          que no se repita el mismo color entre gráficos. */}
+      <Card>
+        <CardHeader><CardTitle>Top 20 más costosos en stock — {tituloAgencia}</CardTitle></CardHeader>
+        <CardContent>
+          {topValorStock.length === 0
+            ? <p className="text-sm text-muted-foreground py-8 text-center">Sin importes para mostrar — cargá precios unitarios en el catálogo.</p>
+            : <ResponsiveContainer width="100%" height={560}>
+                <BarChart data={topValorStock} layout="vertical" margin={{ left: 8, right: 72 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
+                  <XAxis type="number" fontSize={10} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
+                  <YAxis dataKey="codigo" type="category" fontSize={11} width={90} tickLine={false} />
+                  <Tooltip
+                    {...tooltipStyle}
+                    labelFormatter={(codigo, payload) => {
+                      const descripcion = payload?.[0]?.payload?.descripcion;
+                      return descripcion ? `${codigo} — ${descripcion}` : codigo;
+                    }}
+                    formatter={(v: number) => [formatearImporte(v), "Valor en stock"]}
+                  />
+                  <Bar dataKey="valor" radius={[0, 6, 6, 0]} fill="hsl(var(--warning))">
+                    <LabelList
+                      dataKey="valor"
+                      position="right"
+                      formatter={(v: number) => formatearImporte(v)}
+                      style={{ fill: "hsl(var(--foreground))", fontSize: 11, fontWeight: 500 }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>}
+        </CardContent>
+      </Card>
 
       {vista === "pendientes"
         ? <PendientesTable productos={productosPendientes} onQuitarFiltro={() => setVista(null)} />

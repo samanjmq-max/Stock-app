@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Upload, Download, Pencil, Trash2, Search } from "lucide-react";
+import { Loader2, Plus, Upload, Download, Search } from "lucide-react";
 import { productosService } from "@/services/productos.service";
 import type { ProductoInput } from "@/lib/validations";
 import { AGENCIAS, type Agencia, type Producto } from "@/types";
@@ -11,12 +11,11 @@ import { useConfirm } from "@/hooks/useConfirm";
 import { exportarExcel, exportarCSV, exportarPDF } from "@/lib/exportacion";
 import { ProductoFormDialog } from "@/features/productos/components/ProductoFormDialog";
 import { ImportarProductosDialog } from "@/features/productos/components/ImportarProductosDialog";
+import { ProductosTable } from "@/features/productos/components/ProductosTable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-
-const POR_PAGINA = 15;
+import { SearchableSelect } from "@/components/ui/searchable-select";
 
 export default function ProductosPage() {
   const { isAdmin, esSuperAdmin, agencia } = useAuth();
@@ -26,8 +25,8 @@ export default function ProductosPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [busqueda, setBusqueda] = useState("");
-  const [familiaFiltro, setFamiliaFiltro] = useState<string>("todas");
-  const [pagina, setPagina] = useState(1);
+  const [familiaFiltro, setFamiliaFiltro] = useState<string[]>([]);
+  const [ubicacionFiltro, setUbicacionFiltro] = useState<string[]>([]);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -54,11 +53,17 @@ export default function ProductosPage() {
 
   useEffect(() => {
     cargar(agenciaOperativa);
+    setFamiliaFiltro([]);
+    setUbicacionFiltro([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [agenciaOperativa]);
 
   const familias = useMemo(
     () => Array.from(new Set(productos.map((p) => p.familia).filter(Boolean))).sort(),
+    [productos]
+  );
+  const ubicaciones = useMemo(
+    () => Array.from(new Set(productos.map((p) => p.ubicacion).filter(Boolean))).sort(),
     [productos]
   );
 
@@ -67,14 +72,17 @@ export default function ProductosPage() {
     return productos.filter((p) => {
       const coincideBusqueda =
         !q || [p.codigo, p.descripcion, p.ubicacion, p.familia, p.proveedor].join(" ").toLowerCase().includes(q);
-      const coincideFamilia = familiaFiltro === "todas" || p.familia === familiaFiltro;
-      return coincideBusqueda && coincideFamilia;
+      const coincideFamilia = familiaFiltro.length === 0 || familiaFiltro.includes(p.familia);
+      const coincideUbicacion = ubicacionFiltro.length === 0 || ubicacionFiltro.includes(p.ubicacion);
+      return coincideBusqueda && coincideFamilia && coincideUbicacion;
     });
-  }, [productos, busqueda, familiaFiltro]);
+  }, [productos, busqueda, familiaFiltro, ubicacionFiltro]);
 
-  const totalPaginas = Math.max(Math.ceil(filtrados.length / POR_PAGINA), 1);
-  const paginaSegura = Math.min(pagina, totalPaginas);
-  const enPagina = filtrados.slice((paginaSegura - 1) * POR_PAGINA, paginaSegura * POR_PAGINA);
+  function limpiarFiltros() {
+    setBusqueda("");
+    setFamiliaFiltro([]);
+    setUbicacionFiltro([]);
+  }
 
   async function guardarProducto(input: ProductoInput) {
     try {
@@ -90,6 +98,17 @@ export default function ProductosPage() {
       await cargar(agenciaOperativa);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar");
+    }
+  }
+
+  async function guardarPrecioInline(p: Producto, precio: number) {
+    try {
+      await productosService.actualizar(p.id, { precioUnitario: precio });
+      setProductos((prev) => prev.map((x) => (x.id === p.id ? { ...x, precioUnitario: precio } : x)));
+      toast.success(`Precio de ${p.codigo} actualizado`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo actualizar el precio");
+      throw err;
     }
   }
 
@@ -109,6 +128,29 @@ export default function ProductosPage() {
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al eliminar");
     }
+  }
+
+  async function eliminarVariosProductos(seleccionados: Producto[]) {
+    const confirmado = await confirm({
+      titulo: `Eliminar ${seleccionados.length} productos`,
+      descripcion: `¿Eliminar los ${seleccionados.length} productos seleccionados? Esta acción no se puede deshacer.`,
+      textoConfirmar: "Eliminar",
+      variante: "destructive",
+    });
+    if (!confirmado) return;
+
+    // No hay endpoint de borrado en lote para productos (sí para conteos) --
+    // se reutiliza el DELETE por id existente, en paralelo. Mismo resultado
+    // para quien usa la app, sin sumar una ruta nueva para esto.
+    const resultados = await Promise.allSettled(seleccionados.map((p) => productosService.eliminar(p.id)));
+    const exitosos = resultados.filter((r) => r.status === "fulfilled").length;
+    const fallidos = resultados.length - exitosos;
+    if (fallidos > 0) {
+      toast.error(`${exitosos} eliminados, ${fallidos} fallaron`);
+    } else {
+      toast.success(`${exitosos} productos eliminados`);
+    }
+    await cargar(agenciaOperativa);
   }
 
   function exportar(formato: "xlsx" | "csv" | "pdf") {
@@ -154,10 +196,7 @@ export default function ProductosPage() {
             placeholder="Buscar producto..."
             className="pl-9"
             value={busqueda}
-            onChange={(e) => {
-              setBusqueda(e.target.value);
-              setPagina(1);
-            }}
+            onChange={(e) => setBusqueda(e.target.value)}
           />
         </div>
 
@@ -174,15 +213,22 @@ export default function ProductosPage() {
               </SelectContent>
             </Select>
           )}
-          <Select value={familiaFiltro} onValueChange={(v) => { setFamiliaFiltro(v); setPagina(1); }}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="Familia" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todas">Todas las familias</SelectItem>
-              {familias.map((f) => (
-                <SelectItem key={f} value={f}>{f}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <SearchableSelect
+            value={ubicacionFiltro}
+            onValueChange={setUbicacionFiltro}
+            options={ubicaciones}
+            allLabel="Todas las ubicaciones"
+            placeholder="Buscar ubicación..."
+            className="w-44"
+          />
+          <SearchableSelect
+            value={familiaFiltro}
+            onValueChange={setFamiliaFiltro}
+            options={familias}
+            allLabel="Todas las familias"
+            placeholder="Buscar familia..."
+            className="w-40"
+          />
 
           <Button variant="secondary" onClick={() => exportar("xlsx")}><Download size={15} />Excel</Button>
           <Button variant="secondary" onClick={() => exportar("csv")}><Download size={15} />CSV</Button>
@@ -205,47 +251,17 @@ export default function ProductosPage() {
 
       {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
 
-      <p className="text-xs text-muted-foreground">{filtrados.length} productos</p>
-
-      <div className="space-y-2">
-        {enPagina.map((p) => (
-          <Card key={p.id}>
-            <CardContent className="pt-4 pb-4 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{p.codigo} — {p.descripcion}</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  📍 {p.ubicacion || "sin ubicación"} · {p.familia || "sin familia"} · Stock SAP: {p.stockSap}
-                </p>
-              </div>
-              {isAdmin && (
-                <div className="flex gap-1 shrink-0">
-                  <Button variant="ghost" size="icon" onClick={() => { setProductoEditando(p); setDialogOpen(true); }}>
-                    <Pencil size={15} />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => eliminarProducto(p)}>
-                    <Trash2 size={15} className="text-destructive" />
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        ))}
-        {enPagina.length === 0 && (
-          <p className="text-sm text-muted-foreground text-center py-10">No se encontraron productos.</p>
-        )}
-      </div>
-
-      {totalPaginas > 1 && (
-        <div className="flex items-center justify-center gap-2 pt-2">
-          <Button variant="secondary" size="sm" disabled={paginaSegura === 1} onClick={() => setPagina((p) => p - 1)}>
-            Anterior
-          </Button>
-          <span className="text-xs text-muted-foreground">Página {paginaSegura} de {totalPaginas}</span>
-          <Button variant="secondary" size="sm" disabled={paginaSegura === totalPaginas} onClick={() => setPagina((p) => p + 1)}>
-            Siguiente
-          </Button>
-        </div>
-      )}
+      <ProductosTable
+        productos={filtrados}
+        isAdmin={isAdmin}
+        busqueda={busqueda}
+        onEditar={(p) => { setProductoEditando(p); setDialogOpen(true); }}
+        onEliminar={eliminarProducto}
+        onEliminarVarios={eliminarVariosProductos}
+        onGuardarPrecio={guardarPrecioInline}
+        onLimpiarFiltros={busqueda || familiaFiltro.length > 0 || ubicacionFiltro.length > 0 ? limpiarFiltros : undefined}
+        onAgregarPrimero={isAdmin ? () => { setProductoEditando(null); setDialogOpen(true); } : undefined}
+      />
 
       <ProductoFormDialog
         open={dialogOpen}
