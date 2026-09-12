@@ -70,7 +70,12 @@ export default function LoginPage() {
       };
 
   return (
-    <div className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-background px-4">
+    /* Oscuro fijo, no bg-background: ese token en modo claro es casi blanco
+       y se colaba como un halo blanquecino por los bordes del video. */
+    <div
+      className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4"
+      style={{ backgroundColor: "hsl(20 25% 5%)" }}
+    >
       <RiceFieldVideoBackground />
 
       {/* Halo: oscurece muy difuminado justo detrás del formulario. Sin

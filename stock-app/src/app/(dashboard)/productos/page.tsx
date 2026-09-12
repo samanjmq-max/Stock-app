@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Upload, Download, Search, ChevronDown, FileSpreadsheet, FileText, FileType } from "lucide-react";
+import { Loader2, Plus, Upload, Download, Search, ChevronDown, FileSpreadsheet, FileText, FileType, SlidersHorizontal } from "lucide-react";
 import { productosService } from "@/services/productos.service";
 import type { ProductoInput } from "@/lib/validations";
 import { AGENCIAS, type Agencia, type Producto } from "@/types";
@@ -103,6 +103,13 @@ export default function ProductosPage() {
   const [busqueda, setBusqueda] = useState("");
   const [familiaFiltro, setFamiliaFiltro] = useState<string[]>([]);
   const [ubicacionFiltro, setUbicacionFiltro] = useState<string[]>([]);
+  /*
+    En el celular los filtros arrancan plegados: desplegados empujaban la
+    tabla varios renglones hacia abajo y, al hacer scroll, quedaban tapados
+    por el encabezado fijo. La búsqueda y las acciones siguen siempre a la
+    vista porque son lo que más se usa. En escritorio no cambia nada.
+  */
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -153,6 +160,9 @@ export default function ProductosPage() {
       return coincideBusqueda && coincideFamilia && coincideUbicacion;
     });
   }, [productos, busqueda, familiaFiltro, ubicacionFiltro]);
+
+  const filtrosActivos =
+    (ubicacionFiltro.length > 0 ? 1 : 0) + (familiaFiltro.length > 0 ? 1 : 0) + (agenciaSeleccionada ? 1 : 0);
 
   function limpiarFiltros() {
     setBusqueda("");
@@ -273,7 +283,31 @@ export default function ProductosPage() {
           />
         </div>
 
-        <div className="flex gap-2 flex-wrap">
+        {/* Plegador de filtros: solo en celular. */}
+        <div className="flex items-center gap-2 md:hidden">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setFiltrosAbiertos((v) => !v)}
+            aria-expanded={filtrosAbiertos}
+          >
+            <SlidersHorizontal size={14} />
+            Filtros
+            {filtrosActivos > 0 && (
+              <span className="ml-0.5 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
+                {filtrosActivos}
+              </span>
+            )}
+            <ChevronDown size={14} className={cn("transition-transform duration-quick", filtrosAbiertos && "rotate-180")} />
+          </Button>
+          {filtrosActivos > 0 && (
+            <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
+              Limpiar
+            </Button>
+          )}
+        </div>
+
+        <div className={cn("gap-2 flex-wrap", filtrosAbiertos ? "flex" : "hidden md:flex")}>
           {esSuperAdmin && (
             <Select
               value={agenciaOperativa ?? "propia"}
@@ -303,9 +337,12 @@ export default function ProductosPage() {
             className="w-40"
           />
 
-          {/* Jerarquía de la pantalla: "Nuevo" es la única acción primaria.
-              Exportar e Importar son secundarias, y los filtros no son
-              acciones. Antes había cinco botones del mismo peso. */}
+        </div>
+
+        {/* Acciones: siempre visibles, también en celular. Jerarquía de la
+            pantalla: "Nuevo" es la única primaria; Exportar e Importar son
+            secundarias. Antes había cinco botones del mismo peso. */}
+        <div className="flex gap-2 flex-wrap">
           <MenuExportar onExportar={exportar} />
 
           {isAdmin && (

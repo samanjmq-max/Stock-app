@@ -16,7 +16,7 @@ function sincronizarColorDeBarra(oscuro: boolean) {
 
 export function Topbar({ title }: { title: string }) {
   const { user, logout } = useAuth();
-  const { isOnline, pendientes, sincronizando, sincronizarAhora } = useSync();
+  const { isOnline, pendientes, sincronizando, errorSync, sincronizarAhora } = useSync();
   const [dark, setDark] = useState(true);
 
   /*
@@ -56,8 +56,26 @@ export function Topbar({ title }: { title: string }) {
               En línea
             </span>
           )}
-          {pendientes > 0 && <span>· {pendientes} por sincronizar</span>}
+          {pendientes > 0 && (
+            <button
+              type="button"
+              onClick={sincronizarAhora}
+              disabled={sincronizando || !isOnline}
+              className="underline decoration-dotted underline-offset-2 hover:text-foreground disabled:no-underline"
+            >
+              · {pendientes} por sincronizar
+            </button>
+          )}
         </div>
+
+        {/* Si la subida viene fallando, el motivo tiene que estar a la vista:
+            un conteo trabado es trabajo de inventario que no llegó a la
+            planilla, y antes esto fallaba en absoluto silencio. */}
+        {errorSync && pendientes > 0 && (
+          <p className="mt-0.5 max-w-[46ch] truncate text-[11px] text-warning" title={errorSync}>
+            No se pudo subir: {errorSync}
+          </p>
+        )}
       </div>
       <div className="flex items-center gap-2">
         {pendientes > 0 && (

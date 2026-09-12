@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
  * Puramente presentacional (aria-hidden, pointer-events-none): no contiene
  * lógica de negocio ni de autenticación.
  *
- * El video no se muestra crudo: pasa por una gradación de cinco capas que
+ * El video no se muestra crudo: pasa por una gradación de cuatro capas que
  * lo lleva del verde plano de stock a una imagen tratada y cálida. La idea
  * es que el arrozal sea el protagonista de la pantalla, así que el
  * oscurecimiento general es suave -- la legibilidad del formulario la
@@ -93,7 +93,7 @@ export function RiceFieldVideoBackground() {
       <video
         ref={videoRef}
         className="h-full w-full object-cover"
-        style={{ filter: "contrast(1.34) saturate(0.84) brightness(0.74)" }}
+        style={{ filter: "contrast(1.26) saturate(0.96) brightness(0.88)" }}
         src="/videos/campo-arroz-closeup.mp4"
         poster="/images/login-fallback.jpg"
         autoPlay={!reducedMotion}
@@ -111,20 +111,24 @@ export function RiceFieldVideoBackground() {
       */}
       <div
         className="absolute inset-0"
-        style={{ backgroundColor: "hsl(24 75% 34%)", mixBlendMode: "soft-light", opacity: 0.55 }}
+        style={{ backgroundColor: "hsl(24 75% 34%)", mixBlendMode: "soft-light", opacity: 0.4 }}
       />
 
       {/*
-        CAPA 3 — Viñeta radial. Centro limpio para que se vea el arrozal,
-        bordes y esquinas hacia el negro cálido del fondo de la app. Suave: el
-        oscurecimiento fuerte lo hace el halo local del formulario, no esta
-        capa, así que el arrozal se ve en casi toda la pantalla.
+        CAPA 3 — Viñeta radial, muy suave: solo cierra las esquinas para que la
+        imagen no corte en seco contra el borde. El oscurecimiento que hace
+        legible el formulario es el halo local (.login-halo), no esta capa.
+
+        El color va FIJO en el oscuro (20 25% 5%) y no en hsl(var(--background)):
+        ese token en modo claro es casi blanco, así que la viñeta pintaba un
+        velo blanco en todos los bordes de la imagen. El login siempre se ve
+        oscuro, sin importar el tema de la app.
       */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 82% 78% at 50% 46%, transparent 0%, hsl(var(--background) / 0.3) 66%, hsl(var(--background) / 0.78) 100%)",
+            "radial-gradient(ellipse 90% 88% at 50% 46%, transparent 0%, hsl(20 25% 5% / 0.14) 70%, hsl(20 25% 5% / 0.5) 100%)",
         }}
       />
 
@@ -134,12 +138,8 @@ export function RiceFieldVideoBackground() {
       */}
       <div
         className="absolute inset-x-0 bottom-0 h-1/3"
-        style={{ background: "linear-gradient(to top, hsl(var(--background) / 0.6), transparent)" }}
+        style={{ background: "linear-gradient(to top, hsl(20 25% 5% / 0.45), transparent)" }}
       />
-
-      {/* CAPA 5 — Grano. La textura que separa una imagen tratada de un
-          fondo de video sin trabajar. */}
-      <div className="login-grain absolute inset-0" />
     </div>
   );
 }

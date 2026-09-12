@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
+import { CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode, SlidersHorizontal, ChevronDown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -82,6 +82,14 @@ export default function DashboardPage() {
   const [vaciando, setVaciando] = useState(false);
   const [vaciandoTodas, setVaciandoTodas] = useState(false);
   const [actualizando, setActualizando] = useState(false);
+  /*
+    En el celular los filtros arrancan plegados. Desplegados ocupaban cuatro
+    o cinco renglones antes de cualquier dato -- había que hacer scroll para
+    llegar al conteo, y al hacerlo la fila quedaba escondida debajo del
+    encabezado fijo, que es lo que se veía como "los filtros desaparecen".
+    En escritorio no cambia nada: siempre visibles.
+  */
+  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -319,12 +327,45 @@ export default function DashboardPage() {
   const tituloZona = [...ubicacionFiltro, ...familiaFiltro].join(" · ");
   const tituloAgencia = (agenciaFiltro || agenciaUsuario || "Todas las agencias") + (tituloZona ? ` — ${tituloZona}` : "");
   const hayFiltroActivo = vista !== null;
+  const filtrosActivos =
+    (agenciaFiltro ? 1 : 0) + (ubicacionFiltro.length > 0 ? 1 : 0) + (familiaFiltro.length > 0 ? 1 : 0);
+
+  function limpiarFiltrosDashboard() {
+    setAgenciaFiltro(undefined);
+    setUbicacionFiltro([]);
+    setFamiliaFiltro([]);
+    setVista(null);
+  }
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="p-4 md:p-6 space-y-5">
 
+      {/* Plegador de filtros: solo en celular. */}
+      <div className="flex items-center justify-between gap-2 md:hidden">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setFiltrosAbiertos((v) => !v)}
+          aria-expanded={filtrosAbiertos}
+        >
+          <SlidersHorizontal size={14} />
+          Filtros
+          {filtrosActivos > 0 && (
+            <span className="ml-0.5 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
+              {filtrosActivos}
+            </span>
+          )}
+          <ChevronDown size={14} className={cn("transition-transform duration-quick", filtrosAbiertos && "rotate-180")} />
+        </Button>
+        {filtrosActivos > 0 && (
+          <Button variant="ghost" size="sm" onClick={limpiarFiltrosDashboard}>
+            Limpiar
+          </Button>
+        )}
+      </div>
+
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className={cn("items-center gap-3 flex-wrap", filtrosAbiertos ? "flex" : "hidden md:flex")}>
           {isAdmin && (
             <>
               <p className="text-sm text-muted-foreground">Ver agencia:</p>
