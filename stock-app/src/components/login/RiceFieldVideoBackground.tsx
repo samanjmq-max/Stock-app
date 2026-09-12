@@ -6,13 +6,21 @@ import { useEffect, useRef, useState } from "react";
  * Puramente presentacional (aria-hidden, pointer-events-none): no contiene
  * lógica de negocio ni de autenticación.
  *
+ * El video no se muestra crudo: pasa por una gradación de cinco capas que
+ * lo lleva del verde plano de stock a una imagen tratada y cálida. La idea
+ * es que el arrozal sea el protagonista de la pantalla, así que el
+ * oscurecimiento general es suave -- la legibilidad del formulario la
+ * resuelve su propio halo difuminado (.login-halo), que actúa solo donde
+ * hace falta en vez de apagar la imagen entera.
+ *
  * Respeta prefers-reduced-motion: si está activado, el <video> no se
- * reproduce (se pausa/no arranca) y queda solo el poster estático como
- * fondo — mismo criterio que el resto del design-system (ver globals.css).
+ * reproduce y queda solo el poster estático como fondo — la gradación se
+ * aplica igual, así que se ve igual de tratado, simplemente quieto.
  */
 export function RiceFieldVideoBackground() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const mql = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -20,6 +28,14 @@ export function RiceFieldVideoBackground() {
     const onChange = (e: MediaQueryListEvent) => setReducedMotion(e.matches);
     mql.addEventListener("change", onChange);
     return () => mql.removeEventListener("change", onChange);
+  }, []);
+
+  // El fondo entra con un fundido corto en vez de aparecer de golpe: sin
+  // esto, el primer frame del video hace un salto de negro a verde que
+  // arruina la secuencia de entrada de la tarjeta.
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 30);
+    return () => clearTimeout(t);
   }, []);
 
   useEffect(() => {
@@ -60,10 +76,24 @@ export function RiceFieldVideoBackground() {
   }, [reducedMotion]);
 
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-0 overflow-hidden transition-opacity duration-1000 ease-out"
+      style={{ opacity: visible ? 1 : 0 }}
+    >
+      {/*
+        CAPA 1 — El video, graduado.
+        contrast sube el punch, saturate baja el verde neón del material
+        original, y brightness lo baja lo justo: el formulario ya no depende de un fondo
+        muy oscuro porque tiene su propio halo difuminado detrás.
+        Los tres valores son moderados a propósito: filtrar un video en
+        reproducción cuesta trabajo de GPU en cada frame, y en un teléfono de
+        depósito eso se paga en batería.
+      */}
       <video
         ref={videoRef}
-        className="w-full h-full object-cover"
+        className="h-full w-full object-cover"
+        style={{ filter: "contrast(1.34) saturate(0.84) brightness(0.74)" }}
         src="/videos/campo-arroz-closeup.mp4"
         poster="/images/login-fallback.jpg"
         autoPlay={!reducedMotion}
@@ -72,22 +102,44 @@ export function RiceFieldVideoBackground() {
         playsInline
         preload="auto"
       />
+
       {/*
-        Viñeta radial en vez de franja horizontal: el título + card quedan
-        centrados en pantalla, así que un degradado de arriba-abajo tapaba
-        el video tanto en el centro (donde no hace falta) como en los bordes
-        (donde sí queremos que se note). Centro transparente, tiñe solo hacia
-        bordes/esquinas -- ahora a la mitad de intensidad (~28% máximo, antes
-        55%) para que se vean los colores del video, no lavados. El card
-        (glassmorphism) es el que aporta legibilidad al centro, no esta capa.
+        CAPA 2 — Tinte cálido en soft-light.
+        Lleva los verdes hacia la temperatura tierra de la marca sin
+        convertirlos en marrón: soft-light respeta las luces y las sombras
+        del material, a diferencia de un overlay plano que lo ensucia todo.
+      */}
+      <div
+        className="absolute inset-0"
+        style={{ backgroundColor: "hsl(24 75% 34%)", mixBlendMode: "soft-light", opacity: 0.55 }}
+      />
+
+      {/*
+        CAPA 3 — Viñeta radial. Centro limpio para que se vea el arrozal,
+        bordes y esquinas hacia el negro cálido del fondo de la app. Suave: el
+        oscurecimiento fuerte lo hace el halo local del formulario, no esta
+        capa, así que el arrozal se ve en casi toda la pantalla.
       */}
       <div
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(ellipse 70% 65% at 50% 50%, transparent 0%, hsl(var(--background) / 0.28) 100%)",
+            "radial-gradient(ellipse 82% 78% at 50% 46%, transparent 0%, hsl(var(--background) / 0.3) 66%, hsl(var(--background) / 0.78) 100%)",
         }}
       />
+
+      {/*
+        CAPA 4 — Base inferior. Ancla la imagen al suelo de la app en vez de
+        cortarla en seco contra el borde de la pantalla.
+      */}
+      <div
+        className="absolute inset-x-0 bottom-0 h-1/3"
+        style={{ background: "linear-gradient(to top, hsl(var(--background) / 0.6), transparent)" }}
+      />
+
+      {/* CAPA 5 — Grano. La textura que separa una imagen tratada de un
+          fondo de video sin trabajar. */}
+      <div className="login-grain absolute inset-0" />
     </div>
   );
 }

@@ -298,3 +298,175 @@ body {
 .nav-light {
   box-shadow: 0 0 12px 1px hsl(var(--primary) / 0.75);
 }
+
+/*
+  ============================================================================
+  Login — el video es el protagonista
+  ============================================================================
+
+  Regla de esta pantalla: el formulario no vive adentro de un cuadro, vive
+  SOBRE la imagen. No hay tarjeta con fondo propio ni campos con recuadro
+  blanco -- todo eso competía con el arrozal y lo tapaba.
+
+  Lo que sostiene la legibilidad no es opacidad sino tres cosas más sutiles:
+  la gradación oscura del video, un oscurecimiento muy difuminado detrás del
+  formulario (sin borde, así que no se lee como caja), y un filo de luz de
+  1px arriba que ubica el panel en el espacio.
+*/
+
+/* Contenedor del formulario: casi invisible. Apenas un velo y un filo. */
+.login-glass {
+  background: hsl(0 0% 0% / 0.16);
+  border: 1px solid hsl(0 0% 100% / 0.09);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  position: relative;
+}
+.login-glass::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.4), transparent);
+  pointer-events: none;
+}
+
+/*
+  Oscurecimiento detrás del formulario. Va MUY difuminado y sin bordes: el
+  ojo lo lee como profundidad, no como un rectángulo. Es lo que permite que
+  el panel sea casi transparente y el texto igual se lea.
+*/
+.login-halo {
+  background: radial-gradient(ellipse 62% 52% at 50% 52%, hsl(20 25% 4% / 0.62) 0%, hsl(20 25% 4% / 0.28) 55%, transparent 78%);
+  filter: blur(18px);
+}
+
+/*
+  Campos sin recuadro: fondo apenas perceptible y una línea inferior que se
+  enciende en terracota al enfocar. Un input blanco sólido sobre una foto es
+  lo que hace que cualquier login se vea como un formulario pegado encima en
+  vez de parte de la pantalla.
+*/
+.login-field {
+  background: hsl(0 0% 100% / 0.07) !important;
+  border: 1px solid transparent !important;
+  border-bottom: 1px solid hsl(0 0% 100% / 0.28) !important;
+  border-radius: 8px 8px 2px 2px !important;
+  color: hsl(0 0% 100%) !important;
+  box-shadow: none !important;
+  transition: background-color var(--dur-quick) ease, border-color var(--dur-quick) ease;
+}
+.login-field::placeholder {
+  color: hsl(0 0% 100% / 0.42) !important;
+}
+.login-field:hover {
+  background: hsl(0 0% 100% / 0.1) !important;
+}
+.login-field:focus-visible {
+  background: hsl(0 0% 100% / 0.12) !important;
+  border-bottom-color: hsl(var(--primary)) !important;
+  outline: none !important;
+  box-shadow: 0 2px 14px -6px hsl(var(--primary) / 0.9) !important;
+}
+/* El autocompletado de Chrome pinta un fondo blanco propio que ignora el
+   background del input. La única forma de ganarle es una sombra interna
+   enorme del color que queremos. */
+.login-field:-webkit-autofill,
+.login-field:-webkit-autofill:hover,
+.login-field:-webkit-autofill:focus {
+  -webkit-text-fill-color: hsl(0 0% 100%) !important;
+  -webkit-box-shadow: 0 0 0 1000px hsl(20 25% 8%) inset !important;
+  caret-color: hsl(0 0% 100%);
+}
+
+/*
+  Botón Ingresar.
+
+  Tres estados con tres tratamientos distintos:
+
+  - EN REPOSO respira: un halo que late lento y un destello que barre cada
+    tanto. Es un loop ambiente, que en el resto de la app está prohibido --
+    acá se permite porque es el único control de la pantalla, no hay ninguna
+    tarea en curso que interrumpir, y es lo que invita a tocarlo.
+  - AL PRESIONAR se hunde y el halo se cierra de golpe.
+  - AL ENVIAR el destello se acelera y el halo se intensifica: el botón se
+    "enciende" mientras valida, en vez de quedarse mudo con una ruedita.
+*/
+@keyframes btn-enter-glow {
+  0%, 100% { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.35), 0 6px 24px -10px hsl(var(--primary) / 0.6); }
+  50%      { box-shadow: 0 0 0 1px hsl(var(--primary) / 0.55), 0 10px 36px -8px hsl(var(--primary) / 0.95); }
+}
+@keyframes btn-enter-sweep {
+  0%   { transform: translateX(-120%) skewX(-18deg); }
+  55%  { transform: translateX(220%) skewX(-18deg); }
+  100% { transform: translateX(220%) skewX(-18deg); }
+}
+
+.btn-enter {
+  position: relative;
+  overflow: hidden;
+  animation: btn-enter-glow 2.8s ease-in-out infinite;
+  transition: transform var(--dur-quick) var(--ease-spring);
+}
+.btn-enter::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.45), transparent);
+  animation: btn-enter-sweep 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+.btn-enter:active:not(:disabled) {
+  transform: scale(0.975);
+  animation-play-state: paused;
+}
+
+/* Enviando: mismo lenguaje, más rápido y más brillante. */
+.btn-enter[data-entrando="true"] {
+  animation-duration: 0.9s;
+}
+.btn-enter[data-entrando="true"]::after {
+  animation-duration: 1s;
+  background: linear-gradient(90deg, transparent, hsl(0 0% 100% / 0.7), transparent);
+}
+
+/*
+  La línea del escáner. Barre el panel una vez al cargar la pantalla, y
+  vuelve a barrer mientras se está validando el ingreso: StockApp es un
+  lector de códigos, así que entrar a la app es dejarse leer.
+*/
+@keyframes login-scan {
+  0%   { top: -4%;  opacity: 0; }
+  10%  { opacity: 0.9; }
+  88%  { opacity: 0.9; }
+  100% { top: 104%; opacity: 0; }
+}
+.login-scan {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, transparent, hsl(var(--primary) / 0.95), transparent);
+  box-shadow: 0 0 18px 2px hsl(var(--primary) / 0.55);
+  pointer-events: none;
+  /* `both` deja el frame 0% antes del delay (invisible) y el 100% al final
+     (invisible): la línea aparece y no queda nada colgado. */
+  animation: login-scan 1.25s cubic-bezier(0.4, 0, 0.2, 1) 0.35s both;
+}
+.login-scan[data-repetir="true"] {
+  animation: login-scan 0.85s cubic-bezier(0.4, 0, 0.2, 1) 0s infinite;
+}
+
+/*
+  Grano de película. La textura que separa una imagen tratada de un fondo de
+  video sin trabajar. Muy sutil: si se nota conscientemente, está de más.
+*/
+.login-grain {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.55'/%3E%3C/svg%3E");
+  opacity: 0.14;
+  mix-blend-mode: overlay;
+}
