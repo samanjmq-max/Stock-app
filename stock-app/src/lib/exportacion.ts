@@ -1,5 +1,3 @@
-import * as XLSX from "xlsx";
-
 function descargarArchivo(blob: Blob, nombre: string) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -11,8 +9,17 @@ function descargarArchivo(blob: Blob, nombre: string) {
   URL.revokeObjectURL(url);
 }
 
-/** Exporta un array de objetos a un archivo .xlsx descargable. */
-export function exportarExcel(datos: Record<string, unknown>[], nombreHoja: string, nombreArchivo: string) {
+/**
+ * Exporta un array de objetos a un archivo .xlsx descargable.
+ *
+ * `xlsx` se carga dinámicamente (como ya hace `exportarPDF` con jsPDF) en
+ * vez de importarse a nivel de módulo: es una librería pesada que antes
+ * entraba en el bundle inicial de Dashboard/Productos/Historial aunque el
+ * usuario nunca tocara el botón de exportar. Mismo criterio, ahora
+ * consistente en los tres formatos de export.
+ */
+export async function exportarExcel(datos: Record<string, unknown>[], nombreHoja: string, nombreArchivo: string) {
+  const XLSX = await import("xlsx");
   const hoja = XLSX.utils.json_to_sheet(datos);
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, nombreHoja);
@@ -20,7 +27,8 @@ export function exportarExcel(datos: Record<string, unknown>[], nombreHoja: stri
 }
 
 /** Exporta un array de objetos a un archivo .csv descargable. */
-export function exportarCSV(datos: Record<string, unknown>[], nombreArchivo: string) {
+export async function exportarCSV(datos: Record<string, unknown>[], nombreArchivo: string) {
+  const XLSX = await import("xlsx");
   const hoja = XLSX.utils.json_to_sheet(datos);
   const csv = XLSX.utils.sheet_to_csv(hoja);
   descargarArchivo(new Blob([csv], { type: "text/csv;charset=utf-8;" }), `${nombreArchivo}.csv`);

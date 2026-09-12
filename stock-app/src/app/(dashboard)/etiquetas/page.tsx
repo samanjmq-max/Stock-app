@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Download, Barcode as BarcodeIcon, Search, Upload, Loader2, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -101,6 +100,7 @@ export default function EtiquetasPage() {
     if (!file) return;
     setCargandoExcel(true);
     try {
+      const XLSX = await import("xlsx");
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
       const nombreHoja = wb.SheetNames[0];

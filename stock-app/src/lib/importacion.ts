@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import type { FilaImportacion } from "@/services/productos.service";
 
 export interface ResultadoLectura {
@@ -45,8 +44,16 @@ function normalizarEncabezado(h: string): string {
   return String(h).trim().toLowerCase();
 }
 
-/** Lee un archivo .xlsx, .xls o .csv y devuelve las filas normalizadas + errores por fila. */
+/**
+ * Lee un archivo .xlsx, .xls o .csv y devuelve las filas normalizadas +
+ * errores por fila.
+ *
+ * `xlsx` se carga dinámicamente -- solo lo usa el diálogo de importación de
+ * Productos (admin), así que no tiene sentido que viaje en el bundle
+ * inicial de esa página para todo el mundo.
+ */
 export async function leerArchivoProductos(file: File): Promise<ResultadoLectura> {
+  const XLSX = await import("xlsx");
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
   const nombreHoja = workbook.SheetNames[0];
