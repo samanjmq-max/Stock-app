@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Upload, Download, Search, ChevronDown, FileSpreadsheet, FileText, FileType, SlidersHorizontal } from "lucide-react";
+import { Loader2, Plus, Upload, Download, Search, ChevronDown, FileSpreadsheet, FileText, FileType } from "lucide-react";
 import { productosService } from "@/services/productos.service";
 import type { ProductoInput } from "@/lib/validations";
 import { AGENCIAS, type Agencia, type Producto } from "@/types";
@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { FiltrosMoviles } from "@/components/layout/FiltrosMoviles";
 import { cn } from "@/lib/utils";
 
 /*
@@ -103,13 +104,6 @@ export default function ProductosPage() {
   const [busqueda, setBusqueda] = useState("");
   const [familiaFiltro, setFamiliaFiltro] = useState<string[]>([]);
   const [ubicacionFiltro, setUbicacionFiltro] = useState<string[]>([]);
-  /*
-    En el celular los filtros arrancan plegados: desplegados empujaban la
-    tabla varios renglones hacia abajo y, al hacer scroll, quedaban tapados
-    por el encabezado fijo. La búsqueda y las acciones siguen siempre a la
-    vista porque son lo que más se usa. En escritorio no cambia nada.
-  */
-  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -161,8 +155,13 @@ export default function ProductosPage() {
     });
   }, [productos, busqueda, familiaFiltro, ubicacionFiltro]);
 
-  const filtrosActivos =
-    (ubicacionFiltro.length > 0 ? 1 : 0) + (familiaFiltro.length > 0 ? 1 : 0) + (agenciaSeleccionada ? 1 : 0);
+  /* El panel de filtros no toca la búsqueda: son cosas distintas y borrar
+     lo que alguien acaba de escribir al tocar "Limpiar" es desconcertante. */
+  function limpiarFiltrosMoviles() {
+    setFamiliaFiltro([]);
+    setUbicacionFiltro([]);
+    setAgenciaSeleccionada(undefined);
+  }
 
   function limpiarFiltros() {
     setBusqueda("");
@@ -283,31 +282,30 @@ export default function ProductosPage() {
           />
         </div>
 
-        {/* Plegador de filtros: solo en celular. */}
-        <div className="flex items-center gap-2 md:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setFiltrosAbiertos((v) => !v)}
-            aria-expanded={filtrosAbiertos}
-          >
-            <SlidersHorizontal size={14} />
-            Filtros
-            {filtrosActivos > 0 && (
-              <span className="ml-0.5 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
-                {filtrosActivos}
-              </span>
-            )}
-            <ChevronDown size={14} className={cn("transition-transform duration-quick", filtrosAbiertos && "rotate-180")} />
-          </Button>
-          {filtrosActivos > 0 && (
-            <Button variant="ghost" size="sm" onClick={limpiarFiltros}>
-              Limpiar
-            </Button>
-          )}
-        </div>
+        <FiltrosMoviles
+          agencia={
+            esSuperAdmin
+              ? {
+                  valor: agenciaOperativa ?? "propia",
+                  valorNeutro: "propia",
+                  opciones: [
+                    { valor: "propia", etiqueta: `Mi agencia (${agencia})` },
+                    ...AGENCIAS.map((a) => ({ valor: a, etiqueta: a })),
+                  ],
+                  onChange: (v) => setAgenciaSeleccionada(v === "propia" ? undefined : (v as Agencia)),
+                }
+              : undefined
+          }
+          ubicacion={ubicacionFiltro}
+          opcionesUbicacion={ubicaciones}
+          onUbicacion={setUbicacionFiltro}
+          familia={familiaFiltro}
+          opcionesFamilia={familias}
+          onFamilia={setFamiliaFiltro}
+          onLimpiar={limpiarFiltrosMoviles}
+        />
 
-        <div className={cn("gap-2 flex-wrap", filtrosAbiertos ? "flex" : "hidden md:flex")}>
+        <div className="hidden gap-2 flex-wrap md:flex">
           {esSuperAdmin && (
             <Select
               value={agenciaOperativa ?? "propia"}

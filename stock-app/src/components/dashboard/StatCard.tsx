@@ -1,3 +1,4 @@
+import { AlertTriangle } from "lucide-react";
 import { Card, CardContent, CardLabel } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
@@ -26,6 +27,7 @@ export function StatCard({
   onClick,
   activo = false,
   importe,
+  aviso,
 }: {
   label: string;
   value: string | number;
@@ -37,6 +39,13 @@ export function StatCard({
   activo?: boolean;
   /** Importe en pesos a mostrar al pie — se omite si no se pasa. */
   importe?: number;
+  /**
+   * Aviso corto al pie de la tarjeta (ej. "Sin revisar"). Reemplaza a la
+   * franja de alerta que antes vivía suelta arriba del Dashboard y ocupaba
+   * casi una pantalla de alto en celular para decir lo mismo que ya dice
+   * esta cifra.
+   */
+  aviso?: string;
 }) {
   const iconClasses = {
     default: "text-muted-foreground",
@@ -91,6 +100,12 @@ export function StatCard({
           {importe !== undefined && (
             <p className="font-mono text-[11px] text-muted-foreground mt-2 tabular-nums">
               {formatearImporte(importe)}
+            </p>
+          )}
+          {aviso && (
+            <p className={cn("mt-1.5 flex items-center gap-1 text-[11px] font-medium", valorClasses)}>
+              <AlertTriangle size={11} className="shrink-0" />
+              {aviso}
             </p>
           )}
         </div>

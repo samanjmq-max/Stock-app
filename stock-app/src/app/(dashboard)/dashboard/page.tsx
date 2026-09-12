@@ -5,10 +5,11 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode, SlidersHorizontal, ChevronDown } from "lucide-react";
+import { CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { FiltrosMoviles } from "@/components/layout/FiltrosMoviles";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
 import { EditarConteoDialog } from "@/components/dashboard/EditarConteoDialog";
@@ -82,14 +83,6 @@ export default function DashboardPage() {
   const [vaciando, setVaciando] = useState(false);
   const [vaciandoTodas, setVaciandoTodas] = useState(false);
   const [actualizando, setActualizando] = useState(false);
-  /*
-    En el celular los filtros arrancan plegados. Desplegados ocupaban cuatro
-    o cinco renglones antes de cualquier dato -- había que hacer scroll para
-    llegar al conteo, y al hacerlo la fila quedaba escondida debajo del
-    encabezado fijo, que es lo que se veía como "los filtros desaparecen".
-    En escritorio no cambia nada: siempre visibles.
-  */
-  const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -327,9 +320,6 @@ export default function DashboardPage() {
   const tituloZona = [...ubicacionFiltro, ...familiaFiltro].join(" · ");
   const tituloAgencia = (agenciaFiltro || agenciaUsuario || "Todas las agencias") + (tituloZona ? ` — ${tituloZona}` : "");
   const hayFiltroActivo = vista !== null;
-  const filtrosActivos =
-    (agenciaFiltro ? 1 : 0) + (ubicacionFiltro.length > 0 ? 1 : 0) + (familiaFiltro.length > 0 ? 1 : 0);
-
   function limpiarFiltrosDashboard() {
     setAgenciaFiltro(undefined);
     setUbicacionFiltro([]);
@@ -340,32 +330,38 @@ export default function DashboardPage() {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="p-4 md:p-6 space-y-5">
 
-      {/* Plegador de filtros: solo en celular. */}
-      <div className="flex items-center justify-between gap-2 md:hidden">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setFiltrosAbiertos((v) => !v)}
-          aria-expanded={filtrosAbiertos}
-        >
-          <SlidersHorizontal size={14} />
-          Filtros
-          {filtrosActivos > 0 && (
-            <span className="ml-0.5 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground tabular-nums">
-              {filtrosActivos}
-            </span>
-          )}
-          <ChevronDown size={14} className={cn("transition-transform duration-quick", filtrosAbiertos && "rotate-180")} />
-        </Button>
-        {filtrosActivos > 0 && (
-          <Button variant="ghost" size="sm" onClick={limpiarFiltrosDashboard}>
-            Limpiar
-          </Button>
-        )}
-      </div>
+      {/* Control único de filtros en celular. En escritorio no se dibuja:
+          ahí los filtros van en línea, que es lo que ya funcionaba. */}
+      <FiltrosMoviles
+        agencia={
+          isAdmin
+            ? {
+                valor: agenciaFiltro ?? "todas",
+                valorNeutro: "todas",
+                opciones: [
+                  { valor: "todas", etiqueta: "Todas las agencias" },
+                  ...AGENCIAS.map((a) => ({ valor: a, etiqueta: a })),
+                ],
+                onChange: (v) => {
+                  setAgenciaFiltro(v === "todas" ? undefined : (v as Agencia));
+                  setUbicacionFiltro([]);
+                  setFamiliaFiltro([]);
+                  setVista(null);
+                },
+              }
+            : undefined
+        }
+        ubicacion={ubicacionFiltro}
+        opcionesUbicacion={opcionesUbicacion}
+        onUbicacion={setUbicacionFiltro}
+        familia={familiaFiltro}
+        opcionesFamilia={opcionesFamilia}
+        onFamilia={setFamiliaFiltro}
+        onLimpiar={limpiarFiltrosDashboard}
+      />
 
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className={cn("items-center gap-3 flex-wrap", filtrosAbiertos ? "flex" : "hidden md:flex")}>
+        <div className="hidden items-center gap-3 flex-wrap md:flex">
           {isAdmin && (
             <>
               <p className="text-sm text-muted-foreground">Ver agencia:</p>
@@ -487,34 +483,6 @@ export default function DashboardPage() {
       </Card>
 
       {/*
-        NIVEL 2 — Alerta. Solo existe si hay algo que atender: si el conteo
-        viene limpio, este bloque no se dibuja y el Dashboard queda más corto.
-        Responde "¿hay problemas?" sin obligar a buscarlo entre ocho tarjetas.
-      */}
-      {stats.diferenciasNegativas > 0 && (
-        <button
-          type="button"
-          onClick={() => toggleVista("falta")}
-          className={cn(
-            "flex w-full items-start gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors duration-quick",
-            vista === "falta"
-              ? "border-destructive/50 bg-destructive/10"
-              : "border-destructive/25 bg-destructive/[0.06] hover:bg-destructive/10"
-          )}
-        >
-          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-destructive" />
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold">
-              {stats.diferenciasNegativas.toLocaleString("es-UY")} diferencias negativas sin revisar
-            </span>
-            <span className="mt-0.5 block text-xs text-muted-foreground">
-              {formatearImporte(stats.importeDiferenciasNegativas)} en faltantes. Tocá para verlas en la tabla.
-            </span>
-          </span>
-        </button>
-      )}
-
-      {/*
         NIVEL 3 — Estado del conteo. Cuatro tarjetas, no ocho, y todas del
         mismo tipo de dato: cuántos productos hay en cada estado. El importe
         baja a metadato dentro de la tarjeta en vez de competir con la cifra.
@@ -523,9 +491,13 @@ export default function DashboardPage() {
         <StatCard label="Coincidencias" value={stats.coincidencias} icon={CheckCircle2} tone="success"
           onClick={() => toggleVista("coincide")} activo={vista === "coincide"}
           importe={stats.importeCoincidencias} />
+        {/* El aviso de faltantes vive DENTRO de la tarjeta, no en una franja
+            roja aparte: esa franja ocupaba una pantalla entera de alto en
+            celular para decir lo mismo que ya dice esta cifra. */}
         <StatCard label="Diferencias −" value={stats.diferenciasNegativas} icon={ArrowDownCircle} tone="destructive"
           onClick={() => toggleVista("falta")} activo={vista === "falta"}
-          importe={stats.importeDiferenciasNegativas} />
+          importe={stats.importeDiferenciasNegativas}
+          aviso={stats.diferenciasNegativas > 0 ? "Sin revisar" : undefined} />
         <StatCard label="Diferencias +" value={stats.diferenciasPositivas} icon={ArrowUpCircle} tone="warning"
           onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
           importe={stats.importeDiferenciasPositivas} />
