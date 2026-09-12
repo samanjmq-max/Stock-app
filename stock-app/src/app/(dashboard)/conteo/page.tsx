@@ -424,7 +424,13 @@ export default function ConteoPage() {
                   <Textarea id="observaciones" rows={2} {...register("observaciones")} />
                 </div>
 
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                {/* .btn-shiny (el mismo barrido de brillo del botón de login) sumado
+                    acá a mano -- .btn-glow ya lo trae cualquier Button "default",
+                    pero el barrido en loop queda reservado a la acción más
+                    importante de la pantalla, no a todos los botones (design-system:
+                    "Animate 1-2 key elements per view max"), y "Guardar conteo" es
+                    justo esa acción principal de Contar stock. */}
+                <Button type="submit" className="w-full btn-shiny" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
                   Guardar conteo
                 </Button>

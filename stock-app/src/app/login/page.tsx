@@ -53,7 +53,12 @@ export default function LoginPage() {
         </div>
 
         <TiltCard>
-          <Card className="bg-card/30 backdrop-blur-xl border-white/20">
+          {/* Menos blur y menos opacidad que antes (blur-xl/30% -> blur-md/18%):
+              con blur-xl el vidrio quedaba tan difuminado que el arrozal de
+              fondo se veía como una mancha verde plana en vez de imagen --
+              con menos blur se sigue leyendo "vidrio esmerilado" pero el
+              video se nota bastante más detrás (pedido del usuario). */}
+          <Card className="bg-card/[0.18] backdrop-blur-md border-white/20">
             <CardHeader>
               <p className="text-sm font-medium text-foreground">Iniciar sesión</p>
             </CardHeader>
@@ -66,7 +71,7 @@ export default function LoginPage() {
                     type="email"
                     autoComplete="email"
                     placeholder="tu@empresa.com"
-                    className="h-11 bg-background/40 backdrop-blur-md border-white/25 shadow-inner"
+                    className="h-11 bg-background/30 backdrop-blur-sm border-white/25 shadow-inner"
                     aria-invalid={!!errors.email}
                     aria-describedby={errors.email ? "email-error" : undefined}
                     {...register("email")}
@@ -86,7 +91,7 @@ export default function LoginPage() {
                       type={showPassword ? "text" : "password"}
                       autoComplete="current-password"
                       placeholder="••••••••"
-                      className="h-11 pr-10 bg-background/40 backdrop-blur-md border-white/25 shadow-inner"
+                      className="h-11 pr-10 bg-background/30 backdrop-blur-sm border-white/25 shadow-inner"
                       aria-invalid={!!errors.password}
                       aria-describedby={errors.password ? "password-error" : undefined}
                       {...register("password")}

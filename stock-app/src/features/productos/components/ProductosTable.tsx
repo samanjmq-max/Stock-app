@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Pencil, Trash2, Loader2, Search, ArrowUp, ArrowDown, ArrowUpDown, Check, X } from "lucide-react";
@@ -59,11 +59,27 @@ export function ProductosTable({
   const [ordenColumna, setOrdenColumna] = useState<Columna | null>(null);
   const [ordenDireccion, setOrdenDireccion] = useState<Direccion>("asc");
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
-  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
   const [eliminandoLote, setEliminandoLote] = useState(false);
   const [editandoPrecioId, setEditandoPrecioId] = useState<string | null>(null);
   const [precioBorrador, setPrecioBorrador] = useState("");
   const [guardandoPrecio, setGuardandoPrecio] = useState(false);
+
+  // Borrado individual con "Deshacer" (reel 1 -- "wait for the undo"): al
+  // tocar el tacho, la fila se arruga y colapsa YA (ver `ocultos` en
+  // `visibles` más abajo), pero el DELETE real recién se dispara si nadie
+  // deshace en 4s. Por eso `eliminarProducto` en la página ya no muestra su
+  // propio diálogo de confirmación -- el toast con "Deshacer" es la
+  // confirmación ahora, no dos seguidas. `productosRef` deja chequear, una
+  // vez que el DELETE real termina, si el producto sigue estando en la lista
+  // (falló) para hacerlo reaparecer -- `onEliminar` ya avisa el error por su
+  // cuenta con su propio toast, esto solo evita que quede invisible sin
+  // haberse borrado de verdad.
+  const [ocultos, setOcultos] = useState<Set<string>>(new Set());
+  const productosRef = useRef(productos);
+  useEffect(() => {
+    productosRef.current = productos;
+  }, [productos]);
+  const timersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
 
   function toggleOrden(col: Columna) {
     if (ordenColumna !== col) {
@@ -88,12 +104,13 @@ export function ProductosTable({
     });
   }, [productos, ordenColumna, ordenDireccion]);
 
-  const visibles = ordenados.slice(0, 300);
+  const noOcultos = useMemo(() => ordenados.filter((p) => !ocultos.has(p.id)), [ordenados, ocultos]);
+  const visibles = noOcultos.slice(0, 300);
 
   const resumen = useMemo(() => {
-    const importe = ordenados.reduce((acc, p) => acc + importeProducto(p), 0);
-    return { total: ordenados.length, importe };
-  }, [ordenados]);
+    const importe = noOcultos.reduce((acc, p) => acc + importeProducto(p), 0);
+    return { total: noOcultos.length, importe };
+  }, [noOcultos]);
 
   const todosSeleccionados = visibles.length > 0 && seleccionados.size === visibles.length;
   const algunoSeleccionado = seleccionados.size > 0;
@@ -111,12 +128,42 @@ export function ProductosTable({
     setSeleccionados(todosSeleccionados ? new Set() : new Set(visibles.map((p) => p.id)));
   }
 
-  async function eliminar(p: Producto) {
-    setEliminandoId(p.id);
-    try {
-      await onEliminar(p);
-    } finally {
-      setEliminandoId(null);
+  function pedirEliminar(p: Producto) {
+    setOcultos((prev) => new Set(prev).add(p.id));
+    toast(`"${p.codigo}" eliminado`, {
+      id: `deshacer-${p.id}`,
+      duration: 4000,
+      action: { label: "Deshacer", onClick: () => deshacerEliminar(p.id) },
+    });
+    const timer = setTimeout(() => confirmarEliminarDiferido(p), 4000);
+    timersRef.current.set(p.id, timer);
+  }
+
+  function deshacerEliminar(id: string) {
+    const timer = timersRef.current.get(id);
+    if (timer) {
+      clearTimeout(timer);
+      timersRef.current.delete(id);
+    }
+    setOcultos((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }
+
+  async function confirmarEliminarDiferido(p: Producto) {
+    timersRef.current.delete(p.id);
+    await onEliminar(p);
+    if (productosRef.current.some((x) => x.id === p.id)) {
+      // Seguía en la lista después del DELETE real -- falló (onEliminar ya
+      // avisó el error con su propio toast). La volvemos a mostrar en vez de
+      // dejarla invisible sin haberse borrado de verdad.
+      setOcultos((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
     }
   }
 
@@ -336,10 +383,9 @@ export function ProductosTable({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7 text-destructive hover:text-destructive"
-                              onClick={() => eliminar(p)}
-                              disabled={eliminandoId === p.id}
+                              onClick={() => pedirEliminar(p)}
                             >
-                              {eliminandoId === p.id ? <Loader2 className="animate-spin" size={13} /> : <Trash2 size={13} />}
+                              <Trash2 size={13} />
                             </Button>
                           </div>
                         </td>

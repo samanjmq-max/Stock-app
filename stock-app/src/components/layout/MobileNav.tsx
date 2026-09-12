@@ -74,10 +74,16 @@ export function MobileNav() {
           >
             {active && (
               <span className="absolute inset-0 pointer-events-none" style={{ filter: "url(#mobile-nav-gooey)" }} aria-hidden="true">
+                {/* Antes estaba en bottom-1 pensando en "el borde de la barra", pero
+                    ese borde inferior del span (inset-0) cae justo donde está la
+                    etiqueta de texto, no el borde real de la barra -- tapaba el
+                    label ("Cont" quedaba oculto detrás del óvalo). El ancla va
+                    arriba, a la altura de reposo del ícono, que es de donde
+                    realmente "sale" la gota hacia el blob de arriba. */}
                 <motion.span
                   layoutId="mobile-nav-goo-anchor"
                   transition={anchorTransition}
-                  className="absolute left-1/2 -translate-x-1/2 bottom-1 h-3 w-8 rounded-full bg-primary"
+                  className="absolute left-1/2 -translate-x-1/2 top-1 h-3 w-8 rounded-full bg-primary"
                 />
                 <motion.span
                   layoutId="mobile-nav-goo-blob"

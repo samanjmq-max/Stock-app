@@ -112,18 +112,15 @@ export default function ProductosPage() {
     }
   }
 
+  // Ya no pide confirmación acá -- ProductosTable ahora maneja el borrado
+  // individual con un toast "Deshacer" de 4s (reel 1, "wait for the undo") en
+  // vez de un diálogo bloqueante; esta función es lo que se ejecuta recién
+  // si nadie deshace a tiempo. El diálogo de confirmación sigue existiendo
+  // para el borrado en lote (eliminarVariosProductos, más abajo) -- ahí un
+  // solo "Deshacer" no cubre bien N productos a la vez.
   async function eliminarProducto(p: Producto) {
-    const confirmado = await confirm({
-      titulo: "Eliminar producto",
-      descripcion: `¿Eliminar el producto ${p.codigo} — ${p.descripcion}? Esta acción no se puede deshacer.`,
-      textoConfirmar: "Eliminar",
-      variante: "destructive",
-    });
-    if (!confirmado) return;
-
     try {
       await productosService.eliminar(p.id);
-      toast.success("Producto eliminado");
       await cargar(agenciaOperativa);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al eliminar");
