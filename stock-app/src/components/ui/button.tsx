@@ -8,8 +8,14 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
-        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // btn-glow: brillo de borde al hover/focus (design-system, confirmado
+        // 2026-09-12 — "evolución futurista" del sistema cálido). Solo en los
+        // dos variants de mayor jerarquía (acción primaria y destructiva);
+        // outline/secondary/ghost/link quedan sin glow a propósito, para no
+        // saturar pantallas con muchos botones secundarios (ver ui-ux-pro-max:
+        // "Animate 1-2 key elements per view max").
+        default: "bg-primary text-primary-foreground hover:bg-primary/90 btn-glow",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90 btn-glow btn-glow-destructive",
         outline: "border border-input bg-background hover:bg-secondary",
         secondary: "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-secondary hover:text-secondary-foreground",

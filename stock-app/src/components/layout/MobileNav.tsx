@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { LayoutDashboard, ScanBarcode, Package, History, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -22,14 +22,24 @@ const ITEMS = [
   { href: "/usuarios", label: "Usuarios", icon: Users, soloAdmin: true },
 ];
 
-// Nav inferior interactivo: el fondo del ítem activo se desliza entre tabs
-// (framer-motion layoutId, ya instalado) en vez de solo cambiar de color en seco.
-// Sin gradiente saturado ni sombra dramática -- se mantiene "plano" según
-// design-system/stockapp-saman/MASTER.md §11 (anti-patrón: gradientes/3D),
-// el color cálido --primary ya aporta la identidad de marca.
+// Nav inferior interactivo: un anillo de luz viaja detrás del ícono activo
+// (glass + glow, evolución futurista confirmada 2026-09-12 sobre la misma
+// paleta cálida -- ver mockup "Glass & Glow") en vez de deslizar un fondo
+// sólido. Dos capas con layoutId: una "cola" difuminada más grande que viaja
+// con un resorte más lento (queda un paso atrás, efecto cometa) y el anillo
+// nítido encima con un resorte más rápido. Sigue siendo bajo-movimiento en
+// el sentido que importa: solo se anima al cambiar de tab, nunca en loop.
 export function MobileNav() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
+  const tailTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 140, damping: 20 };
+  const ringTransition = prefersReducedMotion
+    ? { duration: 0 }
+    : { type: "spring" as const, stiffness: 320, damping: 24 };
+
   return (
     <nav
       className="md:hidden fixed bottom-0 inset-x-0 z-30 flex justify-around border-t border-border bg-background/95 backdrop-blur px-1 py-2"
@@ -46,11 +56,20 @@ export function MobileNav() {
             className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-[11px] font-medium min-w-[52px] min-h-[44px] justify-center"
           >
             {active && (
-              <motion.span
-                layoutId="mobile-nav-active-pill"
-                className="absolute inset-0 rounded-xl bg-primary/10"
-                transition={{ type: "spring", stiffness: 380, damping: 32 }}
-              />
+              <>
+                <motion.span
+                  layoutId="mobile-nav-glow-tail"
+                  transition={tailTransition}
+                  className="absolute left-1/2 top-0.5 -translate-x-1/2 h-9 w-9 rounded-full bg-primary/25 blur-md"
+                  aria-hidden="true"
+                />
+                <motion.span
+                  layoutId="mobile-nav-glow-ring"
+                  transition={ringTransition}
+                  className="absolute left-1/2 top-0.5 -translate-x-1/2 h-9 w-9 rounded-full ring-2 ring-primary/70 shadow-[0_0_14px_2px_hsl(var(--primary)/0.5)]"
+                  aria-hidden="true"
+                />
+              </>
             )}
             <span
               className={cn(

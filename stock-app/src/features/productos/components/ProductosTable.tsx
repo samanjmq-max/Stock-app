@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Pencil, Trash2, Loader2, Search, ArrowUp, ArrowDown, ArrowUpDown, Check, X } from "lucide-react";
 import type { Producto } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +55,7 @@ export function ProductosTable({
   onLimpiarFiltros,
   onAgregarPrimero,
 }: Props) {
+  const prefersReducedMotion = useReducedMotion();
   const [ordenColumna, setOrdenColumna] = useState<Columna | null>(null);
   const [ordenDireccion, setOrdenDireccion] = useState<Direccion>("asc");
   const [seleccionados, setSeleccionados] = useState<Set<string>>(new Set());
@@ -245,8 +247,28 @@ export function ProductosTable({
                   </tr>
                 </thead>
                 <tbody>
-                  {visibles.map((p) => (
-                    <tr key={p.id} className={`group border-b border-border last:border-0 hover:bg-muted/30 ${seleccionados.has(p.id) ? "bg-primary/5" : ""}`}>
+                  {/* "Crumple & collapse" al eliminar -- el ítem se arruga y colapsa en
+                      vez de desaparecer en seco (design-system, evolución futurista
+                      confirmada 2026-09-12; ver mockup "Glass & Glow"). No es el arco
+                      hasta un tacho del mockup original -- en una tabla no hay un
+                      tacho fijo al que apuntar, así que se acota a lo que sí se
+                      traduce bien acá. `layout="position"` para que las filas de
+                      abajo suban con el mismo resorte en vez de saltar en seco;
+                      `initial={false}` para que esto solo se vea al eliminar (o al
+                      filtrar), nunca al montar la tabla la primera vez. */}
+                  <AnimatePresence initial={false}>
+                    {visibles.map((p) => (
+                      <motion.tr
+                        key={p.id}
+                        layout="position"
+                        initial={false}
+                        exit={
+                          prefersReducedMotion
+                            ? { opacity: 0, transition: { duration: 0 } }
+                            : { opacity: 0, scale: 0.92, x: 14, rotate: -3, transition: { duration: 0.28, ease: [0.5, -0.2, 0.7, 1.1] } }
+                        }
+                        className={`group border-b border-border last:border-0 hover:bg-muted/30 ${seleccionados.has(p.id) ? "bg-primary/5" : ""}`}
+                      >
                       {isAdmin && (
                         <td className="px-5 py-2">
                           <input
@@ -322,8 +344,9 @@ export function ProductosTable({
                           </div>
                         </td>
                       )}
-                    </tr>
-                  ))}
+                      </motion.tr>
+                    ))}
+                  </AnimatePresence>
                 </tbody>
               </table>
               {ordenados.length > 300 && (
