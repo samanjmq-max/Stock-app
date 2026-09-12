@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Loader2, Plus, Pencil, Trash2, ShieldCheck, ShieldOff } from "lucide-react";
 import { usuariosService } from "@/services/usuarios.service";
 import type { UsuarioInput } from "@/lib/validations";
@@ -16,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 export default function UsuariosPage() {
   const { user } = useAuth();
   const { confirm, ConfirmDialogElement } = useConfirm();
+  const prefersReducedMotion = useReducedMotion();
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -100,9 +102,24 @@ export default function UsuariosPage() {
 
       {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
 
+      {/* Mismo "crumple & collapse" que ProductosTable al eliminar (design-system,
+          evolución futurista) -- la card se arruga y colapsa en vez de
+          desaparecer en seco. El diálogo de confirmación existente no cambia,
+          solo cómo se ve la salida una vez confirmado. */}
       <div className="space-y-2">
-        {usuarios.map((u) => (
-          <Card key={u.id}>
+        <AnimatePresence initial={false}>
+          {usuarios.map((u) => (
+            <motion.div
+              key={u.id}
+              layout="position"
+              initial={false}
+              exit={
+                prefersReducedMotion
+                  ? { opacity: 0, transition: { duration: 0 } }
+                  : { opacity: 0, scale: 0.92, x: 14, rotate: -3, transition: { duration: 0.28, ease: [0.5, -0.2, 0.7, 1.1] } }
+              }
+            >
+          <Card>
             <CardContent className="pt-4 pb-4 flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -131,7 +148,9 @@ export default function UsuariosPage() {
               </div>
             </CardContent>
           </Card>
-        ))}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       <UsuarioFormDialog

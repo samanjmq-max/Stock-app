@@ -178,25 +178,32 @@ body {
   Glow de borde para botones primarios/destructivos (Button variant "default"
   y "destructive" en components/ui/button.tsx) -- evolución futurista
   confirmada sobre la paleta cálida existente, sin loop continuo: el brillo
-  aparece solo al hover/focus, no como animación ambiente (a diferencia de
+  aparece solo al interactuar, no como animación ambiente (a diferencia de
   .btn-shiny, que sí es un loop pero reservado a la única CTA del login).
-  Transición pura en CSS -- la queda cubierta por la regla global de
-  prefers-reduced-motion de arriba (duration 0.01ms) sin lógica adicional.
+
+  Incluye :active además de :hover/:focus-visible -- un mouse dispara :hover,
+  pero una pantalla táctil no tiene hover real (a lo sumo lo deja "pegado" de
+  forma inconsistente entre navegadores), así que sin :active el glow directamente
+  no se veía al usar la app desde el celular. Transición pura en CSS -- la
+  regla global de prefers-reduced-motion de arriba (duration 0.01ms) ya la
+  neutraliza sin lógica adicional.
 */
 .btn-glow {
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
 }
+.btn-glow:hover:not(:disabled),
+.btn-glow:focus-visible,
+.btn-glow:active:not(:disabled) {
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 8px 20px -8px hsl(var(--primary) / 0.6);
+}
 .btn-glow:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 8px 20px -8px hsl(var(--primary) / 0.6);
-}
-.btn-glow:focus-visible {
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 8px 20px -8px hsl(var(--primary) / 0.6);
 }
 .btn-glow:active:not(:disabled) {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.98);
 }
 .btn-glow-destructive:hover:not(:disabled),
-.btn-glow-destructive:focus-visible {
+.btn-glow-destructive:focus-visible,
+.btn-glow-destructive:active:not(:disabled) {
   box-shadow: 0 0 0 1px hsl(var(--destructive) / 0.3), 0 8px 20px -8px hsl(var(--destructive) / 0.55);
 }

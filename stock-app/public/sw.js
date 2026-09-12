@@ -8,6 +8,16 @@ self.addEventListener("install", (event) => {
   self.skipWaiting();
 });
 
+// El registro (PwaRegister.tsx) manda esto cuando el usuario toca "Actualizar"
+// en el aviso de nueva versión -- sin esto, skipWaiting() de arriba ya activa
+// el SW nuevo en segundo plano, pero una pestaña/PWA que ya estaba abierta
+// sigue corriendo el JS viejo que tiene cargado en memoria hasta que alguien
+// la recarga a mano. Con este mensaje + el reload en controllerchange del
+// cliente, la actualización se aplica sin que haga falta cerrar la app.
+self.addEventListener("message", (event) => {
+  if (event.data === "SKIP_WAITING") self.skipWaiting();
+});
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
