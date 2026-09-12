@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, ScanBarcode, Package, History, User } from "lucide-react";
+import { LayoutDashboard, ScanBarcode, Package, History, Users } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +14,12 @@ const ITEMS = [
   // Historial es el log de auditoría de toda la empresa (ver middleware.ts,
   // RUTAS_SOLO_ADMIN) -- si un operador lo ve acá, el link lo rebota.
   { href: "/historial", label: "Historial", icon: History, soloAdmin: true },
-  { href: "/usuarios", label: "Perfil", icon: User, soloAdmin: false },
+  // Iba etiquetado "Perfil" pero apunta a /usuarios, que también es
+  // admin-only -- un operador lo veía y el link lo rebotaba. No hay página
+  // de Perfil (se decidió no construirla por ahora); esto queda como el
+  // acceso a gestión de usuarios que realmente es, mismo criterio que ya
+  // usa el Sidebar de escritorio.
+  { href: "/usuarios", label: "Usuarios", icon: Users, soloAdmin: true },
 ];
 
 // Nav inferior interactivo: el fondo del ítem activo se desliza entre tabs

@@ -56,8 +56,11 @@ export async function exportarPDF(
     head: [columnas.map((c) => c.header)],
     body: datos.map((fila) => columnas.map((c) => String(fila[c.key] ?? ""))),
     styles: { fontSize: 8, cellPadding: 3 },
-    headStyles: { fillColor: [37, 99, 235] },
-    alternateRowStyles: { fillColor: [245, 247, 250] },
+    // Terracotta (--primary de globals.css) en vez del azul cobalto del
+    // sistema de diseño viejo, que quedó pisado acá cuando se migró la
+    // paleta cálida (design-system/stockapp-saman/MASTER.md §2).
+    headStyles: { fillColor: [141, 76, 27] },
+    alternateRowStyles: { fillColor: [247, 243, 236] },
   });
 
   doc.save(`${nombreArchivo}.pdf`);
