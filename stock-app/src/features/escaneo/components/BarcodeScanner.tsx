@@ -111,6 +111,7 @@ export function BarcodeScanner({ onDetected, onClose }: Props) {
     if (dispositivos.length < 2) return;
     const idxActual = dispositivos.findIndex((d) => d.deviceId === dispositivoActualId);
     const siguiente = dispositivos[(idxActual + 1) % dispositivos.length];
+    if (!siguiente) return;
     controlsRef.current?.stop();
     setDispositivoActualId(siguiente.deviceId);
     setLinternaActiva(false);

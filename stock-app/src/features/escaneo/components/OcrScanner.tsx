@@ -78,7 +78,7 @@ function recortarAlRecuadro(video: HTMLVideoElement, guiaEl: HTMLDivElement): HT
   const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
-    const gris = d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114;
+    const gris = d[i]! * 0.299 + d[i + 1]! * 0.587 + d[i + 2]! * 0.114;
     const contraste = Math.min(255, Math.max(0, (gris - 128) * 1.4 + 128));
     d[i] = d[i + 1] = d[i + 2] = contraste;
   }

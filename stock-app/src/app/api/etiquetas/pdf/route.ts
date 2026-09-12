@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
 
     for (let i = 0; i < validos.length; i++) {
       const item = validos[i];
+      if (!item) continue;
       const codigoLimpio = String(item.codigo).trim();
 
       if (i > 0) doc.addPage([PAGE_W_MM, PAGE_H_MM], "landscape");

@@ -62,7 +62,7 @@ export function UsuarioFormDialog({ open, onOpenChange, usuarioEditando, onGuard
   }, [open, usuarioEditando, reset, esSuperAdmin, agenciaPropia]);
 
   async function onSubmit(data: UsuarioInput) {
-    const datosFinales = esPropiaCuentaDeSuperAdmin
+    const datosFinales: UsuarioInput = esPropiaCuentaDeSuperAdmin
       ? { ...data, agencia: "" } // el super admin no queda atado a ninguna agencia
       : esSuperAdmin || !agenciaPropia
       ? data

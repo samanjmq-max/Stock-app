@@ -49,7 +49,11 @@ function normalizarEncabezado(h: string): string {
 export async function leerArchivoProductos(file: File): Promise<ResultadoLectura> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array" });
-  const primeraHoja = workbook.Sheets[workbook.SheetNames[0]];
+  const nombreHoja = workbook.SheetNames[0];
+  if (!nombreHoja) {
+    throw new Error("El archivo no tiene ninguna hoja");
+  }
+  const primeraHoja = workbook.Sheets[nombreHoja]!;
   const filas: Record<string, unknown>[] = XLSX.utils.sheet_to_json(primeraHoja, { defval: "" });
 
   const filasValidas: FilaImportacion[] = [];

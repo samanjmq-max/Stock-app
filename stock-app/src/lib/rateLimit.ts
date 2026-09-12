@@ -28,41 +28,52 @@ const VENTANA_MS = 10 * 60 * 1000; // 10 minutos
 interface Intento {
   cantidad: number;
   primerIntentoEn: number;
+  ventanaMs: number;
+  maxIntentos: number;
 }
 
 const intentosPorClave = new Map<string, Intento>();
 
-// Limpieza periódica para no acumular memoria indefinidamente.
+// Limpieza periódica para no acumular memoria indefinidamente. Usa la
+// ventana más larga conocida como cota superior -- una entrada nunca
+// necesita sobrevivir más tiempo que su propia ventana.
+const VENTANA_LIMPIEZA_MS = 60 * 60 * 1000; // 1 hora
 setInterval(() => {
   const ahora = Date.now();
   for (const [clave, intento] of intentosPorClave.entries()) {
-    if (ahora - intento.primerIntentoEn > VENTANA_MS) intentosPorClave.delete(clave);
+    if (ahora - intento.primerIntentoEn > intento.ventanaMs) intentosPorClave.delete(clave);
   }
-}, VENTANA_MS).unref?.();
+}, VENTANA_LIMPIEZA_MS).unref?.();
 
 /**
  * Devuelve true si la clave (normalmente IP + email) superó el máximo de
  * intentos fallidos permitidos en la ventana de tiempo actual.
+ *
+ * `maxIntentos`/`ventanaMs` son opcionales -- por defecto usan el límite
+ * genérico de login (5 / 10 min). SEC-04: la recuperación de contraseña
+ * (RECOVERY_CODE) es, en la práctica, una llave maestra permanente para la
+ * cuenta del super-admin -- vale la pena un límite más estricto ahí que en
+ * un login normal, así que ese endpoint pasa sus propios valores.
  */
-export function estaLimitado(clave: string): boolean {
+export function estaLimitado(clave: string, maxIntentos = MAX_INTENTOS, ventanaMs = VENTANA_MS): boolean {
   const intento = intentosPorClave.get(clave);
   if (!intento) return false;
-  const dentroDeVentana = Date.now() - intento.primerIntentoEn < VENTANA_MS;
-  return dentroDeVentana && intento.cantidad >= MAX_INTENTOS;
+  const dentroDeVentana = Date.now() - intento.primerIntentoEn < ventanaMs;
+  return dentroDeVentana && intento.cantidad >= maxIntentos;
 }
 
-/** Registra un intento fallido de login para esa clave. */
-export function registrarIntentoFallido(clave: string): void {
+/** Registra un intento fallido para esa clave (ver estaLimitado sobre los parámetros opcionales). */
+export function registrarIntentoFallido(clave: string, maxIntentos = MAX_INTENTOS, ventanaMs = VENTANA_MS): void {
   const ahora = Date.now();
   const intento = intentosPorClave.get(clave);
-  if (!intento || ahora - intento.primerIntentoEn > VENTANA_MS) {
-    intentosPorClave.set(clave, { cantidad: 1, primerIntentoEn: ahora });
+  if (!intento || ahora - intento.primerIntentoEn > ventanaMs) {
+    intentosPorClave.set(clave, { cantidad: 1, primerIntentoEn: ahora, ventanaMs, maxIntentos });
   } else {
     intento.cantidad += 1;
   }
 }
 
-/** Limpia los intentos fallidos de una clave (se llama tras un login exitoso). */
+/** Limpia los intentos fallidos de una clave (se llama tras un login/recuperación exitosos). */
 export function limpiarIntentos(clave: string): void {
   intentosPorClave.delete(clave);
 }
@@ -70,6 +81,6 @@ export function limpiarIntentos(clave: string): void {
 export function minutosRestantes(clave: string): number {
   const intento = intentosPorClave.get(clave);
   if (!intento) return 0;
-  const restante = VENTANA_MS - (Date.now() - intento.primerIntentoEn);
+  const restante = intento.ventanaMs - (Date.now() - intento.primerIntentoEn);
   return Math.max(Math.ceil(restante / 60000), 0);
 }

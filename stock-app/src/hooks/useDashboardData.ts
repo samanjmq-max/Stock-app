@@ -144,7 +144,7 @@ function calcularStats(productos: Producto[], conteos: Conteo[]): DashboardStats
     .reduce((acc, p) => acc + (precios[normalizarCodigo(p.codigo)] || 0) * Number(p.stockSap || 0), 0);
 
   const ultimaSincronizacion = conteos.length > 0
-    ? conteos.reduce((max, c) => (new Date(c.creadoEn) > new Date(max) ? c.creadoEn : max), conteos[0].creadoEn)
+    ? conteos.reduce((max, c) => (new Date(c.creadoEn) > new Date(max) ? c.creadoEn : max), conteos[0]!.creadoEn)
     : null;
 
   return {

@@ -10,7 +10,7 @@ export const usuarioSchema = z.object({
   email: z.string().email("Email inválido"),
   password: z.union([z.literal(""), z.string().min(6, "Mínimo 6 caracteres")]).optional(),
   rol: z.enum(["administrador", "operador"]),
-  agencia: z.union([z.literal(""), z.enum(AGENCIAS as unknown as [string, ...string[]])]).optional().default(""),
+  agencia: z.union([z.literal(""), z.enum(AGENCIAS)]).optional().default(""),
   activo: z.boolean().default(true),
 });
 export type UsuarioInput = z.infer<typeof usuarioSchema>;
@@ -22,7 +22,7 @@ export const productoSchema = z.object({
   proveedor: z.string().optional().default(""),
   stockSap: z.coerce.number().min(0, "No puede ser negativo"),
   precioUnitario: z.coerce.number().min(0, "No puede ser negativo").optional().default(0),
-  agencia: z.enum(AGENCIAS as unknown as [string, ...string[]]),
+  agencia: z.enum(AGENCIAS),
 });
 export type ProductoInput = z.infer<typeof productoSchema>;
 export const conteoSchema = z.object({

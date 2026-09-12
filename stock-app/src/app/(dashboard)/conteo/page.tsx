@@ -155,7 +155,7 @@ export default function ConteoPage() {
         if (!encontrado) {
           // Si no está en caché, busca contra el servidor (agencia operativa actual).
           const todos = await productosService.listar(agenciaOperativa);
-          encontrado = todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase()) ?? null;
+          encontrado = todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase());
         }
 
         if (encontrado) {

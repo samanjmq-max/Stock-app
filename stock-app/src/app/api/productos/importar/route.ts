@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { importarProductos, registrarHistorial } from "@/lib/sheets";
+import { esSuperAdmin } from "@/lib/permisos";
 import type { Rol, Agencia } from "@/types";
 import { AGENCIAS } from "@/types";
 
@@ -20,6 +21,7 @@ export async function POST(request: NextRequest) {
   const rol = request.headers.get("x-user-rol") as Rol | null;
   const userId = request.headers.get("x-user-id") || "";
   const email = request.headers.get("x-user-email") || "";
+  const agenciaPropia = request.headers.get("x-user-agencia") as Agencia | null;
   if (rol !== "administrador") {
     return NextResponse.json({ ok: false, error: "Solo un administrador puede importar productos" }, { status: 403 });
   }
@@ -29,6 +31,17 @@ export async function POST(request: NextRequest) {
     const agencia = body.agencia as Agencia | undefined;
     if (!agencia || !(AGENCIAS as readonly string[]).includes(agencia)) {
       return NextResponse.json({ ok: false, error: "Seleccioná una agencia válida para importar" }, { status: 400 });
+    }
+    // SEC-01: solo el super-admin puede importar en una agencia distinta de
+    // la propia (operar en nombre de otra planta) -- mismo criterio ya
+    // aplicado en sync-batch y POST /api/productos. Sin esto, cualquier
+    // administrador de planta podía sobrescribir en lote el catálogo de
+    // OTRA agencia con solo cambiar el campo `agencia` del body.
+    if (agenciaPropia && agencia !== agenciaPropia && !esSuperAdmin(email)) {
+      return NextResponse.json(
+        { ok: false, error: "Solo podés importar productos a tu propia agencia" },
+        { status: 403 }
+      );
     }
     const filas = z.array(filaSchema).safeParse(body.productos);
     if (!filas.success) {

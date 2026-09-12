@@ -103,7 +103,12 @@ export default function EtiquetasPage() {
     try {
       const buffer = await file.arrayBuffer();
       const wb = XLSX.read(buffer, { type: "array" });
-      const hoja = wb.Sheets[wb.SheetNames[0]];
+      const nombreHoja = wb.SheetNames[0];
+      if (!nombreHoja) {
+        toast.error("El archivo no tiene ninguna hoja");
+        return;
+      }
+      const hoja = wb.Sheets[nombreHoja]!;
       const filas: Record<string, unknown>[] = XLSX.utils.sheet_to_json(hoja, { defval: "" });
 
       const nuevos: DatosEtiqueta[] = [];

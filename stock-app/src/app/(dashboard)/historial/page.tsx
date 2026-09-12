@@ -22,6 +22,8 @@ const ETIQUETAS_ACCION: Record<string, string> = {
   editar_usuario: "Usuario editado",
   eliminar_usuario: "Usuario eliminado",
   guardar_conteo: "Conteo guardado",
+  editar_conteo: "Conteo editado",
+  eliminar_conteo: "Conteo eliminado",
   resetear_conteos: "Conteos reiniciados",
   importar_productos: "Importación de productos",
   exportar_datos: "Exportación de datos",

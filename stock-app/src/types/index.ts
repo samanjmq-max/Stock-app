@@ -77,6 +77,8 @@ export type AccionHistorial =
   | "editar_usuario"
   | "eliminar_usuario"
   | "guardar_conteo"
+  | "editar_conteo"
+  | "eliminar_conteo"
   | "resetear_conteos"
   | "importar_productos"
   | "exportar_datos"
