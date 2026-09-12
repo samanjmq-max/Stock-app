@@ -15,6 +15,7 @@ import { conteosService } from "@/services/conteos.service";
 import { esContable, normalizarCodigo } from "@/hooks/useDashboardData";
 import { useAuth } from "@/contexts/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
 import { useHardwareScanner } from "@/hooks/useHardwareScanner";
 import { useSync } from "@/hooks/useSync";
@@ -63,8 +64,8 @@ export default function ConteoPage() {
   // filtro ya resuelve es la parte que se puede hacer sin tocar Apps Script:
   // acotar qué se cuenta y mostrar el avance real de la zona, no de toda
   // la agencia.
-  const [ubicacionFiltro, setUbicacionFiltro] = useState("todas");
-  const [familiaFiltro, setFamiliaFiltro] = useState("todas");
+  const [ubicacionFiltro, setUbicacionFiltro] = useState<string[]>([]);
+  const [familiaFiltro, setFamiliaFiltro] = useState<string[]>([]);
   const [catalogoAgencia, setCatalogoAgencia] = useState<Producto[]>([]);
   const [conteosAgencia, setConteosAgencia] = useState<{ codigo: string }[]>([]);
   const [localesPendientes, setLocalesPendientes] = useState<{ codigo: string }[]>([]);
@@ -94,8 +95,8 @@ export default function ConteoPage() {
     // Al cambiar de agencia, las ubicaciones/familias de la planta anterior
     // ya no aplican -- se resetea el filtro para no dejarlo "vacío" en
     // silencio mostrando cero productos.
-    setUbicacionFiltro("todas");
-    setFamiliaFiltro("todas");
+    setUbicacionFiltro([]);
+    setFamiliaFiltro([]);
 
     // Cachea los productos de la agencia operativa actual (la del usuario,
     // salvo que el super-admin haya elegido otra planta arriba), y de paso
@@ -128,14 +129,14 @@ export default function ConteoPage() {
   const productosZona = catalogoAgencia.filter(
     (p) =>
       esContable(p) &&
-      (ubicacionFiltro === "todas" || p.ubicacion === ubicacionFiltro) &&
-      (familiaFiltro === "todas" || p.familia === familiaFiltro)
+      (ubicacionFiltro.length === 0 || ubicacionFiltro.includes(p.ubicacion)) &&
+      (familiaFiltro.length === 0 || familiaFiltro.includes(p.familia))
   );
   const codigosContadosZona = new Set(
     [...conteosAgencia, ...localesPendientes].map((c) => normalizarCodigo(c.codigo))
   );
   const pendientesZona = productosZona.filter((p) => !codigosContadosZona.has(normalizarCodigo(p.codigo)));
-  const hayFiltroZona = ubicacionFiltro !== "todas" || familiaFiltro !== "todas";
+  const hayFiltroZona = ubicacionFiltro.length > 0 || familiaFiltro.length > 0;
 
   const buscarCodigo = useCallback(
     async (codigo: string) => {
@@ -276,20 +277,20 @@ export default function ConteoPage() {
             Conteo cíclico — acotar por zona
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <Select value={ubicacionFiltro} onValueChange={setUbicacionFiltro}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Ubicación" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas las ubicaciones</SelectItem>
-                {opcionesUbicacion.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={familiaFiltro} onValueChange={setFamiliaFiltro}>
-              <SelectTrigger className="h-9 text-sm"><SelectValue placeholder="Familia" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas las familias</SelectItem>
-                {opcionesFamilia.map((f) => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={ubicacionFiltro}
+              onValueChange={setUbicacionFiltro}
+              options={opcionesUbicacion}
+              allLabel="Todas las ubicaciones"
+              placeholder="Buscar ubicación..."
+            />
+            <SearchableSelect
+              value={familiaFiltro}
+              onValueChange={setFamiliaFiltro}
+              options={opcionesFamilia}
+              allLabel="Todas las familias"
+              placeholder="Buscar familia..."
+            />
           </div>
           <div className="flex items-center justify-between gap-2 flex-wrap">
             <p className="text-xs text-muted-foreground">

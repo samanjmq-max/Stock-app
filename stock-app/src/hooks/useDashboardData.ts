@@ -4,10 +4,18 @@ import type { Producto, Conteo, DashboardStats, Agencia } from "@/types";
 import { productosService } from "@/services/productos.service";
 import { conteosService } from "@/services/conteos.service";
 import { useAuth } from "@/contexts/AuthContext";
-export function useDashboardData(agenciaFiltro?: Agencia) {
+/**
+ * `ubicacionFiltro`/`familiaFiltro`: acotan la data a una zona dentro de la
+ * agencia (conteo cíclico) -- cualquier usuario puede usarlos, a diferencia
+ * de `agenciaFiltro` que es solo para admin. Se filtra client-side sobre lo
+ * ya traído del servidor: no reduce el peso de la descarga (eso requiere
+ * que Apps Script filtre también por ubicación/familia), pero sí acota
+ * correctamente KPIs, gráficos, tablas y exportaciones a la zona elegida.
+ */
+export function useDashboardData(agenciaFiltro?: Agencia, ubicacionFiltro: string[] = [], familiaFiltro: string[] = []) {
   const { isAdmin, agencia: agenciaUsuario } = useAuth();
-  const [productos, setProductos] = useState<Producto[]>([]);
-  const [conteos, setConteos] = useState<Conteo[]>([]);
+  const [productosRaw, setProductosRaw] = useState<Producto[]>([]);
+  const [conteosRaw, setConteosRaw] = useState<Conteo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const agenciaEfectiva = isAdmin
@@ -21,8 +29,8 @@ export function useDashboardData(agenciaFiltro?: Agencia) {
         productosService.listar(agenciaEfectiva),
         conteosService.listar(agenciaEfectiva),
       ]);
-      setProductos(listaProductos);
-      setConteos(listaConteos);
+      setProductosRaw(listaProductos);
+      setConteosRaw(listaConteos);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al cargar datos");
     } finally {
@@ -30,8 +38,28 @@ export function useDashboardData(agenciaFiltro?: Agencia) {
     }
   }, [agenciaEfectiva]);
   useEffect(() => { cargar(); }, [cargar]);
+
+  const opcionesUbicacion = Array.from(new Set(productosRaw.map((p) => p.ubicacion).filter(Boolean))).sort();
+  const opcionesFamilia = Array.from(new Set(productosRaw.map((p) => p.familia).filter(Boolean))).sort();
+
+  const hayFiltroZona = ubicacionFiltro.length > 0 || familiaFiltro.length > 0;
+  // El universo de una zona lo define el catálogo (ubicación/familia de
+  // SAP), no el conteo -- así "cuánto falta de esta zona" tiene sentido
+  // aunque un producto se haya encontrado en otro lado (ubicación incorrecta).
+  // Multi-selección: vacío = sin filtro (todas); con valores, alcanza con
+  // que coincida con CUALQUIERA de los elegidos.
+  const productos = hayFiltroZona
+    ? productosRaw.filter(
+        (p) =>
+          (ubicacionFiltro.length === 0 || ubicacionFiltro.includes(p.ubicacion)) &&
+          (familiaFiltro.length === 0 || familiaFiltro.includes(p.familia))
+      )
+    : productosRaw;
+  const codigosZona = new Set(productos.map((p) => normalizarCodigo(p.codigo)));
+  const conteos = hayFiltroZona ? conteosRaw.filter((c) => codigosZona.has(normalizarCodigo(c.codigo))) : conteosRaw;
+
   const stats: DashboardStats = calcularStats(productos, conteos);
-  return { productos, conteos, stats, loading, error, recargar: cargar };
+  return { productos, conteos, stats, loading, error, recargar: cargar, opcionesUbicacion, opcionesFamilia };
 }
 
 export function normalizarCodigo(codigo: unknown): string {

@@ -37,7 +37,13 @@ export function StatCard({
   // (design-system/stockapp-saman/pages/dashboard.md §Color) -- para
   // "default" el número queda en el color de texto normal, no en --primary,
   // para no gritar en cards que no representan un estado.
-  const valorToneClass = { default: "", success: "text-success", warning: "text-warning-foreground", destructive: "text-destructive" }[tone];
+  //
+  // OJO: acá va `text-warning` (el color saturado), NO `text-warning-foreground`
+  // -- ese token es el texto que va ENCIMA de un fondo --warning (ej. el chip
+  // bg-warning/15), pensado para contrastar con esa superficie, no para
+  // pararse solo sobre el fondo normal de la card. Usarlo acá lo hacía
+  // invisible en modo oscuro (texto casi negro sobre card casi negra).
+  const valorToneClass = { default: "", success: "text-success", warning: "text-warning", destructive: "text-destructive" }[tone];
 
   return (
     <Card

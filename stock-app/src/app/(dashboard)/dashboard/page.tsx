@@ -16,6 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { SearchableSelect } from "@/components/ui/searchable-select";
 import { exportarExcel, exportarPDF } from "@/lib/exportacion";
 import { conteosService } from "@/services/conteos.service";
 import { AGENCIAS } from "@/types";
@@ -63,7 +64,12 @@ const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 60 * 1000; // 5 horas
 export default function DashboardPage() {
   const { isAdmin, esSuperAdmin, agencia: agenciaUsuario } = useAuth();
   const [agenciaFiltro, setAgenciaFiltro] = useState<Agencia | undefined>(undefined);
-  const { stats, conteos, productos, loading, error, recargar } = useDashboardData(agenciaFiltro);
+  // Filtro cíclico por zona -- disponible para cualquier usuario (operario
+  // incluido), a diferencia del selector de agencia que es solo para admin.
+  const [ubicacionFiltro, setUbicacionFiltro] = useState<string[]>([]);
+  const [familiaFiltro, setFamiliaFiltro] = useState<string[]>([]);
+  const { stats, conteos, productos, loading, error, recargar, opcionesUbicacion, opcionesFamilia } =
+    useDashboardData(agenciaFiltro, ubicacionFiltro, familiaFiltro);
   const [vista, setVista] = useState<Vista>(null);
   const [conteoAEditar, setConteoAEditar] = useState<Conteo | null>(null);
   const [vaciando, setVaciando] = useState(false);
@@ -289,36 +295,65 @@ export default function DashboardPage() {
     }
   }
 
-  const tituloAgencia = agenciaFiltro || agenciaUsuario || "Todas las agencias";
+  const tituloZona = [...ubicacionFiltro, ...familiaFiltro].join(" · ");
+  const tituloAgencia = (agenciaFiltro || agenciaUsuario || "Todas las agencias") + (tituloZona ? ` — ${tituloZona}` : "");
   const hayFiltroActivo = vista !== null;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.25 }} className="p-4 md:p-6 space-y-5">
 
       <div className="flex items-center justify-between flex-wrap gap-3">
-        {isAdmin ? (
-          <div className="flex items-center gap-3 flex-wrap">
-            <p className="text-sm text-muted-foreground">Ver agencia:</p>
-            <Select
-              value={agenciaFiltro ?? "todas"}
-              onValueChange={(v) => {
-                setAgenciaFiltro(v === "todas" ? undefined : v as Agencia);
-                setVista(null);
-              }}
-            >
-              <SelectTrigger className="w-52">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="todas">Todas las agencias</SelectItem>
-                {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <span className="text-xs text-muted-foreground">
-              {agenciaFiltro ? `Mostrando: ${agenciaFiltro}` : "Mostrando el consolidado de toda la empresa"}
-            </span>
-          </div>
-        ) : <div />}
+        <div className="flex items-center gap-3 flex-wrap">
+          {isAdmin && (
+            <>
+              <p className="text-sm text-muted-foreground">Ver agencia:</p>
+              <Select
+                value={agenciaFiltro ?? "todas"}
+                onValueChange={(v) => {
+                  setAgenciaFiltro(v === "todas" ? undefined : v as Agencia);
+                  // Ubicaciones/familias de la agencia anterior ya no aplican.
+                  setUbicacionFiltro([]);
+                  setFamiliaFiltro([]);
+                  setVista(null);
+                }}
+              >
+                <SelectTrigger className="w-52">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="todas">Todas las agencias</SelectItem>
+                  {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <span className="text-xs text-muted-foreground">
+                {agenciaFiltro ? `Mostrando: ${agenciaFiltro}` : "Mostrando el consolidado de toda la empresa"}
+              </span>
+            </>
+          )}
+
+          {/* Filtro cíclico por zona -- disponible para cualquier usuario,
+              no solo admin: un operario también necesita poder acotar su
+              propia vista a la ubicación/familia que le toca contar.
+              SearchableSelect en vez de <Select> nativo: con catálogos de
+              miles de productos, las ubicaciones son demasiadas para un
+              dropdown sin buscador. */}
+          <SearchableSelect
+            value={ubicacionFiltro}
+            onValueChange={setUbicacionFiltro}
+            options={opcionesUbicacion}
+            allLabel="Todas las ubicaciones"
+            placeholder="Buscar ubicación..."
+            className="w-44"
+          />
+          <SearchableSelect
+            value={familiaFiltro}
+            onValueChange={setFamiliaFiltro}
+            options={opcionesFamilia}
+            allLabel="Todas las familias"
+            placeholder="Buscar familia..."
+            className="w-40"
+          />
+        </div>
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={actualizarManual} disabled={actualizando} className="h-8">
