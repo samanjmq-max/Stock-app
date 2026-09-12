@@ -1,4 +1,4 @@
-import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardLabel } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
@@ -6,6 +6,18 @@ function formatearImporte(valor: number): string {
   return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
 }
 
+/*
+  Tarjeta de KPI.
+
+  Jerarquía interna, de más a menos peso: la cifra (Archivo, grande, tabular),
+  la etiqueta (mono, mayúsculas, chica) y el importe (metadato, al pie). Antes
+  la etiqueta usaba CardTitle -- que ahora es un título de card de verdad -- y
+  el importe competía con el número en un chip con fondo propio.
+
+  El estado se marca con una franja vertical de color en el borde izquierdo,
+  no tiñendo la tarjeta entera: mantiene la calidez neutra del fondo y deja
+  que el color siga significando una sola cosa.
+*/
 export function StatCard({
   label,
   value,
@@ -23,33 +35,41 @@ export function StatCard({
   onClick?: () => void;
   /** Resalta la tarjeta cuando el filtro que representa está activo. */
   activo?: boolean;
-  /** Importe en pesos a mostrar como chip chico — se omite si no se pasa. */
+  /** Importe en pesos a mostrar al pie — se omite si no se pasa. */
   importe?: number;
 }) {
-  const toneClasses = {
-    default: "text-primary bg-primary/10",
-    success: "text-success bg-success/10",
-    warning: "text-warning-foreground bg-warning/15",
-    destructive: "text-destructive bg-destructive/10",
+  const iconClasses = {
+    default: "text-muted-foreground",
+    success: "text-success",
+    warning: "text-warning",
+    destructive: "text-destructive",
   }[tone];
 
-  // El semáforo de estado va también en el número, no solo en el ícono
-  // (design-system/stockapp-saman/pages/dashboard.md §Color) -- para
-  // "default" el número queda en el color de texto normal, no en --primary,
-  // para no gritar en cards que no representan un estado.
-  //
-  // OJO: acá va `text-warning` (el color saturado), NO `text-warning-foreground`
-  // -- ese token es el texto que va ENCIMA de un fondo --warning (ej. el chip
-  // bg-warning/15), pensado para contrastar con esa superficie, no para
-  // pararse solo sobre el fondo normal de la card. Usarlo acá lo hacía
-  // invisible en modo oscuro (texto casi negro sobre card casi negra).
-  const valorToneClass = { default: "", success: "text-success", warning: "text-warning", destructive: "text-destructive" }[tone];
+  // OJO: `text-warning` (el color saturado), NO `text-warning-foreground`
+  // -- ese token es el texto que va ENCIMA de un fondo --warning, pensado
+  // para contrastar con esa superficie. Usarlo acá lo hacía invisible en
+  // modo oscuro: texto casi negro sobre card casi negra.
+  const valorClasses = {
+    default: "text-foreground",
+    success: "text-success",
+    warning: "text-warning",
+    destructive: "text-destructive",
+  }[tone];
+
+  const franjaClasses = {
+    default: "",
+    success: "border-l-2 border-l-success",
+    warning: "border-l-2 border-l-warning",
+    destructive: "border-l-2 border-l-destructive",
+  }[tone];
 
   return (
     <Card
       onClick={onClick}
       className={cn(
-        onClick && "cursor-pointer transition hover:border-primary/50",
+        "transition-shadow duration-quick",
+        franjaClasses,
+        onClick && "cursor-pointer hover:shadow-elev-1 hover:border-primary/40",
         activo && "border-primary ring-1 ring-primary"
       )}
       role={onClick ? "button" : undefined}
@@ -62,19 +82,19 @@ export function StatCard({
           : undefined
       }
     >
-      <CardContent className="pt-5 flex items-center justify-between">
-        <div>
-          <CardTitle className="mb-1.5">{label}</CardTitle>
-          <p className={cn("text-2xl font-semibold tracking-tight tabular-nums", valorToneClass)}>{value}</p>
+      <CardContent className="flex items-start justify-between gap-3 p-4">
+        <div className="min-w-0">
+          <CardLabel>{label}</CardLabel>
+          <p className={cn("font-display text-[26px] font-semibold leading-none tracking-tight tabular-nums mt-2", valorClasses)}>
+            {value}
+          </p>
           {importe !== undefined && (
-            <span className="inline-block mt-1 text-[11px] font-medium text-muted-foreground bg-muted rounded px-1.5 py-0.5">
+            <p className="font-mono text-[11px] text-muted-foreground mt-2 tabular-nums">
               {formatearImporte(importe)}
-            </span>
+            </p>
           )}
         </div>
-        <div className={cn("h-9 w-9 rounded-lg flex items-center justify-center shrink-0", toneClasses)}>
-          <Icon size={17} />
-        </div>
+        <Icon size={16} className={cn("shrink-0 mt-0.5", iconClasses)} />
       </CardContent>
     </Card>
   );

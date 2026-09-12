@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Package, CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
+import { CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -20,7 +20,15 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { exportarExcel, exportarPDF } from "@/lib/exportacion";
 import { conteosService } from "@/services/conteos.service";
 import { AGENCIAS } from "@/types";
+import { cn } from "@/lib/utils";
 import type { Conteo, Producto, EstadoConteo, Agencia } from "@/types";
+
+// Mismo criterio de formato que StatCard y DashboardCharts. Está repetido en
+// los tres archivos; unificarlo en lib/utils es una limpieza pendiente, sin
+// urgencia porque la regla de formato no cambió nunca.
+function formatearImporte(valor: number): string {
+  return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+}
 
 // Paleta cálida via tokens de globals.css (design-system/stockapp-saman/MASTER.md §2.3):
 // coincide -> success (verde grano), sobra -> warning (dorado), falta -> destructive (rojo semántico).
@@ -386,32 +394,106 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <StatCard label="Productos totales" value={stats.totalProductos} icon={Package} />
-        <StatCard label="Contados" value={stats.totalContados} icon={CheckCircle2} tone="success"
-          onClick={() => toggleVista("contados")} activo={vista === "contados"}
-          importe={stats.importeContados} />
-        <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock} tone="warning"
-          onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
-          importe={stats.importePendientes} />
-        <StatCard label="Avance" value={`${stats.porcentajeCompletado}%`} icon={TrendingUp} />
+      {/*
+        NIVEL 1 — La pregunta que todos traen al abrir la app: ¿cómo viene el
+        conteo? Una sola cifra grande, con la barra que la hace legible de un
+        vistazo y los absolutos abajo.
+
+        Reemplaza a cuatro tarjetas sueltas que decían lo mismo repartido
+        ("Productos totales", "Contados", "Avance", "Última sincronización").
+        Los totales pasan a ser el denominador, los contados el numerador, y
+        la última sincronización ya vive en el topbar, así que no se pierde
+        ningún dato: se pierde la repetición.
+      */}
+      <Card className="overflow-hidden">
+        <CardContent className="flex flex-wrap items-center gap-x-8 gap-y-5 p-5">
+          <div className="shrink-0">
+            <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
+              Avance del conteo
+            </p>
+            <p className="mt-2 font-display text-[clamp(38px,8vw,56px)] font-bold leading-none tracking-tight tabular-nums text-success">
+              {stats.porcentajeCompletado}%
+            </p>
+            <p className="mt-2 text-xs text-muted-foreground">{tituloAgencia}</p>
+          </div>
+
+          <div className="min-w-[200px] flex-1">
+            <div className="h-[7px] w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-success transition-[width] duration-base ease-out-soft"
+                style={{ width: `${Math.min(100, Math.max(0, stats.porcentajeCompletado))}%` }}
+              />
+            </div>
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 font-mono text-[11px] tabular-nums text-muted-foreground">
+              {/* Sigue siendo el filtro de "contados", que antes vivía en su
+                  propia tarjeta -- no se pierde, cambia de lugar. */}
+              <button
+                type="button"
+                onClick={() => toggleVista("contados")}
+                className={cn(
+                  "rounded px-1.5 py-0.5 transition-colors duration-quick hover:bg-elevated hover:text-foreground",
+                  vista === "contados" && "bg-elevated text-foreground"
+                )}
+              >
+                {stats.totalContados.toLocaleString("es-UY")} contados
+              </button>
+              <span>{stats.totalProductos.toLocaleString("es-UY")} productos totales</span>
+            </div>
+          </div>
+
+          <TrendingUp size={18} className="hidden shrink-0 text-muted-foreground sm:block" />
+        </CardContent>
+      </Card>
+
+      {/*
+        NIVEL 2 — Alerta. Solo existe si hay algo que atender: si el conteo
+        viene limpio, este bloque no se dibuja y el Dashboard queda más corto.
+        Responde "¿hay problemas?" sin obligar a buscarlo entre ocho tarjetas.
+      */}
+      {stats.diferenciasNegativas > 0 && (
+        <button
+          type="button"
+          onClick={() => toggleVista("falta")}
+          className={cn(
+            "flex w-full items-start gap-3 rounded-xl border px-4 py-3.5 text-left transition-colors duration-quick",
+            vista === "falta"
+              ? "border-destructive/50 bg-destructive/10"
+              : "border-destructive/25 bg-destructive/[0.06] hover:bg-destructive/10"
+          )}
+        >
+          <AlertTriangle size={18} className="mt-0.5 shrink-0 text-destructive" />
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold">
+              {stats.diferenciasNegativas.toLocaleString("es-UY")} diferencias negativas sin revisar
+            </span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">
+              {formatearImporte(stats.importeDiferenciasNegativas)} en faltantes. Tocá para verlas en la tabla.
+            </span>
+          </span>
+        </button>
+      )}
+
+      {/*
+        NIVEL 3 — Estado del conteo. Cuatro tarjetas, no ocho, y todas del
+        mismo tipo de dato: cuántos productos hay en cada estado. El importe
+        baja a metadato dentro de la tarjeta en vez de competir con la cifra.
+      */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard label="Coincidencias" value={stats.coincidencias} icon={CheckCircle2} tone="success"
           onClick={() => toggleVista("coincide")} activo={vista === "coincide"}
           importe={stats.importeCoincidencias} />
-        <StatCard label="Diferencias +" value={stats.diferenciasPositivas} icon={ArrowUpCircle} tone="success"
-          onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
-          importe={stats.importeDiferenciasPositivas} />
         <StatCard label="Diferencias −" value={stats.diferenciasNegativas} icon={ArrowDownCircle} tone="destructive"
           onClick={() => toggleVista("falta")} activo={vista === "falta"}
           importe={stats.importeDiferenciasNegativas} />
-        <StatCard label="Última sincronización"
-          value={stats.ultimaSincronizacion
-            ? new Date(stats.ultimaSincronizacion).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" })
-            : "—"}
-          icon={Clock} />
+        <StatCard label="Diferencias +" value={stats.diferenciasPositivas} icon={ArrowUpCircle} tone="warning"
+          onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
+          importe={stats.importeDiferenciasPositivas} />
+        <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock}
+          onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
+          importe={stats.importePendientes} />
       </div>
 
-      <p className="text-xs text-muted-foreground -mt-2">
+      <p className="-mt-2 text-xs text-muted-foreground">
         $ → Importe total en pesos (calculado con el precio unitario cargado en cada producto; los que todavía no tienen precio no suman).
       </p>
 

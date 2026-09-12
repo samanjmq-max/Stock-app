@@ -3,92 +3,169 @@
 @tailwind utilities;
 
 /*
-  Sistema de diseño "Depósito v2" — evolución cálida del sistema original.
-  Misma arquitectura de tokens (shadcn-style, HSL), mismo --radius, mismo
-  darkMode por clase. Solo cambia la temperatura de marca: de azul cobalto
-  frío a terracota/siena + verde grano + dorado cosecha, inspirado en el
-  arroz y la cosecha. Los semáforos de estado siguen siendo nítidos
-  (verde / ámbar / rojo) porque en un conteo físico el color ES la
-  información (coincide / sobra / falta). Ver design-system/stockapp-saman/
-  MASTER.md §2 para la tabla de migración token por token.
+  ============================================================================
+  StockApp — Sistema de diseño "Turno noche"
+  ============================================================================
+
+  Evolución del sistema cálido "Depósito v2". Misma arquitectura de tokens
+  (shadcn-style, HSL en triples "H S% L%"), mismo darkMode por clase, mismos
+  nombres de variable -- para que migrar siga siendo cambiar valores y no
+  reescribir componentes.
+
+  Qué cambia respecto de la versión anterior:
+
+  1. El modo OSCURO pasa a ser la identidad, no un modo alternativo. Antes era
+     una inversión mecánica del claro; ahora tiene capas reales de superficie
+     (--background / --card / --elevated) que es lo que permite construir
+     profundidad. Sin capas no hay oscuro premium posible.
+
+  2. Todos los neutros tiran a tierra (matices 18-32°), nunca a azul. Es la
+     temperatura del grano y del depósito, y es lo que diferencia esta app de
+     cualquier plantilla de SaaS.
+
+  3. Los cinco colores de estado comparten matiz entre claro y oscuro
+     (terracota 21° / grano 112° / dorado 40° / alerta 4° / señal 208°), con
+     luminosidad y saturación recalibradas por modo. Un solo juego de nombres
+     para los dos.
+
+  4. Se agregan tokens de elevación y de motion, que antes no existían y cada
+     componente improvisaba.
+
+  El semáforo del conteo (coincide / sobra / falta) se mantiene nítido y
+  saturado a propósito: en un conteo físico el color ES la información, y el
+  operario lo lee con guantes y media luz. No se pastelea.
+
+  Ver design-system/stockapp-saman/MASTER.md para el sistema completo.
 */
 
 :root {
+  /* --- Superficies (claro) --- */
   --background: 38 30% 97%;
   --foreground: 20 25% 12%;
 
   --card: 0 0% 100%;
   --card-foreground: 20 25% 12%;
 
+  /* Capa por encima de --card: modales, dropdowns, hover de fila. */
+  --elevated: 0 0% 100%;
+  --elevated-foreground: 20 25% 12%;
+
   --popover: 0 0% 100%;
   --popover-foreground: 20 25% 12%;
-
-  --primary: 28 68% 33%;
-  --primary-foreground: 0 0% 100%;
 
   --secondary: 38 22% 93%;
   --secondary-foreground: 20 25% 18%;
 
   --muted: 38 20% 94%;
-  --muted-foreground: 30 12% 42%;
+  --muted-foreground: 30 14% 42%;
 
-  --accent: 142 45% 94%;
-  --accent-foreground: 142 60% 22%;
+  --accent: 112 40% 94%;
+  --accent-foreground: 112 55% 22%;
 
-  --destructive: 0 72% 51%;
-  --destructive-foreground: 0 0% 100%;
+  /* --- Marca y estado (claro) --- */
+  --primary: 21 72% 36%;
+  --primary-foreground: 0 0% 100%;
 
-  --success: 142 60% 32%;
+  --success: 112 45% 30%;
   --success-foreground: 0 0% 100%;
 
-  --warning: 38 90% 46%;
-  --warning-foreground: 26 45% 14%;
+  --warning: 40 85% 42%;
+  --warning-foreground: 30 45% 14%;
+
+  --destructive: 4 70% 47%;
+  --destructive-foreground: 0 0% 100%;
+
+  --info: 208 45% 42%;
+  --info-foreground: 0 0% 100%;
 
   --border: 34 22% 88%;
   --input: 34 22% 85%;
-  --ring: 28 68% 33%;
+  --ring: 21 72% 36%;
 
   --radius: 0.75rem;
 
-  --font-sans: "Inter", system-ui, sans-serif;
-  --font-display: "Inter", system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  /* --- Tipografía ---
+     Archivo para titulación y cifras (grotesca industrial, emparentada con
+     la cartelería de depósito). Inter para toda la interfaz. JetBrains Mono
+     para códigos, ubicaciones y timestamps. Las tres se cargan por
+     next/font en src/app/layout.tsx, que define estas mismas variables --
+     los valores de acá son el fallback si por algún motivo no cargan. */
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* --- Elevación ---
+     Cuatro niveles, no uno solo estampado en todo. En claro la sombra es
+     suave y cálida; en oscuro (más abajo) es más profunda, porque sobre
+     fondo oscuro una sombra tenue directamente no se ve. */
+  --elev-1: 0 1px 2px hsl(20 30% 10% / 0.06);
+  --elev-2: 0 4px 12px hsl(20 30% 10% / 0.10);
+  --elev-3: 0 16px 40px hsl(20 30% 10% / 0.16);
+
+  /* --- Motion ---
+     Una sola tabla para toda la app. Antes cada animación elegía su propia
+     duración entre Framer Motion, keyframes CSS y tailwindcss-animate. */
+  --dur-instant: 100ms;
+  --dur-quick: 160ms;
+  --dur-base: 240ms;
+  --dur-enter: 280ms;
+  --dur-exit: 180ms;
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
 }
 
 .dark {
-  --background: 20 18% 8%;
-  --foreground: 38 25% 94%;
+  /* --- Superficies (oscuro) — tres capas reales ---
+     background = suelo de la app
+     card       = tarjetas, barras, paneles
+     elevated   = modales, dropdowns, hover
+     Cada una es un escalón visible de luminosidad, todas de matiz tierra. */
+  --background: 20 25% 5%;
+  --foreground: 32 46% 93%;
 
-  --card: 20 16% 11%;
-  --card-foreground: 38 25% 94%;
+  --card: 18 18% 8%;
+  --card-foreground: 32 46% 93%;
 
-  --popover: 20 16% 11%;
-  --popover-foreground: 38 25% 94%;
+  --elevated: 20 22% 11%;
+  --elevated-foreground: 32 46% 93%;
 
-  --primary: 28 70% 52%;
-  --primary-foreground: 20 25% 10%;
+  --popover: 20 22% 11%;
+  --popover-foreground: 32 46% 93%;
 
-  --secondary: 22 14% 16%;
-  --secondary-foreground: 38 20% 90%;
+  --secondary: 20 22% 11%;
+  --secondary-foreground: 32 40% 90%;
 
-  --muted: 22 14% 16%;
-  --muted-foreground: 30 10% 62%;
+  --muted: 20 20% 13%;
+  --muted-foreground: 29 18% 60%;
 
-  --accent: 142 30% 16%;
-  --accent-foreground: 142 55% 76%;
+  --accent: 112 25% 14%;
+  --accent-foreground: 112 45% 72%;
 
-  --destructive: 0 72% 55%;
+  /* --- Marca y estado (oscuro) ---
+     Más claros y menos saturados que en modo claro: sobre fondo oscuro un
+     color saturado vibra y cansa la vista en una jornada larga. */
+  --primary: 21 71% 57%;
+  --primary-foreground: 20 40% 8%;
+
+  --success: 112 34% 55%;
+  --success-foreground: 112 50% 7%;
+
+  --warning: 40 78% 61%;
+  --warning-foreground: 35 50% 8%;
+
+  --destructive: 4 72% 59%;
   --destructive-foreground: 0 0% 100%;
 
-  --success: 142 50% 46%;
-  --success-foreground: 142 60% 8%;
+  --info: 208 43% 60%;
+  --info-foreground: 208 50% 8%;
 
-  --warning: 38 88% 55%;
-  --warning-foreground: 26 40% 10%;
+  --border: 22 24% 15%;
+  --input: 22 24% 18%;
+  --ring: 21 71% 57%;
 
-  --border: 22 14% 19%;
-  --input: 22 14% 19%;
-  --ring: 28 70% 52%;
+  --elev-1: 0 2px 8px hsl(0 0% 0% / 0.4);
+  --elev-2: 0 12px 28px hsl(0 0% 0% / 0.55);
+  --elev-3: 0 24px 60px hsl(0 0% 0% / 0.7);
 }
 
 * {
@@ -98,6 +175,14 @@
 body {
   @apply bg-background text-foreground antialiased;
   font-feature-settings: "cv11", "ss01";
+}
+
+/* Cifras que no bailan al actualizarse. Se aplica a toda la familia mono y
+   a cualquier elemento marcado como dato -- una tabla de conteo que salta de
+   ancho cada vez que sincroniza se lee mal y se ve barata. */
+.font-mono,
+[data-numeric] {
+  font-variant-numeric: tabular-nums;
 }
 
 ::-webkit-scrollbar {
@@ -122,10 +207,10 @@ body {
 
 /*
   Decoración de fondo del Login (design-system/stockapp-saman/pages/login.md):
-  espigas de trigo con leve balanceo de viento. Motion bajo (dial 3/10):
-  una sola animación de rotación suave, sin scroll-jacking ni partículas.
-  La regla de prefers-reduced-motion de arriba ya la neutraliza (duración
-  0.01ms, 1 iteración) sin lógica adicional.
+  espigas de trigo con leve balanceo de viento. Es el único loop ambiente de
+  toda la app -- el login es la pantalla donde se permite atmósfera, porque
+  no hay una tarea en curso que interrumpir. La regla de prefers-reduced-motion
+  de arriba ya la neutraliza sin lógica adicional.
 */
 @keyframes wheat-sway {
   0%, 100% { transform: rotate(-2.5deg); }
@@ -139,20 +224,9 @@ body {
 }
 
 /*
-  Efecto "shiny" del botón Ingresar del login (design-system/stockapp-saman/
-  pages/login.md) -- solo esa instancia por ahora, no el Button global
-  (components/ui/button.tsx sigue igual para el resto de la app). El fondo
-  --primary del botón no cambia; el brillo es un ::after encima, en loop,
-  con overflow:hidden en el botón para que no se salga del border-radius.
-
-  El keyframe barre rápido (0% -> 28% del ciclo) y después queda "aparcado"
-  fuera de vista el resto del tiempo (28% -> 100%), para que sea un destello
-  periódico -- no un brillo constante tipo casino/slot machine.
-
-  La regla de prefers-reduced-motion de arriba ya lo neutraliza (duración
-  0.01ms, 1 iteración): el ::after queda congelado en el último frame, que
-  es justo el estado "barrido y aparcado fuera de vista" -- el botón se ve
-  sólido, sin lógica adicional.
+  Efecto "shiny" del botón Ingresar del login. Reservado a esa única CTA:
+  es el único botón de esa pantalla y no compite con nada. No se extiende al
+  Button global -- un brillo en loop en cada botón de la app sería ruido.
 */
 @keyframes btn-shiny-sweep {
   0% { background-position: -100% 0; }
@@ -175,35 +249,52 @@ body {
 }
 
 /*
-  Glow de borde para botones primarios/destructivos (Button variant "default"
-  y "destructive" en components/ui/button.tsx) -- evolución futurista
-  confirmada sobre la paleta cálida existente, sin loop continuo: el brillo
-  aparece solo al interactuar, no como animación ambiente (a diferencia de
-  .btn-shiny, que sí es un loop pero reservado a la única CTA del login).
+  Glow de interacción. Regla del sistema: la luz es información, así que esto
+  va SOLO en la acción primaria de cada pantalla y en la destructiva. Si todo
+  brilla, no brilla nada.
 
-  Incluye :active además de :hover/:focus-visible -- un mouse dispara :hover,
-  pero una pantalla táctil no tiene hover real (a lo sumo lo deja "pegado" de
-  forma inconsistente entre navegadores), así que sin :active el glow directamente
-  no se veía al usar la app desde el celular. Transición pura en CSS -- la
-  regla global de prefers-reduced-motion de arriba (duration 0.01ms) ya la
-  neutraliza sin lógica adicional.
+  Incluye :active además de :hover/:focus-visible porque una pantalla táctil
+  no tiene hover real -- sin :active el efecto no se veía en el celular, que
+  es donde se usa la app.
 */
 .btn-glow {
-  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease;
+  transition:
+    transform var(--dur-quick) var(--ease-spring),
+    box-shadow var(--dur-base) ease,
+    background-color var(--dur-quick) ease;
 }
 .btn-glow:hover:not(:disabled),
 .btn-glow:focus-visible,
 .btn-glow:active:not(:disabled) {
-  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.3), 0 8px 20px -8px hsl(var(--primary) / 0.6);
+  box-shadow: 0 0 0 1px hsl(var(--primary) / 0.35), 0 10px 26px -12px hsl(var(--primary) / 0.85);
 }
 .btn-glow:hover:not(:disabled) {
   transform: translateY(-1px);
 }
 .btn-glow:active:not(:disabled) {
-  transform: translateY(0) scale(0.98);
+  transform: translateY(0) scale(0.985);
+}
+.btn-glow-success:hover:not(:disabled),
+.btn-glow-success:focus-visible,
+.btn-glow-success:active:not(:disabled) {
+  box-shadow: 0 0 0 1px hsl(var(--success) / 0.35), 0 10px 26px -12px hsl(var(--success) / 0.8);
 }
 .btn-glow-destructive:hover:not(:disabled),
 .btn-glow-destructive:focus-visible,
 .btn-glow-destructive:active:not(:disabled) {
-  box-shadow: 0 0 0 1px hsl(var(--destructive) / 0.3), 0 8px 20px -8px hsl(var(--destructive) / 0.55);
+  box-shadow: 0 0 0 1px hsl(var(--destructive) / 0.35), 0 10px 26px -12px hsl(var(--destructive) / 0.75);
+}
+
+/*
+  Barra de luz del ítem activo en la navegación. Mismo lenguaje en el tab bar
+  de móvil (barra corta sobre el borde superior) y en el sidebar de escritorio
+  (resaltado de fila) -- la forma cambia según el contenedor, el significado
+  y el color no.
+
+  Reemplaza a la "gota líquida" con filtro SVG: el óvalo se montaba sobre la
+  etiqueta y tapaba el texto del tab ("Cont" quedaba oculto), un problema ya
+  documentado en el propio componente. Se prioriza leer el nombre del tab.
+*/
+.nav-light {
+  box-shadow: 0 0 12px 1px hsl(var(--primary) / 0.75);
 }

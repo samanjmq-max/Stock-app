@@ -1,280 +1,416 @@
-# Design System Master File — StockApp (SAMAN)
+# Design System Master — StockApp (SAMAN)
 
-> **LOGIC:** When building a specific page, first check `design-system/stockapp-saman/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
-
----
-
-**Project:** StockApp SAMAN — PWA de conteo de inventario para logística arrocera (Uruguay)
-**Industry:** Logística y distribución de arroz (campo, producción, industria, almacenes, distribución)
-**Generated:** 2026-09-10
-**Design Dials:** Variance 4/10 (Balanced/Modern) · Motion 3/10 (Subtle) · Density 5/10 (Standard)
-**Status:** Documento de diseño únicamente. Ningún archivo de la aplicación fue modificado para producir esto.
+> **LÓGICA:** al construir una pantalla específica, mirar primero
+> `design-system/stockapp-saman/pages/[pantalla].md`. Si ese archivo existe,
+> sus reglas **sobreescriben** este documento. Si no, seguir lo de acá.
 
 ---
 
-## 0. Relación con el sistema actual — "Depósito v2" (evolución cálida)
-
-El repo ya tiene un design system implementado y documentado en `src/app/globals.css` / `tailwind.config.ts`: el sistema **"Depósito"**, con arquitectura de tokens HSL estilo shadcn (`--background`, `--primary`, `--success`, etc.), `darkMode: ["class"]`, radius `0.75rem`, tipografía Inter, y semáforos de estado (`success`/`warning`/`destructive`) ya cableados en componentes reales — con este comentario explícito en el código:
-
-> *"...semáforos de estado nítidos (verde esmeralda / ámbar / rojo) porque en un conteo físico el color ES la información (coincide / sobra / falta)."*
-
-Ese principio es correcto y se conserva intacto. Lo que este documento cambia es la **temperatura de marca**: de azul cobalto frío a una paleta cálida inspirada en el arroz y la cosecha (terracota/siena + verde grano + dorado), pedida explícitamente para este proyecto. Se decidió (con el usuario) que sea una **evolución de bajo riesgo**, no una reinvención:
-
-- Misma arquitectura de tokens (mismos nombres de variable, mismo shape HSL `H S% L%`).
-- Mismo `--radius` (0.75rem), misma familia tipográfica (Inter + JetBrains Mono), mismas keyframes de motion.
-- Mismo modo oscuro basado en clase, misma librería de iconos (`lucide-react`, ya instalada — **no** se introduce Phosphor aunque sea la recomendación por defecto del skill, para no duplicar sistema de íconos).
-- Solo cambian los **valores numéricos** de color. Migrar es swap-and-check-contrast, no reescritura de componentes.
-
-Cuando se aplique (fuera del alcance de esta tarea), el cambio se limita a `globals.css` (bloques `:root` y `.dark`) — cero cambios de lógica de negocio o de props de componentes.
+**Producto:** StockApp SAMAN — PWA de conteo de inventario para logística arrocera (Uruguay)
+**Dirección:** "Turno noche en el depósito"
+**Versión:** 3 — 12 de septiembre de 2026
+**Reemplaza a:** "Depósito v2" (10 set 2026)
 
 ---
 
-## 1. Principios de diseño
+## 0. Por qué se reescribió este documento
 
-1. **Cálido y profesional, no decorativo.** "Vida con propósito": cada color, sombra y transición comunica algo (estado, jerarquía, foco). Nada se anima porque sí.
-2. **El color ES información.** Los tres estados de conteo (coincide / sobra / falta) siempre van acompañados de ícono + texto, nunca solo color (regla `color-not-only`, crítica en `ux-guidelines`).
-3. **Diseño para manos ocupadas y guantes.** Los operarios escanean códigos, sostienen productos y a veces usan guantes en depósito/campo. Los objetivos táctiles del flujo de conteo son más grandes que el mínimo web estándar (ver §7).
-4. **Offline-first se ve, no se oculta.** El estado de conexión/sincronización es un elemento de UI de primera clase, no un detalle técnico escondido en una esquina.
-5. **Densidad media, sin saturar.** Dashboards y tablas (historial, productos) pueden ser densos; el flujo de conteo en sí debe quedar despejado — es la pantalla de mayor uso y de mayor costo de error.
-6. **Motion bajo-moderado.** Transiciones que confirman una acción (guardado, sync, error), no efectos de "wow". Nada de scroll-jacking ni animaciones de entrada complejas.
+La versión anterior dejó de describir el producto. Prohibía explícitamente
+gradientes, sombras marcadas y glassmorphism, y fijaba el dial de motion en
+3/10 — mientras el código ya tenía glow en botones, un filtro SVG tipo
+metaball en el tab bar, y un login con video, vidrio esmerilado y tilt 3D.
+
+Un documento de diseño que contradice al producto es peor que no tener
+documento: cada sesión de implementación decide por su cuenta a cuál de los
+dos hacerle caso. Esta versión describe lo que la app es y hacia dónde va.
+
+**Lo que se conserva de la versión anterior**, porque estaba bien y sigue
+estándolo: la arquitectura de tokens HSL estilo shadcn (mismos nombres de
+variable), el `--radius` de 0.75rem, `darkMode` por clase, `lucide-react`
+como única familia de íconos, Inter como cara de interfaz, y —sobre todo— el
+principio de que en un conteo físico **el color ES la información**.
 
 ---
 
-## 2. Paleta de color — "Depósito v2" (evolución cálida)
+## 1. La idea
 
-Formato: HSL en triples `H S% L%`, listo para pegar en `:root` / `.dark` de `globals.css` (mismo formato que hoy).
+StockApp no es "una app de logística". Es **la cabina desde la que se maneja
+el movimiento del arroz**: un tablero oscuro donde los números brillan porque
+son la única fuente de luz.
 
-### 2.1 Modo claro
+El campo y el grano no entran como decoración —ni espigas ni fotos de
+arrozales en cada pantalla— sino como **temperatura**: todos los neutros
+tiran a tierra (matices 18–32°), nunca a azul. Es lo que separa esta app de
+cualquier plantilla de SaaS, y se sostiene sin que haga falta un solo
+elemento ilustrativo.
 
-| Token | Valor actual (frío) | Valor nuevo (cálido) | Uso |
+### Tres reglas que gobiernan todo
+
+1. **La luz es información.** En un tablero oscuro, lo que brilla es lo que
+   importa. El glow se reserva para la acción primaria de cada pantalla y
+   para el estado que requiere atención. Si todo brilla, no brilla nada.
+
+2. **El color sigue siendo el dato.** El semáforo coincide / sobra / falta no
+   se suaviza, no se pastelea y no se cambia por tonos de moda. Un operario
+   con guantes y media luz tiene que distinguirlos de un vistazo. Siempre
+   acompañado de ícono y texto, nunca solo color.
+
+3. **Una cara para hablar, otra para contar.** Los números —stock,
+   diferencias, importes, códigos— llevan ancho fijo y nunca bailan al
+   actualizarse.
+
+### Modo oscuro como identidad
+
+El oscuro deja de ser un modo alternativo y pasa a ser el diseño principal.
+El claro sigue existiendo, bien resuelto, para quien trabaja en oficina con
+ventanal — pero es la traducción, no el original.
+
+---
+
+## 2. Color
+
+Formato HSL en triples `H S% L%`, listo para `:root` / `.dark` en
+`globals.css`. Los cinco colores de estado comparten matiz entre los dos
+modos; cambian luminosidad y saturación.
+
+### 2.1 Superficies — tres capas reales
+
+La capa que faltaba en la versión anterior, donde el oscuro era una inversión
+mecánica del claro. Sin capas no hay profundidad posible.
+
+| Token | Claro | Oscuro | Uso |
 |---|---|---|---|
-| `--background` | `210 20% 98%` | `38 30% 97%` | Fondo general — blanco cálido, tono "grano de arroz" |
-| `--foreground` | `222 30% 11%` | `20 25% 12%` | Texto principal — casi-negro cálido, no azulado |
-| `--card` | `0 0% 100%` | `0 0% 100%` | Sin cambio |
-| `--card-foreground` | `222 30% 11%` | `20 25% 12%` | = foreground |
-| `--popover` / `--popover-foreground` | — | `0 0% 100%` / `20 25% 12%` | Sin cambio de arquitectura |
-| `--primary` | `221 83% 53%` (cobalto) | **`28 68% 33%`** (terracota/siena — "tierra cosechada") | Marca, botones primarios, links, estado activo |
-| `--primary-foreground` | `0 0% 100%` | `0 0% 100%` | Sin cambio (contraste ya alto contra el nuevo primary, más oscuro que el azul original) |
-| `--secondary` | `210 20% 94%` | `38 22% 93%` | Superficies secundarias, botones secundarios |
-| `--secondary-foreground` | `222 30% 15%` | `20 25% 18%` | — |
-| `--muted` | `210 20% 94%` | `38 20% 94%` | Fondos discretos, filas alternadas de tabla |
-| `--muted-foreground` | `215 16% 47%` | `30 12% 42%` | Texto secundario — gris cálido, no slate |
-| `--accent` | `221 83% 96%` | `142 45% 94%` | Chips/tabs activos — tinte verde suave (campo) |
-| `--accent-foreground` | `221 83% 40%` | `142 60% 22%` | Texto sobre accent |
-| `--destructive` | `0 72% 51%` | `0 72% 51%` | **Sin cambio** — rojo semántico universal |
-| `--destructive-foreground` | `0 0% 100%` | `0 0% 100%` | — |
-| `--success` | `152 60% 36%` (verde esmeralda/teal) | **`142 60% 32%`** (verde grano/pradera, más cálido) | Conteo **coincide** |
-| `--success-foreground` | `0 0% 100%` | `0 0% 100%` | — |
-| `--warning` | `38 92% 50%` | `38 90% 46%` | Conteo **sobra** / alertas — ya era cálido, apenas recalibrado |
-| `--warning-foreground` | `26 40% 15%` | `26 45% 14%` | — |
-| `--border` | `214 20% 90%` | `34 22% 88%` | — |
-| `--input` | `214 20% 88%` | `34 22% 85%` | — |
-| `--ring` | `221 83% 53%` | `28 68% 33%` (= primary) | Foco de teclado |
-| `--radius` | `0.75rem` | `0.75rem` | **Sin cambio** |
+| `--background` | `38 30% 97%` | `20 25% 5%` | Suelo de la app |
+| `--card` | `0 0% 100%` | `18 18% 8%` | Tarjetas, barras, paneles |
+| `--elevated` | `0 0% 100%` | `20 22% 11%` | Modales, dropdowns, hover de fila |
+| `--popover` | `0 0% 100%` | `20 22% 11%` | Popovers y menús |
+| `--secondary` | `38 22% 93%` | `20 22% 11%` | Superficies y botones secundarios |
+| `--muted` | `38 20% 94%` | `20 20% 13%` | Fondos discretos, filas alternadas |
+| `--border` | `34 22% 88%` | `22 24% 15%` | Bordes y separadores |
+| `--input` | `34 22% 85%` | `22 24% 18%` | Borde de campos |
 
-**Nota crítica de contraste marca-vs-error:** `--primary` (terracota, H26–28°) y `--destructive` (rojo, H0°) están a solo ~28° de distancia de matiz. Para que un botón primario nunca se lea como "peligro" a primera vista: el primary es notablemente más oscuro y menos saturado (L33% / S68%) que el rojo (L51% / S72%), y las acciones destructivas **siempre** llevan ícono (`Trash`, `AlertTriangle`) + texto explícito ("Eliminar", nunca solo color) — regla ya exigida en §6 y §8.
+### 2.2 Texto
 
-### 2.2 Modo oscuro
+| Token | Claro | Oscuro | Uso |
+|---|---|---|---|
+| `--foreground` | `20 25% 12%` | `32 46% 93%` | Cifras y títulos. Blanco cálido, nunca puro |
+| `--muted-foreground` | `30 14% 42%` | `29 18% 60%` | Descripciones, etiquetas, metadatos |
 
-| Token | Valor actual (frío) | Valor nuevo (cálido) |
-|---|---|---|
-| `--background` | `222 30% 7%` | `20 18% 8%` |
-| `--foreground` | `210 20% 96%` | `38 25% 94%` |
-| `--card` / `--popover` | `222 26% 10%` | `20 16% 11%` |
-| `--card-foreground` / `--popover-foreground` | `210 20% 96%` | `38 25% 94%` |
-| `--primary` | `221 83% 60%` | `28 70% 52%` |
-| `--primary-foreground` | `222 30% 8%` | `20 25% 10%` |
-| `--secondary` | `222 20% 15%` | `22 14% 16%` |
-| `--secondary-foreground` | `210 20% 92%` | `38 20% 90%` |
-| `--muted` | `222 20% 15%` | `22 14% 16%` |
-| `--muted-foreground` | `215 16% 60%` | `30 10% 62%` |
-| `--accent` | `221 40% 18%` | `142 30% 16%` |
-| `--accent-foreground` | `221 83% 75%` | `142 55% 76%` |
-| `--destructive` | `0 72% 55%` | `0 72% 55%` (sin cambio) |
-| `--destructive-foreground` | `0 0% 100%` | `0 0% 100%` |
-| `--success` | `152 55% 45%` | `142 50% 46%` |
-| `--success-foreground` | `152 60% 8%` | `142 60% 8%` |
-| `--warning` | `38 92% 55%` | `38 88% 55%` |
-| `--warning-foreground` | `26 40% 10%` | `26 40% 10%` |
-| `--border` / `--input` | `222 20% 18%` | `22 14% 19%` |
-| `--ring` | `221 83% 60%` | `28 70% 52%` |
+### 2.3 Marca y estado
 
-Contraste verificado a nivel de tono (L%): todas las combinaciones texto/fondo mantienen o mejoran la diferencia de luminancia respecto al sistema actual (regla `color-accessible-pairs`, AA 4.5:1). Antes de aplicar, correr un chequeo de contraste real sobre los hex renderizados (no asumir por HSL nominal).
+| Token | Claro | Oscuro | Significado |
+|---|---|---|---|
+| `--primary` | `21 72% 36%` | `21 71% 57%` | Terracota. Marca, acción primaria, ítem activo |
+| `--success` | `112 45% 30%` | `112 34% 55%` | Grano. Coincide, avance |
+| `--warning` | `40 85% 42%` | `40 78% 61%` | Dorado. Sobra, alertas |
+| `--destructive` | `4 70% 47%` | `4 72% 59%` | Falta, destructivo, error |
+| `--info` | `208 45% 42%` | `208 43% 60%` | Señal. Sincronización, info neutra |
+| `--accent` | `112 40% 94%` | `112 25% 14%` | Chips y tabs activos, tinte verde |
+| `--ring` | `= primary` | `= primary` | Foco de teclado |
 
-### 2.3 Semáforo de conteo (patrón de dominio — no tocar la lógica, solo el color)
+En oscuro los colores van más claros y **menos saturados**: sobre fondo
+oscuro un color saturado vibra y cansa la vista en una jornada larga.
 
-| Estado | Token | Ícono (lucide-react) | Texto obligatorio |
+`--info` es el único color frío del sistema, y por eso mismo se lee como
+"del sistema" y no como estado del conteo.
+
+**Contraste marca vs. error:** `--primary` (21°) y `--destructive` (4°) están
+a 17° de matiz. Para que un botón primario nunca se lea como peligro, el
+primario es más oscuro y menos saturado en claro, y las acciones destructivas
+llevan **siempre** ícono más verbo explícito.
+
+### 2.4 Semáforo del conteo — patrón de dominio
+
+| Estado | Token | Ícono | Texto obligatorio |
 |---|---|---|---|
 | Coincide | `--success` | `CheckCircle2` | "Coincide" |
-| Sobra | `--warning` | `TrendingUp` o `PlusCircle` | "Sobra (+N)" |
-| Falta | `--destructive` | `TrendingDown` o `AlertCircle` | "Falta (−N)" |
-| Pendiente de sync | `--muted-foreground` + ícono animado sutil | `RefreshCw` (spin discreto, respeta `prefers-reduced-motion`) | "Pendiente de sincronizar" |
+| Sobra | `--warning` | `ArrowUpCircle` | "Sobra (+N)" |
+| Falta | `--destructive` | `ArrowDownCircle` | "Falta (−N)" |
+| Pendiente de sync | `--info` | `RefreshCw` girando | "Pendiente de sincronizar" |
 
 ---
 
 ## 3. Tipografía
 
-**Sin cambios respecto al sistema actual** — Inter ya es cálida-neutra, profesional y de alta legibilidad; cambiarla no aportaba nada a la dirección "cálido" y sí rompía continuidad visual.
+Tres roles, tres caras. Se cargan por `next/font` en `src/app/layout.tsx`, o
+sea que se sirven desde el propio dominio — importa para una PWA que tiene
+que arrancar con señal mala.
 
-- `--font-sans` / `--font-display`: `"Inter", system-ui, sans-serif`
-- `--font-mono`: `"JetBrains Mono", ui-monospace, monospace` — usar para códigos de barra, SKUs y cualquier columna numérica en tablas (`font-feature-settings: "tnum"` o clase mono) para que las cifras no salten de ancho al actualizarse (regla `number-tabular`).
-
-### Escala tipográfica
-
-| Rol | Tamaño | Peso | Uso |
+| Rol | Cara | Variable | Dónde |
 |---|---|---|---|
-| Display | 28–32px | 600–700 | Título de página (Dashboard, Conteo) |
-| H1 | 24px | 600 | Encabezado de sección |
-| H2 | 18–20px | 600 | Subsección, título de card |
-| Body | 16px | 400 | Texto de formularios, listas — nunca menos de 16px en inputs (evita auto-zoom iOS) |
-| Label | 13–14px | 500 | Labels de input, badges |
-| Caption | 12px | 400–500 | Metadatos, timestamps, ayuda |
+| Display | **Archivo** 500/600/700 | `--font-display` | Títulos de pantalla y de card, cifras grandes de KPI |
+| Interfaz | **Inter** | `--font-sans` | Cuerpo, formularios, botones, tablas, navegación |
+| Datos | **JetBrains Mono** | `--font-mono` | Códigos SKU, ubicaciones, timestamps, etiquetas overline |
+
+Archivo es una grotesca industrial, emparentada con la cartelería de
+depósito: es lo que le da carácter propio a la app. Inter se queda donde es
+imbatible, que es la interfaz.
+
+### Escala
+
+| Token | Tamaño | Peso | Uso |
+|---|---|---|---|
+| display-xl | 38–56px | 700 | Cifra protagonista del Dashboard |
+| display | 28–34px | 600 | Título de pantalla |
+| kpi | 26px | 600 | Cifra de tarjeta de KPI |
+| heading | 16–20px | 600 | Título de sección o de card |
+| body | 15px | 400 | Cuerpo general |
+| body-input | 16px | 400 | Campos de formulario. **Nunca menos**: evita el zoom de iOS |
+| label | 13px | 500 | Etiquetas de campo |
+| caption | 11.5px | 500 | Metadatos y ayudas |
+| overline | 10.5px | 500 | Mono, mayúsculas, tracking .13em |
+
+Nada de tamaños sueltos fuera de esta escala. Si hace falta uno nuevo, se
+agrega acá primero.
+
+**Cifras tabulares siempre** en columnas numéricas, KPI y tablas: una tabla
+que salta de ancho cada vez que sincroniza se lee mal y se ve barata. La
+regla ya está global en `globals.css` para `.font-mono` y `[data-numeric]`.
 
 ---
 
-## 4. Espaciado (Density 5/10 — Standard)
+## 4. Espacio y forma
 
-| Token | Valor | Uso |
+| Grupo | Valores | Criterio |
 |---|---|---|
-| `--space-xs` | `4px` | Gaps internos de ícono+texto |
-| `--space-sm` | `8px` | Espaciado inline, gaps de chip |
-| `--space-md` | `16px` | Padding estándar de card/input |
-| `--space-lg` | `24px` | Padding de sección |
-| `--space-xl` | `32px` | Separación entre bloques mayores |
-| `--space-2xl` | `48px` | Márgenes de sección en desktop |
+| Espaciado | 4 · 8 · 12 · 16 · 24 · 32 · 48 | Escala fija, nada fuera de la lista |
+| Radio | 6 / 10 / 14 / 20 / 9999 | Chip · input y botón · card · modal y FAB · píldora |
+| Íconos | 16 · 20 · 24 | Inline · estándar · acción primaria y FAB |
 
-Excepción documentada por página en `pages/*.md`: Productos e Historial suben densidad en tablas (filas más compactas); Conteo baja densidad (más aire, objetivos más grandes) porque es la pantalla de mayor presión operativa.
+### Elevación
 
----
-
-## 5. Elevación y bordes (Variance 4/10 — Balanced)
-
-Nada de sombras dramáticas ni 3D — coherente con Flat/Data-Dense. Se usan sombras muy sutiles solo para separar capas flotantes (modal, dropdown, toast), nunca en cards de contenido estático.
+Cuatro niveles, no uno estampado en todo.
 
 | Nivel | Valor | Uso |
 |---|---|---|
-| `--shadow-sm` | `0 1px 2px rgba(20,10,5,0.06)` | Cards con hover, inputs con foco |
-| `--shadow-md` | `0 4px 10px rgba(20,10,5,0.08)` | Dropdowns, popovers |
-| `--shadow-lg` | `0 12px 24px rgba(20,10,5,0.12)` | Modales, sheets |
+| 0 | Sin sombra, solo borde | Card en reposo. La superficie ya la separa del fondo |
+| `--elev-1` | `0 2px 8px hsl(0 0% 0% / .4)` | Card interactiva en hover |
+| `--elev-2` | `0 12px 28px hsl(0 0% 0% / .55)` | Dropdown, popover |
+| `--elev-3` | `0 24px 60px hsl(0 0% 0% / .7)` | Modal, sheet |
 
-Border-radius: `0.75rem` (cards, botones grandes), `0.5rem` (inputs, botones estándar), `9999px` (badges/chips de estado, avatar).
+(Valores del modo oscuro; en claro son más suaves y cálidos.)
 
----
-
-## 6. Motion (Motion 3/10 — Subtle)
-
-El código actual ya está bien calibrado para este dial: `tailwindcss-animate` con `fade-in 0.2s ease-out`, `slide-up 0.3s ease-out`, accordion en `0.2s`, y un bloque `@media (prefers-reduced-motion: reduce)` global que ya fuerza duración casi nula. **Conservar tal cual**; no agregar animaciones de scroll-reveal, parallax ni choreography — quedan fuera de alcance para densidad 3.
-
-Reglas para nuevas interacciones:
-
-- Duración estándar: **150–250ms**, easing `ease-out` (entrada) / `ease-in` (salida). Nunca linear salvo para spinners de carga.
-- Motion con propósito únicamente: confirmar guardado de conteo, transición de estado del semáforo, aparición/desaparición de toast (`sonner`, ya instalado), indicador de sync.
-- 1 elemento animado por vista como máximo — nunca animar la lista completa de productos al cargar.
-- Feedback de tap en botones/cards interactivas: cambio de opacidad o color, **no** `transform: scale()` que desplace layout (regla `layout-shift-avoid`).
-- Respetar siempre `prefers-reduced-motion` (ya implementado globalmente — extender el mismo criterio a cualquier animación nueva vía Framer Motion, ya instalado).
+**Glow:** `0 0 0 1px primary/.35, 0 10px 26px -12px primary/.85`. Solo en la
+acción primaria, la destructiva y el foco. Nunca como animación ambiente.
 
 ---
 
-## 7. Interacción y accesibilidad táctil
+## 5. Motion
 
-Contexto: operarios de depósito/campo, a veces con guantes, escaneando con cámara/lector Bluetooth mientras sostienen el producto.
+Una sola tabla para toda la app. Antes cada animación elegía su propia
+duración entre Framer Motion, keyframes CSS y `tailwindcss-animate`.
 
-- **Objetivo táctil mínimo:** 44×44px en general (regla estándar), mínimo **48×48px** en el flujo de Conteo específicamente (botón de confirmar cantidad, +/− de cantidad, acción de escanear) — más generoso que el mínimo por el contexto de uso con guantes.
-- **Espaciado entre targets:** ≥8px siempre, ≥12px en Conteo para evitar toques accidentales con guantes.
-- **Feedback inmediato:** todo botón async (guardar conteo, sync) muestra estado de carga y se deshabilita durante la operación — nunca doble-submit.
-- **Feedback sonoro + visual + textual** en cada escaneo exitoso/fallido (ya implementado — "Etapa 2: escaneo, offline, sonidos" — mantener ese patrón de triple confirmación).
-- **Foco de teclado visible** en todo control interactivo, incluidos los de modales (usa `--ring`).
-- **Contraste:** texto normal ≥4.5:1 sobre fondo en ambos modos; los tres colores de semáforo verificados independientemente en claro y oscuro antes de shippear.
-- **Color nunca solo:** cada estado de conteo lleva ícono + texto además del color de fondo/borde.
+| Token | Duración | Curva | Para |
+|---|---|---|---|
+| instant | 100ms | ease-out | Color de hover, foco |
+| quick | 160ms | ease-out | Presión de botón, chips, tooltips |
+| base | 240ms | `cubic-bezier(.2,.8,.2,1)` | Cards, acordeones, cambio de tab |
+| enter | 280ms | `cubic-bezier(.34,1.4,.64,1)` | Modales, sheets, escáner a producto |
+| exit | 180ms | ease-in | Todo lo que se va. Siempre más rápido que al entrar |
+| count | 600ms | ease-out | Números que suben al cargar el Dashboard |
 
----
+Disponibles como `duration-quick`, `ease-out-soft`, `ease-spring` en Tailwind,
+y como `--dur-*` / `--ease-*` en CSS.
 
-## 8. Iconografía
+### Reglas
 
-**Librería:** `lucide-react` (ya instalada — no introducir Phosphor pese a ser la recomendación por defecto del skill; evita una segunda librería de íconos en el proyecto). Trazo consistente 1.5–2px, tamaño por token (`16px` inline, `20px` estándar, `24px` acciones primarias).
-
-| Concepto | Ícono lucide-react |
-|---|---|
-| Escaneo cámara | `Camera` / `ScanLine` |
-| Escaneo OCR | `ScanText` |
-| Lector Bluetooth/USB | `Bluetooth` o `Usb` |
-| Entrada manual | `Keyboard` |
-| Producto | `Package` |
-| Depósito/almacén | `Warehouse` |
-| Distribución/transporte | `Truck` |
-| Historial | `History` |
-| Sincronización pendiente | `RefreshCw` |
-| Sin conexión | `WifiOff` |
-| Conectado | `Wifi` |
-| Perfil/usuario | `User` |
-| Coincide | `CheckCircle2` |
-| Sobra | `TrendingUp` |
-| Falta | `TrendingDown` / `AlertCircle` |
-| Eliminar (destructivo) | `Trash2` |
-| Exportar | `Download` / `FileSpreadsheet` |
-
-Nunca usar emoji como ícono estructural (regla crítica, ya respetada en el proyecto).
+- **Un elemento animado por vista.** Nada de animar la lista entera al cargar.
+- **Motion con propósito:** orientar, confirmar, anticipar, mostrar estado o
+  progreso. Nunca decorativo.
+- **Sin loops ambiente**, con una sola excepción: el login (`wheat-sway`,
+  `btn-shiny`), que es la única pantalla sin una tarea en curso que
+  interrumpir.
+- **`prefers-reduced-motion` siempre.** La regla global de `globals.css` ya
+  neutraliza duraciones; los componentes con Framer Motion usan además
+  `useReducedMotion()`.
 
 ---
 
-## 9. Componentes clave (patrones, no CSS literal — el proyecto ya usa shadcn/ui + CVA)
+## 6. Botones
 
-### Botones
-- **Primario:** fondo `--primary`, texto `--primary-foreground`, radius `0.5rem`, un solo CTA primario por vista (regla `primary-action`).
-- **Secundario:** outline con `--border`, texto `--foreground`.
-- **Destructivo:** fondo/borde `--destructive`, siempre con ícono + confirmación (`confirmation-dialogs`) antes de ejecutar.
-- **Estado disabled:** opacidad 0.5, `cursor: not-allowed`, sin acción al click.
+Cuatro niveles de peso. La regla: **una sola acción primaria por pantalla**.
 
-### Cards
-- Fondo `--card`, borde `--border` 1px, radius `0.75rem`, sombra solo en hover si es interactiva (`--shadow-sm`). Sin `transform` en hover.
+| Nivel | Variants | Tratamiento |
+|---|---|---|
+| 1 | `default`, `success` | Fondo sólido, glow. Una por pantalla |
+| 2 | `outline`, `destructive` | Contorno. Destructiva se rellena al hover |
+| 3 | `secondary`, `ghost` | Sin borde. Acciones de fila y de barra |
+| 4 | `link` | Navegación dentro de un texto |
 
-### Badges de estado (semáforo)
-- Forma píldora (`radius: 9999px`), fondo tenue del color semántico + texto en el tono fuerte del mismo color (ej. `bg-success/10 text-success`), ícono a la izquierda, nunca solo color.
+`destructive-solid` existe aparte, y se usa **solo** en la confirmación final
+dentro de un diálogo: ahí ya no compite con nada y el usuario decidió
+avanzar. Un botón rojo sólido permanente en pantalla enseña a ignorar el
+rojo, que es justo el color que no queremos que nadie ignore.
 
-### Inputs
-- Altura mínima 44px (48px en Conteo), label visible siempre (nunca solo placeholder), tipo semántico (`inputMode="numeric"` para cantidades), mensaje de error debajo del campo vinculado con `aria-describedby`.
+### Tamaños
 
-### Indicador de sync/offline (nuevo — patrón de dominio, no existe en el skill genérico)
-- Barra o chip persistente en el topbar: `Wifi`/`WifiOff` + texto de estado ("En línea" / "Sin conexión — N conteos pendientes"). Nunca un ícono solo sin conteo/texto cuando hay pendientes.
+| Size | Altura | Uso |
+|---|---|---|
+| `sm` | 36px | Acciones de barra y de fila |
+| `default` | 44px | Estándar. Objetivo táctil mínimo |
+| `lg` | 48px | Flujo de Conteo, donde se opera con guantes |
+| `icon` | 44×44 | Botón de solo ícono |
+| `icon-sm` | 36×36 | Ícono en fila de tabla |
+| `fab` | 56×56 | Acción central del tab bar |
+
+### Estado de carga
+
+Usar la prop `loading` del `Button`, no un `<Loader2>` improvisado en cada
+pantalla. El botón **mantiene su texto y su ancho** mientras trabaja, y
+cuando hay progreso real lo dice ("Importando 3.000 de 10.826"). Reemplazar
+el texto por una ruedita muda es lo que dejó la app aparentemente colgada
+durante la importación de Lascano.
+
+### Accesibilidad
+
+Objetivo táctil mínimo 44px (48px en Conteo). Foco visible siempre: anillo de
+2px en `--ring` más 2px de separación. Todo botón asíncrono se deshabilita
+mientras corre. Ninguna acción se comunica solo por color.
 
 ---
 
-## 10. Layout responsive
+## 7. Navegación
 
-Breakpoints: `375px` (móvil chico) · `768px` (tablet — dispositivo principal en depósito) · `1024px` (desktop/admin) · `1440px` (desktop grande).
+### Móvil — tab bar con acción central
 
-- Mobile-first; el flujo de Conteo se diseña primero para tablet en mano (768px), no para desktop.
-- Sin scroll horizontal nunca. Tablas de Productos/Historial usan contenedor `overflow-x: auto` propio, no la página entera.
-- Contenido nunca oculto detrás de topbar/bottom-bar fijos — reservar padding equivalente a su altura.
-- `min-h-dvh` en vez de `100vh` (barras de navegador móvil).
+**Contar sale de la fila de tabs** y pasa a botón central de 56px. La app
+existe para contar y esa acción pesaba exactamente lo mismo que "Productos".
+
+Los tabs se reparten a los lados: la mitad a la izquierda, la mitad a la
+derecha. Así la barra queda equilibrada tanto para un administrador (cuatro
+tabs) como para un operario (dos), sin el hueco que dejaban antes los ítems
+solo-admin.
+
+**El activo se marca con una barra de luz** de 2.5px sobre el borde superior,
+del ancho del ícono, con halo. Reemplaza a la gota líquida con filtro SVG:
+el óvalo se montaba sobre la etiqueta y tapaba el texto del tab. En una app
+que se usa con guantes y a media luz, leer el nombre del tab gana sobre el
+efecto.
+
+Historial y Usuarios siguen siendo solo-admin porque el middleware los
+restringe de verdad (`RUTAS_SOLO_ADMIN`): mostrárselos a un operario le daría
+un link que lo rebota.
+
+### Escritorio — sidebar agrupado y colapsable
+
+Los siete ítems se agrupan en dos bloques separados por un filete:
+**Operación** (Dashboard, Contar, Productos) y **Administración** (Etiquetas,
+Historial, Usuarios, Configuración). Antes eran una lista plana donde "Contar
+stock" y "Configuración" pesaban lo mismo.
+
+Se puede colapsar a 68px mostrando solo íconos, con la preferencia recordada
+en `localStorage`.
+
+El indicador activo es el mismo lenguaje de luz que en móvil, pero como
+resaltado de fila completa: el contenedor es una fila con ícono y texto, no
+un ícono suelto. Mismo significado, forma distinta según el contenedor.
 
 ---
 
-## 11. Anti-patrones (evitar explícitamente)
+## 8. Dashboard
 
-- ❌ Animaciones de scroll-reveal, parallax o choreography compleja (fuera de dial motion=3).
-- ❌ Sombras dramáticas, gradientes, efectos 3D o glassmorphism.
+Cuatro niveles de jerarquía, en vez de ocho tarjetas iguales compitiendo.
+
+| Nivel | Qué | Por qué ahí |
+|---|---|---|
+| 1 · Protagonista | Avance del conteo: porcentaje grande, barra, absolutos | Es la pregunta que todos traen al abrir |
+| 2 · Alerta | Solo si hay diferencias negativas sin revisar | Responde "¿hay problemas?" sin buscarlo. Si no hay, el bloque no existe |
+| 3 · Estado | Coincidencias, faltantes, sobrantes, pendientes | Cuatro tarjetas del mismo tipo de dato. El importe baja a metadato |
+| 4 · Análisis | Gráficos, tablas, exportaciones, acciones de admin | Debajo del pliegue. Quien los necesita, los busca |
+
+Salieron "Productos totales" (es el denominador de la barra), "Contados" (el
+numerador), "Avance" (la cifra protagonista) y "Última sincronización" (ya
+vive en el topbar). **Cuatro tarjetas menos sin perder un solo dato.**
+
+Todos los filtros se conservan: los cuatro estados en las tarjetas, y
+"contados" pasa a ser el contador clickeable dentro de la barra de avance.
+
+### Gráficos
+
+Leyenda visible, tooltip tematizado con los tokens, paleta accesible (nunca
+rojo/verde puro como única diferenciación), y **estado vacío explícito**
+("Todavía no hay conteos") en vez de un gráfico en blanco. Los colores salen
+de los tokens, nunca hex sueltos en el componente.
+
+---
+
+## 9. Interacción táctil
+
+Contexto: operarios de depósito, a veces con guantes, escaneando con cámara o
+lector Bluetooth mientras sostienen el producto.
+
+- Objetivo táctil mínimo **44px**, y **48px** en el flujo de Conteo.
+- Separación entre targets ≥8px, ≥12px en Conteo.
+- Todo botón async muestra estado de carga y se deshabilita. Nunca doble envío.
+- Triple confirmación en cada escaneo: sonido, vibración y texto.
+- El estado de conexión y sincronización es UI de primera clase, siempre
+  visible en el topbar. Nunca un ícono solo cuando hay pendientes: va con el
+  número.
+
+---
+
+## 10. Responsive
+
+| Ancho | Dispositivo | Qué define |
+|---|---|---|
+| 390px | Teléfono | **Referencia de diseño.** Tab bar con FAB, tarjetas apiladas |
+| 768px | Tablet | Dispositivo de depósito. Dos columnas, fila híbrida en Productos |
+| 1024px | Escritorio | Aparece el sidebar, desaparece la tab bar. Tablas completas |
+| 1440px | Escritorio grande | Contenido tope a 1400px centrado. Nada se estira |
+
+El teléfono no es "la versión chica": es el dispositivo principal.
+
+Reglas que no se negocian: nunca scroll horizontal en la página —solo dentro
+de una tabla, en su propio contenedor—; `min-h-dvh` en vez de `100vh`;
+padding reservado para la tab bar fija y el área segura; inputs en 16px.
+
+---
+
+## 11. Anti-patrones
+
+- ❌ Más de una acción primaria por pantalla.
+- ❌ Glow o brillo en botones secundarios. La luz es información.
+- ❌ Loops de animación ambiente fuera del login.
 - ❌ Semáforo de estado solo por color, sin ícono ni texto.
+- ❌ Colores pastel para los estados del conteo.
+- ❌ Hex sueltos en componentes. Todo color sale de un token.
+- ❌ Tamaños de fuente fuera de la escala de §3.
 - ❌ Emoji como ícono estructural.
-- ❌ Botones sin `cursor: pointer` o sin estado de carga en acciones async.
-- ❌ Segunda librería de íconos (mantener solo `lucide-react`).
-- ❌ Cambiar tipografía a algo distinto de Inter sin razón funcional (ya es cálida y accesible).
-- ❌ Ocultar el estado de conexión/sync — siempre visible en el topbar.
-- ❌ Reducir objetivos táctiles por debajo de 44px (48px en Conteo).
+- ❌ Segunda librería de íconos. Solo `lucide-react`.
+- ❌ Neutros fríos o azulados. Todos los grises tiran a tierra.
+- ❌ Objetivos táctiles por debajo de 44px (48px en Conteo).
+- ❌ Ocultar el estado de conexión o de sincronización.
+- ❌ Botones async sin estado de carga, o que se queden mudos mientras trabajan.
 
 ---
 
 ## 12. Checklist de pre-entrega
 
-- [ ] Paleta cálida aplicada solo vía tokens HSL en `globals.css` (sin hex sueltos en componentes)
-- [ ] Contraste 4.5:1 verificado en claro y oscuro, con hex reales (no solo HSL nominal)
-- [ ] Los 3 estados de conteo llevan ícono + texto, no solo color
-- [ ] `lucide-react` como única librería de íconos
-- [ ] Objetivos táctiles ≥44px (≥48px en Conteo), separación ≥8px (≥12px en Conteo)
-- [ ] Motion limitado a 150–250ms, con propósito, `prefers-reduced-motion` respetado
-- [ ] Indicador de conexión/sync visible en todo momento
-- [ ] Responsive verificado en 375 / 768 / 1024 / 1440px, sin scroll horizontal
-- [ ] Un solo CTA primario por vista
-- [ ] Acciones destructivas con confirmación + ícono + texto explícito
+- [ ] Una sola acción primaria por pantalla
+- [ ] Todo color vía token, en los dos modos
+- [ ] Contraste 4.5:1 verificado en claro y oscuro con los hex reales
+- [ ] Los tres estados del conteo con ícono más texto
+- [ ] Cifras tabulares en toda columna numérica
+- [ ] Tamaños de fuente dentro de la escala
+- [ ] Motion entre 100 y 280ms, con propósito, `prefers-reduced-motion` respetado
+- [ ] Un elemento animado por vista
+- [ ] Objetivos táctiles ≥44px (≥48px en Conteo), separación ≥8px
+- [ ] Estado de conexión y sync visible
+- [ ] Responsive verificado en 390 / 768 / 1024 / 1440px, sin scroll horizontal
+- [ ] Acciones destructivas con confirmación, ícono y verbo explícito
+- [ ] Estados vacíos escritos, nunca un bloque en blanco
+
+---
+
+## 13. Estado de implementación
+
+| Fase | Alcance | Estado |
+|---|---|---|
+| 1 | Tokens, superficies, elevación, motion, tipografía, este documento | Aplicada |
+| 2 | Sistema de botones, CardTitle, jerarquía en Productos | Aplicada |
+| 3 | Tab bar con FAB, sidebar agrupado y colapsable, jerarquía del Dashboard | Aplicada |
+| 4 | Escáner: siete estados, haptics, transición marco → ficha | Pendiente |
+| 5 | Fila de producto responsive, paginado o virtualización para 12.400+ ítems | Pendiente |
+
+Las fases 4 y 5 tienen su especificación en la propuesta de diseño; la 5 es
+tanto rendimiento como estética y por eso va al final.

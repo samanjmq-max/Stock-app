@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Plus, Upload, Download, Search } from "lucide-react";
+import { Loader2, Plus, Upload, Download, Search, ChevronDown, FileSpreadsheet, FileText, FileType } from "lucide-react";
 import { productosService } from "@/services/productos.service";
 import type { ProductoInput } from "@/lib/validations";
 import { AGENCIAS, type Agencia, type Producto } from "@/types";
@@ -16,6 +16,82 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { SearchableSelect } from "@/components/ui/searchable-select";
+import { cn } from "@/lib/utils";
+
+/*
+  Menú de exportación.
+
+  Antes Excel, CSV y PDF eran tres botones sueltos, uno al lado del otro, con
+  el mismo peso visual que "Importar" y casi el mismo que "Nuevo": cinco
+  acciones compitiendo en la misma fila, donde exportar a CSV parecía tan
+  importante como dar de alta un producto. Ahora son un solo botón secundario
+  con tres opciones adentro.
+
+  Es un desplegable propio y no un componente de librería a propósito: el
+  proyecto tiene radix-ui de dialog, select, label y slot, pero no de
+  dropdown-menu, y sumar una dependencia para tres opciones no se justifica.
+*/
+function MenuExportar({ onExportar }: { onExportar: (formato: "xlsx" | "csv" | "pdf") => void }) {
+  const [abierto, setAbierto] = useState(false);
+  const contenedor = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!abierto) return;
+    function alClickearFuera(e: MouseEvent) {
+      if (contenedor.current && !contenedor.current.contains(e.target as Node)) setAbierto(false);
+    }
+    function alPresionarEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setAbierto(false);
+    }
+    document.addEventListener("mousedown", alClickearFuera);
+    document.addEventListener("keydown", alPresionarEscape);
+    return () => {
+      document.removeEventListener("mousedown", alClickearFuera);
+      document.removeEventListener("keydown", alPresionarEscape);
+    };
+  }, [abierto]);
+
+  const opciones = [
+    { formato: "xlsx" as const, label: "Excel", icono: FileSpreadsheet },
+    { formato: "csv" as const, label: "CSV", icono: FileText },
+    { formato: "pdf" as const, label: "PDF", icono: FileType },
+  ];
+
+  return (
+    <div ref={contenedor} className="relative">
+      <Button
+        variant="outline"
+        onClick={() => setAbierto((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={abierto}
+      >
+        <Download size={15} />
+        Exportar
+        <ChevronDown size={14} className={cn("transition-transform duration-quick", abierto && "rotate-180")} />
+      </Button>
+
+      {abierto && (
+        <div
+          role="menu"
+          className="absolute right-0 z-40 mt-1.5 min-w-[168px] overflow-hidden rounded-lg border border-border bg-elevated p-1 shadow-elev-2 animate-fade-in"
+        >
+          {opciones.map(({ formato, label, icono: Icono }) => (
+            <button
+              key={formato}
+              role="menuitem"
+              type="button"
+              onClick={() => { onExportar(formato); setAbierto(false); }}
+              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-sm text-foreground transition-colors duration-quick hover:bg-secondary"
+            >
+              <Icono size={15} className="text-muted-foreground" />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function ProductosPage() {
   const { isAdmin, esSuperAdmin, agencia } = useAuth();
@@ -227,13 +303,14 @@ export default function ProductosPage() {
             className="w-40"
           />
 
-          <Button variant="secondary" onClick={() => exportar("xlsx")}><Download size={15} />Excel</Button>
-          <Button variant="secondary" onClick={() => exportar("csv")}><Download size={15} />CSV</Button>
-          <Button variant="secondary" onClick={() => exportar("pdf")}><Download size={15} />PDF</Button>
+          {/* Jerarquía de la pantalla: "Nuevo" es la única acción primaria.
+              Exportar e Importar son secundarias, y los filtros no son
+              acciones. Antes había cinco botones del mismo peso. */}
+          <MenuExportar onExportar={exportar} />
 
           {isAdmin && (
             <>
-              <Button variant="secondary" onClick={() => setImportDialogOpen(true)}>
+              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
                 <Upload size={15} />
                 Importar
               </Button>

@@ -13,6 +13,7 @@ const config: Config = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", "sans-serif"],
+        // Archivo -- grotesca industrial. Solo titulación y cifras grandes.
         display: ["var(--font-display)", "sans-serif"],
         mono: ["var(--font-mono)", "monospace"],
       },
@@ -50,9 +51,22 @@ const config: Config = {
           DEFAULT: "hsl(var(--warning))",
           foreground: "hsl(var(--warning-foreground))",
         },
+        // Azul de señal: sincronización, información neutra. Es el único
+        // color frío del sistema y por eso mismo se lee como "del sistema"
+        // y no como estado del conteo.
+        info: {
+          DEFAULT: "hsl(var(--info))",
+          foreground: "hsl(var(--info-foreground))",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        // Capa por encima de card: modales, dropdowns, hover de fila.
+        // Es lo que permite construir profundidad en modo oscuro.
+        elevated: {
+          DEFAULT: "hsl(var(--elevated))",
+          foreground: "hsl(var(--elevated-foreground))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -65,6 +79,22 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
         xl: "calc(var(--radius) + 4px)",
       },
+      boxShadow: {
+        "elev-1": "var(--elev-1)",
+        "elev-2": "var(--elev-2)",
+        "elev-3": "var(--elev-3)",
+      },
+      transitionDuration: {
+        instant: "100ms",
+        quick: "160ms",
+        base: "240ms",
+        enter: "280ms",
+        exit: "180ms",
+      },
+      transitionTimingFunction: {
+        "out-soft": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        spring: "cubic-bezier(0.34, 1.4, 0.64, 1)",
+      },
       keyframes: {
         "accordion-down": { from: { height: "0" }, to: { height: "var(--radix-accordion-content-height)" } },
         "accordion-up": { from: { height: "var(--radix-accordion-content-height)" }, to: { height: "0" } },
@@ -74,8 +104,8 @@ const config: Config = {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.2s ease-out",
-        "slide-up": "slide-up 0.3s ease-out",
+        "fade-in": "fade-in 0.24s cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "slide-up": "slide-up 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)",
       },
     },
   },

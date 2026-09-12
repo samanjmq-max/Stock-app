@@ -3,113 +3,143 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { LayoutDashboard, ScanBarcode, Package, History, Users } from "lucide-react";
+import { LayoutDashboard, ScanLine, Package, History, Users, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
+/*
+  Tab bar con acción central.
+
+  Dos decisiones de fondo:
+
+  1. CONTAR SALE DE LA FILA DE TABS. La app existe para contar y esa acción
+     pesaba exactamente lo mismo que "Productos". Ahora es un botón central,
+     el único punto de la barra que no es navegación sino acción, y cae
+     naturalmente bajo el pulgar.
+
+  2. EL ACTIVO SE MARCA CON UNA BARRA DE LUZ sobre el borde superior de la
+     barra, no con la gota líquida anterior. La gota (filtro SVG tipo
+     metaball) se montaba encima de la etiqueta y tapaba el texto del tab --
+     "Cont" quedaba oculto detrás del óvalo, algo que ya se había tenido que
+     parchear moviendo el ancla. En una app que se usa con guantes y a media
+     luz, leer el nombre del tab gana sobre el efecto.
+
+  Los tabs se reparten a los lados del botón central: la mitad a la izquierda
+  y la mitad a la derecha. Así la barra queda equilibrada tanto para un
+  administrador (que ve cuatro) como para un operario (que ve dos), sin el
+  hueco que dejaban antes los ítems solo-admin.
+
+  Historial y Usuarios siguen siendo solo-admin porque el middleware los
+  restringe de verdad (RUTAS_SOLO_ADMIN): mostrárselos a un operario le
+  daría un link que lo rebota. Unificar sesión, agencia, tema y usuarios en
+  una pantalla "Cuenta" es el paso siguiente, pero implica una ruta nueva y
+  queda fuera de este pase visual.
+*/
 const ITEMS = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard, soloAdmin: false },
-  { href: "/conteo", label: "Contar", icon: ScanBarcode, soloAdmin: false },
   { href: "/productos", label: "Productos", icon: Package, soloAdmin: false },
-  // Historial es el log de auditoría de toda la empresa (ver middleware.ts,
-  // RUTAS_SOLO_ADMIN) -- si un operador lo ve acá, el link lo rebota.
   { href: "/historial", label: "Historial", icon: History, soloAdmin: true },
-  // Iba etiquetado "Perfil" pero apunta a /usuarios, que también es
-  // admin-only -- un operador lo veía y el link lo rebotaba. No hay página
-  // de Perfil (se decidió no construirla por ahora); esto queda como el
-  // acceso a gestión de usuarios que realmente es, mismo criterio que ya
-  // usa el Sidebar de escritorio.
   { href: "/usuarios", label: "Usuarios", icon: Users, soloAdmin: true },
 ];
 
-// Tab bar con "gota líquida": el ícono activo se levanta sobre un bulto de
-// --primary que sube desde el propio borde superior de la barra (efecto
-// metaball vía filtro SVG), elegido por el usuario sobre el anillo de luz y
-// la burbuja flotante (ver mockup "Tres Barras", 2026-09-12) -- con la
-// condición explícita de no inventar un color nuevo: el bulto usa el mismo
-// --primary que ya usan el botón .btn-glow y el Sidebar, y la barra en sí
-// (fondo, blur, borde) queda exactamente como está hoy, no se convierte en
-// una píldora nueva.
-//
-// Dos piezas con layoutId (anchor pegado al borde de la barra + blob flotando
-// arriba) que un filtro SVG funde en una sola forma continua -- sin esto se
-// verían como dos círculos separados en vez de una gota. Los íconos van en
-// una capa aparte, sin el filtro, para que no salgan borrosos: el filtro solo
-// difumina las dos formas de fondo, nunca el trazo del ícono.
+/*
+  Tab va a nivel de módulo, NO adentro de MobileNav.
+
+  Si se define dentro del componente padre, se crea una función nueva en cada
+  render: para React es un tipo de componente distinto, así que desmonta el
+  árbol viejo y monta uno nuevo en lugar de actualizarlo. Eso rompe justo la
+  animación de la barra de luz, porque layoutId necesita que el elemento
+  sobreviva entre renders para poder interpolar su posición.
+*/
+function Tab({
+  href,
+  label,
+  icon: Icon,
+  active,
+  transition,
+}: {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  active: boolean;
+  transition: { duration: number } | { type: "spring"; stiffness: number; damping: number };
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "relative flex min-h-[48px] min-w-[60px] flex-1 flex-col items-center justify-center gap-1 rounded-lg text-[11px] font-medium transition-colors duration-quick",
+        active ? "text-primary" : "text-muted-foreground"
+      )}
+    >
+      {active && (
+        <motion.span
+          layoutId="nav-light"
+          transition={transition}
+          aria-hidden="true"
+          className="nav-light absolute -top-[9px] h-[2.5px] w-7 rounded-b-full bg-primary"
+        />
+      )}
+      <Icon size={20} strokeWidth={active ? 2.4 : 1.8} />
+      <span>{label}</span>
+    </Link>
+  );
+}
+
 export function MobileNav() {
   const pathname = usePathname();
   const { isAdmin } = useAuth();
   const prefersReducedMotion = useReducedMotion();
-  const anchorTransition = prefersReducedMotion
+
+  const visibles = ITEMS.filter((item) => !item.soloAdmin || isAdmin);
+  const corte = Math.ceil(visibles.length / 2);
+  const izquierda = visibles.slice(0, corte);
+  const derecha = visibles.slice(corte);
+
+  const contandoActivo = pathname === "/conteo" || pathname.startsWith("/conteo/");
+
+  const lightTransition = prefersReducedMotion
     ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 260, damping: 22 };
-  const blobTransition = prefersReducedMotion
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 200, damping: 20 };
-  const iconTransition = prefersReducedMotion
-    ? { duration: 0 }
-    : { type: "spring" as const, stiffness: 300, damping: 20 };
+    : { type: "spring" as const, stiffness: 380, damping: 32 };
+
+  const esActivo = (href: string) => pathname === href || pathname.startsWith(href + "/");
 
   return (
     <nav
-      className="md:hidden fixed bottom-0 inset-x-0 z-30 flex justify-around border-t border-border bg-background/95 backdrop-blur px-1 py-2"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-end justify-around border-t border-border bg-card/95 px-2 pt-2 backdrop-blur md:hidden"
       style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
-      <svg width="0" height="0" style={{ position: "absolute" }} aria-hidden="true">
-        <filter id="mobile-nav-gooey">
-          <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur" />
-          <feColorMatrix in="blur" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" />
-        </filter>
-      </svg>
+      {izquierda.map((item) => (
+        <Tab key={item.href} href={item.href} label={item.label} icon={item.icon}
+          active={esActivo(item.href)} transition={lightTransition} />
+      ))}
 
-      {ITEMS.filter((item) => !item.soloAdmin || isAdmin).map((item) => {
-        const active = pathname === item.href || pathname.startsWith(item.href + "/");
-        const Icon = item.icon;
-        return (
-          <Link
-            key={item.href}
-            href={item.href}
-            aria-current={active ? "page" : undefined}
-            className="relative flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl text-[11px] font-medium min-w-[52px] min-h-[44px] justify-center"
-          >
-            {active && (
-              <span className="absolute inset-0 pointer-events-none" style={{ filter: "url(#mobile-nav-gooey)" }} aria-hidden="true">
-                {/* Antes estaba en bottom-1 pensando en "el borde de la barra", pero
-                    ese borde inferior del span (inset-0) cae justo donde está la
-                    etiqueta de texto, no el borde real de la barra -- tapaba el
-                    label ("Cont" quedaba oculto detrás del óvalo). El ancla va
-                    arriba, a la altura de reposo del ícono, que es de donde
-                    realmente "sale" la gota hacia el blob de arriba. */}
-                <motion.span
-                  layoutId="mobile-nav-goo-anchor"
-                  transition={anchorTransition}
-                  className="absolute left-1/2 -translate-x-1/2 top-1 h-3 w-8 rounded-full bg-primary"
-                />
-                <motion.span
-                  layoutId="mobile-nav-goo-blob"
-                  transition={blobTransition}
-                  className="absolute left-1/2 -translate-x-1/2 -top-3.5 h-8 w-8 rounded-full bg-primary"
-                />
-              </span>
-            )}
-            <span className="relative z-10 flex flex-col items-center gap-0.5">
-              <motion.span
-                animate={{ y: active ? -13 : 0 }}
-                transition={iconTransition}
-                className={cn(
-                  "flex items-center justify-center transition-colors duration-200",
-                  active ? "text-primary-foreground" : "text-muted-foreground"
-                )}
-              >
-                <Icon size={19} strokeWidth={active ? 2.25 : 1.75} />
-              </motion.span>
-              <span className={cn("transition-colors duration-200", active ? "text-primary" : "text-muted-foreground")}>
-                {item.label}
-              </span>
-            </span>
-          </Link>
-        );
-      })}
+      {/* Acción central. El anillo del mismo color que la barra recorta el
+          botón contra ella, para que se lea como una pieza montada sobre la
+          barra y no como un círculo flotando por encima, desconectado. */}
+      <div className="flex min-w-[68px] flex-col items-center">
+        <Link
+          href="/conteo"
+          aria-label="Contar stock"
+          aria-current={contandoActivo ? "page" : undefined}
+          className={cn(
+            "-mt-6 grid h-14 w-14 place-items-center rounded-[18px] text-primary-foreground transition-transform duration-quick ease-spring active:scale-95",
+            "shadow-[0_0_0_5px_hsl(var(--card)),0_10px_24px_-8px_hsl(var(--primary)/0.8)]",
+            contandoActivo ? "bg-primary" : "bg-primary/90"
+          )}
+        >
+          <ScanLine size={25} strokeWidth={2.2} />
+        </Link>
+        <span className={cn("mt-1 text-[11px] font-semibold", contandoActivo ? "text-primary" : "text-muted-foreground")}>
+          Contar
+        </span>
+      </div>
+
+      {derecha.map((item) => (
+        <Tab key={item.href} href={item.href} label={item.label} icon={item.icon}
+          active={esActivo(item.href)} transition={lightTransition} />
+      ))}
     </nav>
   );
 }

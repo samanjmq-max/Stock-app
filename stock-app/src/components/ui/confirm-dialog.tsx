@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,9 +21,9 @@ interface Props extends ConfirmOptions {
 }
 
 /**
- * Diálogo de confirmación genérico. Se usa vía el hook useConfirm() de más
- * abajo, que evita tener que manejar el estado open/close a mano en cada
- * pantalla que necesita confirmar una acción (eliminar, reiniciar, etc.).
+ * Diálogo de confirmación genérico. Se usa vía el hook useConfirm()
+ * (src/hooks/useConfirm.ts), que evita tener que manejar el estado
+ * open/close a mano en cada pantalla que necesita confirmar una acción.
  */
 export function ConfirmDialog({ open, onOpenChange, titulo, descripcion, textoConfirmar = "Confirmar", variante = "default", palabraDeSeguridad, onConfirm }: Props) {
   const [escrito, setEscrito] = useState("");
@@ -61,11 +60,21 @@ export function ConfirmDialog({ open, onOpenChange, titulo, descripcion, textoCo
         )}
 
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancelar
           </Button>
-          <Button variant={variante === "destructive" ? "destructive" : "default"} onClick={confirmar} disabled={cargando || bloqueado}>
-            {cargando && <Loader2 className="animate-spin" size={15} />}
+          {/*
+            Acá sí va el rojo sólido, no el contorno del variant "destructive":
+            este es el último paso, el usuario ya decidió avanzar y el botón no
+            compite con nada más en pantalla. El contorno se reserva para los
+            botones destructivos que conviven con otras acciones en una lista.
+          */}
+          <Button
+            variant={variante === "destructive" ? "destructive-solid" : "default"}
+            onClick={confirmar}
+            loading={cargando}
+            disabled={bloqueado}
+          >
             {textoConfirmar}
           </Button>
         </DialogFooter>
