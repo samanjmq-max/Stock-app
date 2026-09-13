@@ -13,9 +13,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
 /*
-  Mismo semáforo y mismo vocabulario que el Dashboard: coincide = azul (nada
-  que hacer), diferencia + = verde, diferencia − = rojo, y "no existe en SAP"
-  en ámbar porque es un hallazgo a revisar, no un faltante.
+  Mismo semáforo y mismo vocabulario que el Dashboard: coincide = verde,
+  diferencia + = azul, diferencia − = rojo, y "no existe en SAP" en ámbar
+  porque es un hallazgo a revisar, no un faltante.
 
   Antes "sobra" usaba el variant `default` -- terracota, el color de marca y de
   las acciones primarias -- así que una fila de stock sobrante se veía igual
@@ -25,9 +25,9 @@ import { Input } from "@/components/ui/input";
   modelo de datos.
 */
 const BADGE_POR_ESTADO: Record<EstadoConteo, "info" | "success" | "warning" | "destructive"> = {
-  coincide: "info",
+  coincide: "success",
+  sobra: "info",
   falta: "destructive",
-  sobra: "success",
   no_existe: "warning",
 };
 
@@ -356,7 +356,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                             c.diferencia < 0
                               ? "text-destructive"
                               : c.diferencia > 0
-                              ? "text-success"
+                              ? "text-info"
                               : "text-muted-foreground"
                           }`}
                         >

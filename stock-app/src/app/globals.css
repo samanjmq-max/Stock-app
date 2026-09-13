@@ -66,27 +66,31 @@
   --primary: 21 72% 36%;
   --primary-foreground: 0 0% 100%;
 
-  --success: 112 45% 30%;
+  --success: 129 52% 30%;
   --success-foreground: 0 0% 100%;
 
-  --warning: 40 85% 42%;
+  /* Ámbar anaranjado, corrido desde los 40° de dorado para no confundirse
+     con el amarillo de --avance ("Por contar"). Marca lo que hay que ir a
+     revisar: "No existe en SAP", el aviso de sin conexión. */
+  --warning: 32 85% 40%;
   --warning-foreground: 30 45% 14%;
 
-  --destructive: 4 70% 47%;
+  --destructive: 3 74% 47%;
   --destructive-foreground: 0 0% 100%;
 
-  --info: 208 45% 42%;
+  --info: 215 72% 42%;
   --info-foreground: 0 0% 100%;
 
-  /* Fucsia de avance. El único color del sistema que NO es tierra, y es a
-     propósito: no describe un estado del stock, describe el PROGRESO de la
-     tarea -- cuánto se contó y cuánto falta. Al no pertenecer a la familia
-     cálida, liga de un vistazo la cifra grande de "Avance del conteo" con la
-     tarjeta de "Pendientes", que es justo lo que ese porcentaje mide.
-     Uso cerrado: avance, barra de progreso, progreso en el tiempo y
-     pendientes. Nunca para un estado del conteo ni para una acción. */
-  --avance: 322 74% 42%;
-  --avance-foreground: 0 0% 100%;
+  /* Amarillo de avance. No describe un estado del stock: describe el PROGRESO
+     de la tarea -- cuánto se contó y cuánto falta. Liga de un vistazo la cifra
+     grande de "Avance del conteo" con la tarjeta de "Por contar", que es justo
+     lo que ese porcentaje mide.
+     Uso cerrado: avance, barra de progreso, progreso en el tiempo y la tarjeta
+     "Por contar". Nunca para un estado del conteo ni para una acción.
+     Está a 45° y --warning a 34° justamente para que se distingan: amarillo
+     es "falta hacer", ámbar es "hay que revisar". */
+  --avance: 43 78% 36%;
+  --avance-foreground: 45 60% 10%;
 
   --border: 34 22% 88%;
   --input: 34 22% 85%;
@@ -157,20 +161,20 @@
   --primary: 21 71% 57%;
   --primary-foreground: 20 40% 8%;
 
-  --success: 112 34% 55%;
-  --success-foreground: 112 50% 7%;
+  --success: 129 46% 50%;
+  --success-foreground: 129 55% 7%;
 
-  --warning: 40 78% 61%;
-  --warning-foreground: 35 50% 8%;
+  --warning: 34 80% 58%;
+  --warning-foreground: 32 55% 8%;
 
-  --destructive: 4 72% 59%;
+  --destructive: 3 76% 60%;
   --destructive-foreground: 0 0% 100%;
 
-  --info: 208 43% 60%;
-  --info-foreground: 208 50% 8%;
+  --info: 215 79% 57%;
+  --info-foreground: 215 60% 8%;
 
-  --avance: 322 72% 68%;
-  --avance-foreground: 322 55% 10%;
+  --avance: 45 82% 61%;
+  --avance-foreground: 45 60% 8%;
 
   --border: 22 24% 15%;
   --input: 22 24% 18%;

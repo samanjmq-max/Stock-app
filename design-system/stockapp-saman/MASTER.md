@@ -101,28 +101,33 @@ mecánica del claro. Sin capas no hay profundidad posible.
 | Token | Claro | Oscuro | Significado |
 |---|---|---|---|
 | `--primary` | `21 72% 36%` | `21 71% 57%` | Terracota. Marca, acción primaria, ítem activo |
-| `--success` | `112 45% 30%` | `112 34% 55%` | Grano. Diferencia + |
-| `--warning` | `40 85% 42%` | `40 78% 61%` | Dorado. No existe en SAP, ranking por valor, alertas |
-| `--destructive` | `4 70% 47%` | `4 72% 59%` | Diferencia −, destructivo, error |
-| `--info` | `208 45% 42%` | `208 43% 60%` | Señal. Coincide, sincronización, info neutra |
-| `--avance` | `322 74% 42%` | `322 72% 68%` | Fucsia. Avance del conteo y pendientes |
+| `--success` | `129 52% 30%` | `129 46% 50%` | Verde. Coincide |
+| `--warning` | `32 85% 40%` | `34 80% 58%` | Ámbar. No existe en SAP, ranking por valor, alertas |
+| `--destructive` | `3 74% 47%` | `3 76% 60%` | Rojo. Diferencia −, destructivo, error |
+| `--info` | `215 72% 42%` | `215 79% 57%` | Azul. Diferencia +, sincronización, info neutra |
+| `--avance` | `43 78% 36%` | `45 82% 61%` | Amarillo. Avance del conteo y "Por contar" |
 | `--accent` | `112 40% 94%` | `112 25% 14%` | Chips y tabs activos, tinte verde |
 | `--ring` | `= primary` | `= primary` | Foco de teclado |
 
 En oscuro los colores van más claros y **menos saturados**: sobre fondo
 oscuro un color saturado vibra y cansa la vista en una jornada larga.
 
-`--info` es frío a propósito, y por eso se lee como "del sistema". En el
-semáforo del conteo marca "coincide": el caso que no pide ninguna acción.
+Los cuatro colores del conteo son más saturados que el resto del sistema, a
+diferencia de lo que pedía la versión anterior. Es una decisión consciente: en
+las tarjetas de estado el color es un contorno de 1,5&nbsp;px y una cifra, no un
+bloque de texto largo, así que no cansa la vista y sí hace falta que se
+distingan de un vistazo desde lejos.
 
-`--avance` es el único color del sistema **fuera de la familia cálida**, y es
-deliberado. No describe un estado del stock: describe el PROGRESO de la tarea.
-Al no pertenecer a ninguna otra familia, liga de un vistazo el porcentaje
-grande de "Avance del conteo", su barra, la curva de progreso en el tiempo y la
-tarjeta de "Pendientes" — que son cuatro vistas del mismo número. **Uso
-cerrado: esos cuatro lugares y nada más.** Nunca un estado del conteo, nunca
-una acción, nunca un acento decorativo. Si aparece fucsia en otro lado, está
-mal usado.
+`--warning` está a 34° (ámbar anaranjado) y `--avance` a 45° (amarillo dorado)
+justamente para que no se confundan. **Ámbar es "hay que revisar"** — no existe
+en SAP, sin conexión. **Amarillo es "falta hacer"** — el avance y lo que queda
+por contar. Si alguna vez se acercan de nuevo, el que se corre es el ámbar.
+
+`--avance` no describe un estado del stock: describe el PROGRESO de la tarea.
+Liga de un vistazo el porcentaje grande de "Avance del conteo", su barra, la
+curva de progreso en el tiempo y la tarjeta de "Por contar" — que son cuatro
+vistas del mismo número. **Uso cerrado: esos cuatro lugares y nada más.** Nunca
+un estado del conteo, nunca una acción, nunca un acento decorativo.
 
 **Contraste marca vs. error:** `--primary` (21°) y `--destructive` (4°) están
 a 17° de matiz. Para que un botón primario nunca se lea como peligro, el
@@ -131,36 +136,64 @@ llevan **siempre** ícono más verbo explícito.
 
 ### 2.4 Semáforo del conteo — patrón de dominio
 
-Se lee **en clave de variación**, como un gráfico de cotización: lo que baja en
-rojo, lo que sube en verde, el equilibrio en azul. No en clave de "bien / mal".
+Cuatro estados, **siempre en este orden** — en las tarjetas, en la torta, en el
+gráfico de importes y en la leyenda. Reordenarlo en un solo lugar obliga a
+re-leer todos los demás.
 
-| Estado | Token | Ícono | Texto obligatorio |
-|---|---|---|---|
-| Coincide | `--info` | `Equal` | "Coincide" |
-| Diferencia + | `--success` | `TrendingUp` | "Diferencia +N" |
-| Diferencia − | `--destructive` | `TrendingDown` | "Diferencia −N" |
-| No existe en SAP | `--warning` | `PackageX` | "No existe en SAP" |
-| Pendiente de sync | `--info` | `RefreshCw` girando | "Pendiente de sincronizar" |
+| # | Estado | Token | Ícono | Texto obligatorio |
+|---|---|---|---|---|
+| 1 | Coincidencias | `--success` | `Equal` | "Coincidencias" |
+| 2 | Diferencias + | `--info` | `TrendingUp` | "Diferencias +" |
+| 3 | Diferencias − | `--destructive` | `TrendingDown` | "Diferencias −" |
+| 4 | Por contar | `--avance` | `Clock` | "Por contar" |
 
-**Vocabulario cerrado.** En toda la interfaz los tres estados se llaman
-"Coincidencias", "Diferencias −" y "Diferencias +", en ese orden, en las
-tarjetas, en los dos gráficos y en la tabla. Los valores `coincide` / `sobra` /
-`falta` / `no_existe` son **del modelo de datos** — así se guardan en la
-planilla y así salen en las exportaciones — y no se muestran crudos nunca: se
-mapean a etiqueta (`LABEL_VISTA` en el Dashboard, `LABEL_ESTADO` en
-`ConteosTable`).
+Fuera de la fila, dentro de la tabla de conteos: **No existe en SAP** va en
+`--warning` con `PackageX`, porque es un hallazgo a revisar y no un faltante.
 
-Por qué se cambió respecto de la versión anterior (coincide=verde,
-sobra=dorado): el dorado no decía nada — ¿advertencia de qué? — y el verde se
-gastaba en el único estado que NO pide ninguna acción, lo que dejaba a las dos
-diferencias sin par visual y obligaba a leer la etiqueta para saber cuál era
-cuál. El ámbar queda libre para lo que sí es un hallazgo a revisar: "no existe
-en SAP".
+**Vocabulario cerrado.** Los valores `coincide` / `sobra` / `falta` /
+`no_existe` son **del modelo de datos** — así se guardan en la planilla y así
+salen en las exportaciones — y no se muestran crudos nunca: se mapean a
+etiqueta (`LABEL_VISTA` en el Dashboard, `LABEL_ESTADO` en `ConteosTable`).
 
-Consecuencia: **el avance del conteo va en fucsia (`--avance`), no en verde.**
-El porcentaje grande, su barra, la curva de progreso en el tiempo y la tarjeta
-de "Pendientes" son el progreso de la tarea, no un estado del stock; dejarlos
-verdes competía con "Diferencia +". Ver §2.3 para el uso cerrado de ese token.
+**El color nunca va solo.** Cada estado lleva además ícono y texto. Se usa con
+guantes, a contraluz y sin memorizar colores.
+
+### 2.5 La tarjeta de estado — "panel nocturno, contorno completo"
+
+La superficie sigue siendo oscura y el color entra por tres lados: el **marco
+entero** a 1,5&nbsp;px, un **resplandor difuminado** que sube desde abajo a la
+izquierda (opacidad 0.17), y la **cifra**.
+
+Ese resplandor no es decoración y no se saca. Un contorno de color liso y nada
+más es exactamente el recurso que usa cualquier formulario para marcar un campo
+mal completado; con las cuatro tarjetas encendidas a la vez, la fila se leería
+como cuatro alertas en vez de cuatro cifras. La luz de adentro la convierte en
+un panel encendido. De paso deja una perilla: para que una tarjeta llame más la
+atención cuando su cifra crece, se sube esa opacidad y nada más.
+
+| Pieza | Tratamiento |
+|---|---|
+| Título | Mono, mayúsculas, 12px, `tracking .1em`, con el ícono en un chip del color al 15% |
+| Cifra | Archivo 700, 40px, tabular, en el color del estado |
+| Importe | Mono 12.5px, `--muted-foreground`, al pie |
+| Aviso | Solo cuando hace falta ("Sin revisar"), con `AlertTriangle`, en el color del estado |
+| Pastilla | El movimiento de hoy, con flecha, fondo del color al 15% |
+| Curva | El estado a lo largo del conteo, a sangre en el borde de abajo |
+
+La curva se calcula **en el navegador** con los conteos que el Dashboard ya
+tiene cargados: cada conteo trae `creadoEn`, así que la evolución sale sola.
+No hace falta pedirle nada nuevo al servidor ni tocar Apps Script. Se reparte
+en 12 tramos iguales **por cantidad de conteos, no por reloj**: un conteo real
+tiene ráfagas y huecos largos, y repartir por tiempo daría una línea casi plana
+con un escalón. La de "Por contar" es la única que desciende, y termina exacta
+en `stats.pendientes` para que el final coincida con la cifra de la tarjeta.
+
+Detalle de implementación que ya costó una vez: la clase de color va en el
+`<svg>`, no en un `<g>` de adentro. Los stops del degradado viven en `<defs>`,
+que hereda del `<svg>`; con el color en un `<g>` hermano, `currentColor` en el
+degradado se resuelve contra el color de la Card y el área sale del color
+equivocado. Y ninguna clase de Tailwind se arma en runtime — `ring-success` no
+existe si no aparece literal en el código fuente.
 
 ---
 

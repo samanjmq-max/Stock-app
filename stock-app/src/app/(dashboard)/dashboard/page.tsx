@@ -32,25 +32,22 @@ function formatearImporte(valor: number): string {
 }
 
 /*
-  Semáforo del conteo, en clave de variación — no de "bien / mal".
+  Semáforo del conteo. Cuatro colores, en este orden fijo:
 
-  Antes era coincide=verde, falta=rojo, sobra=dorado. El problema: el dorado no
-  decía nada (¿advertencia de qué?) y el verde se gastaba en el caso que NO pide
-  ninguna acción, dejando a las dos diferencias sin par visual.
+    verde    coincide        lo que cerró bien
+    azul     diferencia +    sobrante
+    rojo     diferencia −    faltante, lo único que pide acción inmediata
+    amarillo por contar      lo que falta hacer, no un estado del stock
 
-  Ahora se lee como un gráfico de cotización, que es el modelo mental que ya
-  tiene cualquiera: lo que baja en rojo, lo que sube en verde, y el punto de
-  equilibrio en azul. Las dos diferencias quedan enfrentadas y el caso neutro
-  sale del camino.
-
-  Esto convive con la regla del sistema de que el azul (--info) es el color del
-  sistema: acá significa exactamente eso, "nada que hacer", no un estado del
-  stock. Ver design-system/stockapp-saman/MASTER.md §2.3.
+  El orden y los colores los fijó Maximiliano. La única regla que se mantiene
+  del sistema: cada estado va SIEMPRE con ícono y texto además del color.
+  Ver design-system/stockapp-saman/MASTER.md §2.4.
 */
 const COLORS = {
-  coincide: "hsl(var(--info))",
+  coincide: "hsl(var(--success))",
+  sobra: "hsl(var(--info))",
   falta: "hsl(var(--destructive))",
-  sobra: "hsl(var(--success))",
+  pendientes: "hsl(var(--avance))",
 };
 type Vista = EstadoConteo | "pendientes" | "contados" | null;
 
@@ -59,7 +56,7 @@ const LABEL_VISTA: Record<string, string> = {
   sobra: "Diferencias +",
   falta: "Diferencias −",
   contados: "Contados",
-  pendientes: "Pendientes",
+  pendientes: "Por contar",
 };
 
 // Auto-actualización: cada cuánto se refresca el Dashboard solo, en milisegundos.
@@ -202,6 +199,53 @@ export default function DashboardPage() {
   // Espaciado de ticks del eje X para no amontonar etiquetas cuando hay
   // muchos conteos -- muestra ~8 como máximo, sin importar cuántos puntos haya.
   const saltoTicksTiempo = Math.max(0, Math.ceil(progresoTiempo.length / 8) - 1);
+
+  /*
+    Series de la curva que lleva cada tarjeta al pie. Se calculan acá, en el
+    navegador, con los conteos que el Dashboard ya tiene cargados: cada conteo
+    trae `creadoEn`, así que la evolución sale sola. No hace falta pedirle
+    nada nuevo al servidor ni tocar Apps Script.
+
+    Se reparten en 12 tramos iguales POR CANTIDAD de conteos, no por tiempo:
+    un conteo real tiene ráfagas y huecos largos (el almuerzo, el cambio de
+    pasillo), y repartir por reloj daría una curva casi plana con un escalón.
+  */
+  const PUNTOS_SERIE = 12;
+
+  function serieAcumulada(esDeLaSerie: (c: Conteo) => boolean): number[] {
+    if (conteosOrdenados.length < 2) return [];
+    const paso = conteosOrdenados.length / PUNTOS_SERIE;
+    const serie: number[] = [];
+    let acumulado = 0;
+    let i = 0;
+    for (let tramo = 1; tramo <= PUNTOS_SERIE; tramo++) {
+      const hasta = Math.round(paso * tramo);
+      while (i < hasta) {
+        if (esDeLaSerie(conteosOrdenados[i]!)) acumulado++;
+        i++;
+      }
+      serie.push(acumulado);
+    }
+    return serie;
+  }
+
+  /*
+    "Por contar" es la única que baja: arranca en lo que había al empezar y
+    termina EXACTAMENTE en stats.pendientes, para que el final de la curva
+    coincida con la cifra grande de la tarjeta y no con una aproximación.
+  */
+  function serieDescendente(): number[] {
+    const contados = serieAcumulada(() => true);
+    if (contados.length === 0) return [];
+    const totalContados = contados[contados.length - 1]!;
+    return contados.map((c) => stats.pendientes + (totalContados - c));
+  }
+
+  // Movimiento de hoy: cuántos conteos de cada estado se registraron en la
+  // fecha de hoy. Es la cifra de la pastilla.
+  const hoy = new Date().toLocaleDateString("es-UY");
+  const deHoy = todosLosConteos.filter((c) => c.fecha === hoy);
+  const deltaDe = (estado: EstadoConteo) => deHoy.filter((c) => c.estado === estado).length;
 
   const conteosFiltrados = vista && vista !== "pendientes" && vista !== "contados"
     ? todosLosConteos.filter((c) => c.estado === vista)
@@ -479,11 +523,11 @@ export default function DashboardPage() {
           <div className="min-w-[200px] flex-1">
             <div className="h-[7px] w-full overflow-hidden rounded-full bg-muted">
               <div
-                /* Fucsia de avance -- el mismo color que la tarjeta de
-                   "Pendientes", para que se lea de un vistazo que este
-                   porcentaje habla justamente de eso. Ni verde (ahora es
-                   "Diferencias +") ni terracota (es el color de las
-                   acciones): el avance no es un estado del stock. */
+                /* Amarillo de avance -- el mismo color que la tarjeta de
+                   "Por contar", para que se lea de un vistazo que este
+                   porcentaje habla justamente de eso. No es verde ni rojo
+                   porque el avance no es un estado del stock: es el
+                   progreso de la tarea. */
                 className="h-full rounded-full bg-avance transition-[width] duration-base ease-out-soft"
                 style={{ width: `${Math.min(100, Math.max(0, stats.porcentajeCompletado))}%` }}
               />
@@ -515,29 +559,46 @@ export default function DashboardPage() {
         baja a metadato dentro de la tarjeta en vez de competir con la cifra.
       */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {/* Los tres iconos son el mismo gesto de cotización: la línea quebrada
-            que baja, la que sube, y el igual para el equilibrio. Antes eran
-            flechas en círculo, que se leen como "mover" o "descargar" y no
-            como "varió". */}
-        <StatCard label={LABEL_VISTA.coincide!} value={stats.coincidencias} icon={Equal} tone="info"
+        {/* Orden fijo: coincide, sobra, falta, por contar. Es el mismo de los
+            gráficos y el de la leyenda, para no obligar a reordenar
+            mentalmente al pasar de las tarjetas a la torta.
+
+            Los iconos son el gesto de cada estado: el igual para el
+            equilibrio, la línea quebrada que sube y la que baja. */}
+        <StatCard id="coincide" label={LABEL_VISTA.coincide!} value={stats.coincidencias}
+          icon={Equal} tone="success"
           onClick={() => toggleVista("coincide")} activo={vista === "coincide"}
-          importe={stats.importeCoincidencias} />
+          importe={stats.importeCoincidencias}
+          serie={serieAcumulada((c) => c.estado === "coincide")}
+          delta={deltaDe("coincide")} />
+
+        <StatCard id="sobra" label={LABEL_VISTA.sobra!} value={stats.diferenciasPositivas}
+          icon={TrendingUp} tone="info"
+          onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
+          importe={stats.importeDiferenciasPositivas}
+          serie={serieAcumulada((c) => c.estado === "sobra")}
+          delta={deltaDe("sobra")} />
+
         {/* El aviso de faltantes vive DENTRO de la tarjeta, no en una franja
             roja aparte: esa franja ocupaba una pantalla entera de alto en
             celular para decir lo mismo que ya dice esta cifra. */}
-        <StatCard label={LABEL_VISTA.falta!} value={stats.diferenciasNegativas} icon={TrendingDown} tone="destructive"
+        <StatCard id="falta" label={LABEL_VISTA.falta!} value={stats.diferenciasNegativas}
+          icon={TrendingDown} tone="destructive"
           onClick={() => toggleVista("falta")} activo={vista === "falta"}
           importe={stats.importeDiferenciasNegativas}
-          aviso={stats.diferenciasNegativas > 0 ? "Sin revisar" : undefined} />
-        <StatCard label={LABEL_VISTA.sobra!} value={stats.diferenciasPositivas} icon={TrendingUp} tone="success"
-          onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
-          importe={stats.importeDiferenciasPositivas} />
-        {/* Fucsia, igual que el avance de arriba: son las dos caras del
+          aviso={stats.diferenciasNegativas > 0 ? "Sin revisar" : undefined}
+          serie={serieAcumulada((c) => c.estado === "falta")}
+          delta={deltaDe("falta")} />
+
+        {/* Amarillo, igual que el avance de arriba: son las dos caras del
             mismo número. El porcentaje dice cuánto se hizo, esta tarjeta
-            cuánto queda. */}
-        <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock} tone="avance"
+            cuánto queda -- y su curva es la única que baja. */}
+        <StatCard id="pendientes" label={LABEL_VISTA.pendientes!} value={stats.pendientes}
+          icon={Clock} tone="avance"
           onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
-          importe={stats.importePendientes} />
+          importe={stats.importePendientes}
+          serie={serieDescendente()}
+          delta={-deHoy.length} />
       </div>
 
       <p className="-mt-2 text-xs text-muted-foreground">
