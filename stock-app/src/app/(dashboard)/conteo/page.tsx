@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -135,8 +135,18 @@ export default function ConteoPage() {
       (ubicacionFiltro.length === 0 || ubicacionFiltro.includes(p.ubicacion)) &&
       (familiaFiltro.length === 0 || familiaFiltro.includes(p.familia))
   );
+  // `conteosAgencia` ya viene filtrado por el servidor, pero la cola local NO:
+  // guarda todo lo pendiente de este dispositivo, de cualquier planta para la
+  // que se haya contado. Como el código de material es el mismo en todas las
+  // agencias, sin este filtro un conteo hecho para Lascano marcaría el mismo
+  // artículo como ya contado en Salto.
+  const pendientesDeEstaAgencia = useMemo(
+    () => localesPendientes.filter((c) => c.agencia === agenciaOperativa),
+    [localesPendientes, agenciaOperativa]
+  );
+
   const codigosContadosZona = new Set(
-    [...conteosAgencia, ...localesPendientes].map((c) => normalizarCodigo(c.codigo))
+    [...conteosAgencia, ...pendientesDeEstaAgencia].map((c) => normalizarCodigo(c.codigo))
   );
   const pendientesZona = productosZona.filter((p) => !codigosContadosZona.has(normalizarCodigo(p.codigo)));
   const hayFiltroZona = ubicacionFiltro.length > 0 || familiaFiltro.length > 0;
@@ -146,8 +156,15 @@ export default function ConteoPage() {
   // está, el servidor. Lo usan tanto la búsqueda manual como el escáner.
   const buscarProducto = useCallback(
     async (c: string): Promise<Producto | undefined> => {
+      // OJO: la caché local guarda UNA agencia por vez (cachearProductos hace
+      // clear() antes de escribir), pero el código de material de SAP es el
+      // mismo en todas las plantas. Si la caché quedó con el catálogo de otra
+      // agencia -- el super-admin recién cambió de planta y el re-cacheo
+      // todavía no terminó -- el código se encontraría igual y devolvería el
+      // producto de la agencia equivocada, con SU stock de SAP. Por eso se
+      // verifica la agencia y, si no coincide, se va al servidor.
       const enCache = await getProductoCachePorCodigo(c);
-      if (enCache) return enCache;
+      if (enCache && enCache.agencia === agenciaOperativa) return enCache;
       const todos = await productosService.listar(agenciaOperativa);
       return todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase());
     },
@@ -176,7 +193,7 @@ export default function ConteoPage() {
         // acaba de contar y que aún no subió.
         const hoy = new Date().toLocaleDateString("es-UY");
         const norm = normalizarCodigo(c);
-        const previos = [...conteosAgencia, ...localesPendientes].filter(
+        const previos = [...conteosAgencia, ...pendientesDeEstaAgencia].filter(
           (x) => normalizarCodigo(x.codigo) === norm && x.fecha === hoy
         );
         const ultimo = previos[previos.length - 1];
@@ -203,7 +220,7 @@ export default function ConteoPage() {
         };
       }
     },
-    [buscarProducto, conteosAgencia, localesPendientes]
+    [buscarProducto, conteosAgencia, pendientesDeEstaAgencia]
   );
 
   const buscarCodigo = useCallback(
@@ -228,14 +245,18 @@ export default function ConteoPage() {
           sonidoLecturaIncorrecta();
         }
 
-        setHistorialProducto(await getHistorialLocalDeProducto(c));
+        // Mismo criterio que arriba: el historial local es del dispositivo, no
+        // de la planta. Se acota a la agencia operativa para no mostrar, como
+        // "conteos anteriores de este producto", los de otro depósito.
+        const historial = await getHistorialLocalDeProducto(c);
+        setHistorialProducto(historial.filter((h) => h.agencia === agenciaOperativa));
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "No se pudo buscar el producto");
       } finally {
         setBuscando(false);
       }
     },
-    [reset, buscarProducto]
+    [reset, buscarProducto, agenciaOperativa]
   );
 
   useHardwareScanner((codigo) => buscarCodigo(codigo), true);
