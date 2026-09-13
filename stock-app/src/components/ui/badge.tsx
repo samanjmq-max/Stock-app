@@ -12,6 +12,9 @@ const badgeVariants = cva(
         success: "border-transparent bg-success/15 text-success",
         warning: "border-transparent bg-warning/20 text-warning-foreground",
         destructive: "border-transparent bg-destructive/15 text-destructive",
+        // Azul de señal. En el semáforo del conteo marca "coincide": el caso
+        // neutro, el que no pide ninguna acción. Ver StatCard y el Dashboard.
+        info: "border-transparent bg-info/15 text-info",
         outline: "text-foreground border-border",
       },
     },

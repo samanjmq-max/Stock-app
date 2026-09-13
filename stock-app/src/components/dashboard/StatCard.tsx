@@ -32,7 +32,7 @@ export function StatCard({
   label: string;
   value: string | number;
   icon: LucideIcon;
-  tone?: "default" | "success" | "warning" | "destructive";
+  tone?: "default" | "success" | "warning" | "destructive" | "info" | "avance";
   /** Si se pasa, la tarjeta se vuelve clickeable (ej: filtrar la tabla de abajo). */
   onClick?: () => void;
   /** Resalta la tarjeta cuando el filtro que representa está activo. */
@@ -52,6 +52,8 @@ export function StatCard({
     success: "text-success",
     warning: "text-warning",
     destructive: "text-destructive",
+    info: "text-info",
+    avance: "text-avance",
   }[tone];
 
   // OJO: `text-warning` (el color saturado), NO `text-warning-foreground`
@@ -63,6 +65,8 @@ export function StatCard({
     success: "text-success",
     warning: "text-warning",
     destructive: "text-destructive",
+    info: "text-info",
+    avance: "text-avance",
   }[tone];
 
   const franjaClasses = {
@@ -70,6 +74,8 @@ export function StatCard({
     success: "border-l-2 border-l-success",
     warning: "border-l-2 border-l-warning",
     destructive: "border-l-2 border-l-destructive",
+    info: "border-l-2 border-l-info",
+    avance: "border-l-2 border-l-avance",
   }[tone];
 
   return (

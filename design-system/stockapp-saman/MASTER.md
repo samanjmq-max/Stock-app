@@ -101,18 +101,28 @@ mecánica del claro. Sin capas no hay profundidad posible.
 | Token | Claro | Oscuro | Significado |
 |---|---|---|---|
 | `--primary` | `21 72% 36%` | `21 71% 57%` | Terracota. Marca, acción primaria, ítem activo |
-| `--success` | `112 45% 30%` | `112 34% 55%` | Grano. Coincide, avance |
-| `--warning` | `40 85% 42%` | `40 78% 61%` | Dorado. Sobra, alertas |
-| `--destructive` | `4 70% 47%` | `4 72% 59%` | Falta, destructivo, error |
-| `--info` | `208 45% 42%` | `208 43% 60%` | Señal. Sincronización, info neutra |
+| `--success` | `112 45% 30%` | `112 34% 55%` | Grano. Diferencia + |
+| `--warning` | `40 85% 42%` | `40 78% 61%` | Dorado. No existe en SAP, ranking por valor, alertas |
+| `--destructive` | `4 70% 47%` | `4 72% 59%` | Diferencia −, destructivo, error |
+| `--info` | `208 45% 42%` | `208 43% 60%` | Señal. Coincide, sincronización, info neutra |
+| `--avance` | `322 74% 42%` | `322 72% 68%` | Fucsia. Avance del conteo y pendientes |
 | `--accent` | `112 40% 94%` | `112 25% 14%` | Chips y tabs activos, tinte verde |
 | `--ring` | `= primary` | `= primary` | Foco de teclado |
 
 En oscuro los colores van más claros y **menos saturados**: sobre fondo
 oscuro un color saturado vibra y cansa la vista en una jornada larga.
 
-`--info` es el único color frío del sistema, y por eso mismo se lee como
-"del sistema" y no como estado del conteo.
+`--info` es frío a propósito, y por eso se lee como "del sistema". En el
+semáforo del conteo marca "coincide": el caso que no pide ninguna acción.
+
+`--avance` es el único color del sistema **fuera de la familia cálida**, y es
+deliberado. No describe un estado del stock: describe el PROGRESO de la tarea.
+Al no pertenecer a ninguna otra familia, liga de un vistazo el porcentaje
+grande de "Avance del conteo", su barra, la curva de progreso en el tiempo y la
+tarjeta de "Pendientes" — que son cuatro vistas del mismo número. **Uso
+cerrado: esos cuatro lugares y nada más.** Nunca un estado del conteo, nunca
+una acción, nunca un acento decorativo. Si aparece fucsia en otro lado, está
+mal usado.
 
 **Contraste marca vs. error:** `--primary` (21°) y `--destructive` (4°) están
 a 17° de matiz. Para que un botón primario nunca se lea como peligro, el
@@ -121,12 +131,36 @@ llevan **siempre** ícono más verbo explícito.
 
 ### 2.4 Semáforo del conteo — patrón de dominio
 
+Se lee **en clave de variación**, como un gráfico de cotización: lo que baja en
+rojo, lo que sube en verde, el equilibrio en azul. No en clave de "bien / mal".
+
 | Estado | Token | Ícono | Texto obligatorio |
 |---|---|---|---|
-| Coincide | `--success` | `CheckCircle2` | "Coincide" |
-| Sobra | `--warning` | `ArrowUpCircle` | "Sobra (+N)" |
-| Falta | `--destructive` | `ArrowDownCircle` | "Falta (−N)" |
+| Coincide | `--info` | `Equal` | "Coincide" |
+| Diferencia + | `--success` | `TrendingUp` | "Diferencia +N" |
+| Diferencia − | `--destructive` | `TrendingDown` | "Diferencia −N" |
+| No existe en SAP | `--warning` | `PackageX` | "No existe en SAP" |
 | Pendiente de sync | `--info` | `RefreshCw` girando | "Pendiente de sincronizar" |
+
+**Vocabulario cerrado.** En toda la interfaz los tres estados se llaman
+"Coincidencias", "Diferencias −" y "Diferencias +", en ese orden, en las
+tarjetas, en los dos gráficos y en la tabla. Los valores `coincide` / `sobra` /
+`falta` / `no_existe` son **del modelo de datos** — así se guardan en la
+planilla y así salen en las exportaciones — y no se muestran crudos nunca: se
+mapean a etiqueta (`LABEL_VISTA` en el Dashboard, `LABEL_ESTADO` en
+`ConteosTable`).
+
+Por qué se cambió respecto de la versión anterior (coincide=verde,
+sobra=dorado): el dorado no decía nada — ¿advertencia de qué? — y el verde se
+gastaba en el único estado que NO pide ninguna acción, lo que dejaba a las dos
+diferencias sin par visual y obligaba a leer la etiqueta para saber cuál era
+cuál. El ámbar queda libre para lo que sí es un hallazgo a revisar: "no existe
+en SAP".
+
+Consecuencia: **el avance del conteo va en fucsia (`--avance`), no en verde.**
+El porcentaje grande, su barra, la curva de progreso en el tiempo y la tarjeta
+de "Pendientes" son el progreso de la tarea, no un estado del stock; dejarlos
+verdes competía con "Diferencia +". Ver §2.3 para el uso cerrado de ese token.
 
 ---
 

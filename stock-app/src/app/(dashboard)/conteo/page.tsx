@@ -518,8 +518,19 @@ export default function ConteoPage() {
                 </div>
 
                 {producto && diferenciaPreview !== null && (
-                  <Badge variant={diferenciaPreview === 0 || diferenciaPreview > 0 ? "success" : "destructive"}>
-                    Diferencia: {diferenciaPreview > 0 ? "+" : ""}{diferenciaPreview} ({estadoDesdeDiferencia(diferenciaPreview)})
+                  /* Mismo vocabulario y mismo semáforo que el Dashboard:
+                     coincide = azul (nada que hacer), diferencia + = verde,
+                     diferencia − = rojo. Antes decía "(sobra)" / "(falta)" --
+                     los nombres internos del estado, que no son los que usa
+                     ninguna otra pantalla -- y pintaba de verde el cero. */
+                  <Badge
+                    variant={
+                      diferenciaPreview === 0 ? "info" : diferenciaPreview > 0 ? "success" : "destructive"
+                    }
+                  >
+                    {diferenciaPreview === 0
+                      ? "Coincide con SAP"
+                      : `Diferencia ${diferenciaPreview > 0 ? "+" : "−"}${Math.abs(diferenciaPreview)}`}
                   </Badge>
                 )}
 

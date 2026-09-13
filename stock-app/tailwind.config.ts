@@ -58,6 +58,12 @@ const config: Config = {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        // Fucsia de avance: progreso de la tarea, no estado del stock. Uso
+        // cerrado -- avance, barra, progreso en el tiempo y pendientes.
+        avance: {
+          DEFAULT: "hsl(var(--avance))",
+          foreground: "hsl(var(--avance-foreground))",
+        },
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",

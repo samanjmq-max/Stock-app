@@ -78,6 +78,16 @@
   --info: 208 45% 42%;
   --info-foreground: 0 0% 100%;
 
+  /* Fucsia de avance. El único color del sistema que NO es tierra, y es a
+     propósito: no describe un estado del stock, describe el PROGRESO de la
+     tarea -- cuánto se contó y cuánto falta. Al no pertenecer a la familia
+     cálida, liga de un vistazo la cifra grande de "Avance del conteo" con la
+     tarjeta de "Pendientes", que es justo lo que ese porcentaje mide.
+     Uso cerrado: avance, barra de progreso, progreso en el tiempo y
+     pendientes. Nunca para un estado del conteo ni para una acción. */
+  --avance: 322 74% 42%;
+  --avance-foreground: 0 0% 100%;
+
   --border: 34 22% 88%;
   --input: 34 22% 85%;
   --ring: 21 72% 36%;
@@ -158,6 +168,9 @@
 
   --info: 208 43% 60%;
   --info-foreground: 208 50% 8%;
+
+  --avance: 322 72% 68%;
+  --avance-foreground: 322 55% 10%;
 
   --border: 22 24% 15%;
   --input: 22 24% 18%;

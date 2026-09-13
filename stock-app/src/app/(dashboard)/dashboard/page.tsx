@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { CheckCircle2, Clock, TrendingUp, ArrowUpCircle, ArrowDownCircle, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
+import { Clock, TrendingUp, TrendingDown, Equal, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -31,12 +31,26 @@ function formatearImporte(valor: number): string {
   return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
 }
 
-// Paleta cálida via tokens de globals.css (design-system/stockapp-saman/MASTER.md §2.3):
-// coincide -> success (verde grano), sobra -> warning (dorado), falta -> destructive (rojo semántico).
+/*
+  Semáforo del conteo, en clave de variación — no de "bien / mal".
+
+  Antes era coincide=verde, falta=rojo, sobra=dorado. El problema: el dorado no
+  decía nada (¿advertencia de qué?) y el verde se gastaba en el caso que NO pide
+  ninguna acción, dejando a las dos diferencias sin par visual.
+
+  Ahora se lee como un gráfico de cotización, que es el modelo mental que ya
+  tiene cualquiera: lo que baja en rojo, lo que sube en verde, y el punto de
+  equilibrio en azul. Las dos diferencias quedan enfrentadas y el caso neutro
+  sale del camino.
+
+  Esto convive con la regla del sistema de que el azul (--info) es el color del
+  sistema: acá significa exactamente eso, "nada que hacer", no un estado del
+  stock. Ver design-system/stockapp-saman/MASTER.md §2.3.
+*/
 const COLORS = {
-  coincide: "hsl(var(--success))",
+  coincide: "hsl(var(--info))",
   falta: "hsl(var(--destructive))",
-  sobra: "hsl(var(--warning))",
+  sobra: "hsl(var(--success))",
 };
 type Vista = EstadoConteo | "pendientes" | "contados" | null;
 
@@ -124,16 +138,24 @@ export default function DashboardPage() {
 
   const precios = mapaPrecios(productos);
 
+  /*
+    Un solo vocabulario en toda la pantalla: "Coincidencias", "Diferencias −",
+    "Diferencias +", y siempre en ese orden. Antes el gráfico de torta decía
+    "Coinciden / Faltan / Sobran" y el de importes decía otra cosa, en otro
+    orden, y las tarjetas una tercera — tres nombres para los mismos tres
+    estados obligan a re-leer cada gráfico. Los nombres salen de LABEL_VISTA
+    para que no haya forma de que se desincronicen otra vez.
+  */
   const pieData = [
-    { name: "Coinciden", value: stats.coincidencias, color: COLORS.coincide },
-    { name: "Faltan", value: stats.diferenciasNegativas, color: COLORS.falta },
-    { name: "Sobran", value: stats.diferenciasPositivas, color: COLORS.sobra },
+    { name: LABEL_VISTA.coincide!, value: stats.coincidencias, color: COLORS.coincide },
+    { name: LABEL_VISTA.falta!, value: stats.diferenciasNegativas, color: COLORS.falta },
+    { name: LABEL_VISTA.sobra!, value: stats.diferenciasPositivas, color: COLORS.sobra },
   ];
 
   const importeData = [
-    { name: "Coincidencias", value: stats.importeCoincidencias, color: COLORS.coincide },
-    { name: "Diferencias +", value: stats.importeDiferenciasPositivas, color: COLORS.sobra },
-    { name: "Diferencias −", value: stats.importeDiferenciasNegativas, color: COLORS.falta },
+    { name: LABEL_VISTA.coincide!, value: stats.importeCoincidencias, color: COLORS.coincide },
+    { name: LABEL_VISTA.falta!, value: stats.importeDiferenciasNegativas, color: COLORS.falta },
+    { name: LABEL_VISTA.sobra!, value: stats.importeDiferenciasPositivas, color: COLORS.sobra },
   ];
 
   const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
@@ -448,7 +470,7 @@ export default function DashboardPage() {
             <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
               Avance del conteo
             </p>
-            <p className="mt-2 font-display text-[clamp(38px,8vw,56px)] font-bold leading-none tracking-tight tabular-nums text-success">
+            <p className="mt-2 font-display text-[clamp(38px,8vw,56px)] font-bold leading-none tracking-tight tabular-nums text-avance">
               {stats.porcentajeCompletado}%
             </p>
             <p className="mt-2 text-xs text-muted-foreground">{tituloAgencia}</p>
@@ -457,7 +479,12 @@ export default function DashboardPage() {
           <div className="min-w-[200px] flex-1">
             <div className="h-[7px] w-full overflow-hidden rounded-full bg-muted">
               <div
-                className="h-full rounded-full bg-success transition-[width] duration-base ease-out-soft"
+                /* Fucsia de avance -- el mismo color que la tarjeta de
+                   "Pendientes", para que se lea de un vistazo que este
+                   porcentaje habla justamente de eso. Ni verde (ahora es
+                   "Diferencias +") ni terracota (es el color de las
+                   acciones): el avance no es un estado del stock. */
+                className="h-full rounded-full bg-avance transition-[width] duration-base ease-out-soft"
                 style={{ width: `${Math.min(100, Math.max(0, stats.porcentajeCompletado))}%` }}
               />
             </div>
@@ -488,20 +515,27 @@ export default function DashboardPage() {
         baja a metadato dentro de la tarjeta en vez de competir con la cifra.
       */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Coincidencias" value={stats.coincidencias} icon={CheckCircle2} tone="success"
+        {/* Los tres iconos son el mismo gesto de cotización: la línea quebrada
+            que baja, la que sube, y el igual para el equilibrio. Antes eran
+            flechas en círculo, que se leen como "mover" o "descargar" y no
+            como "varió". */}
+        <StatCard label={LABEL_VISTA.coincide!} value={stats.coincidencias} icon={Equal} tone="info"
           onClick={() => toggleVista("coincide")} activo={vista === "coincide"}
           importe={stats.importeCoincidencias} />
         {/* El aviso de faltantes vive DENTRO de la tarjeta, no en una franja
             roja aparte: esa franja ocupaba una pantalla entera de alto en
             celular para decir lo mismo que ya dice esta cifra. */}
-        <StatCard label="Diferencias −" value={stats.diferenciasNegativas} icon={ArrowDownCircle} tone="destructive"
+        <StatCard label={LABEL_VISTA.falta!} value={stats.diferenciasNegativas} icon={TrendingDown} tone="destructive"
           onClick={() => toggleVista("falta")} activo={vista === "falta"}
           importe={stats.importeDiferenciasNegativas}
           aviso={stats.diferenciasNegativas > 0 ? "Sin revisar" : undefined} />
-        <StatCard label="Diferencias +" value={stats.diferenciasPositivas} icon={ArrowUpCircle} tone="warning"
+        <StatCard label={LABEL_VISTA.sobra!} value={stats.diferenciasPositivas} icon={TrendingUp} tone="success"
           onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
           importe={stats.importeDiferenciasPositivas} />
-        <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock}
+        {/* Fucsia, igual que el avance de arriba: son las dos caras del
+            mismo número. El porcentaje dice cuánto se hizo, esta tarjeta
+            cuánto queda. */}
+        <StatCard label="Pendientes (con stock)" value={stats.pendientes} icon={Clock} tone="avance"
           onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
           importe={stats.importePendientes} />
       </div>

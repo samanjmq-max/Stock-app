@@ -182,9 +182,13 @@ export default function DashboardCharts({
             : <ResponsiveContainer width="100%" height={320}>
                 <AreaChart data={progresoTiempo} margin={{ right: 16, top: 8 }}>
                   <defs>
+                    {/* Fucsia de avance, el mismo color que el porcentaje
+                        grande de arriba y que la tarjeta de "Pendientes":
+                        esta curva es exactamente ese número en el tiempo.
+                        Antes era verde, que ahora significa "Diferencias +". */}
                     <linearGradient id="gradienteProgreso" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--success))" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="hsl(var(--success))" stopOpacity={0} />
+                      <stop offset="0%" stopColor="hsl(var(--avance))" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="hsl(var(--avance))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
@@ -202,7 +206,7 @@ export default function DashboardCharts({
                   <Area
                     type="monotone"
                     dataKey="acumulado"
-                    stroke="hsl(var(--success))"
+                    stroke="hsl(var(--avance))"
                     strokeWidth={2.5}
                     fill="url(#gradienteProgreso)"
                     dot={progresoTiempo.length <= 30}

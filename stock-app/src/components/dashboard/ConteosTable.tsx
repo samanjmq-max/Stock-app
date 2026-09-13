@@ -12,11 +12,30 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const BADGE_POR_ESTADO: Record<EstadoConteo, "success" | "destructive" | "default"> = {
-  coincide: "success",
+/*
+  Mismo semáforo y mismo vocabulario que el Dashboard: coincide = azul (nada
+  que hacer), diferencia + = verde, diferencia − = rojo, y "no existe en SAP"
+  en ámbar porque es un hallazgo a revisar, no un faltante.
+
+  Antes "sobra" usaba el variant `default` -- terracota, el color de marca y de
+  las acciones primarias -- así que una fila de stock sobrante se veía igual
+  que un botón. Y la celda imprimía `c.estado` crudo: "coincide", "sobra",
+  "falta", "no_existe". Esos son los valores que se guardan en la planilla, no
+  los nombres que usa la interfaz; por eso se mapean acá y NO se cambian en el
+  modelo de datos.
+*/
+const BADGE_POR_ESTADO: Record<EstadoConteo, "info" | "success" | "warning" | "destructive"> = {
+  coincide: "info",
   falta: "destructive",
-  sobra: "default",
-  no_existe: "destructive",
+  sobra: "success",
+  no_existe: "warning",
+};
+
+const LABEL_ESTADO: Record<EstadoConteo, string> = {
+  coincide: "Coincide",
+  falta: "Diferencia −",
+  sobra: "Diferencia +",
+  no_existe: "No existe en SAP",
 };
 
 const LABEL_FILTRO: Record<string, string> = {
@@ -328,15 +347,27 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                         </td>
                         <td className="px-2 py-2 text-right">{c.stockSap}</td>
                         <td className="px-2 py-2 text-right">{c.stockContado}</td>
-                        <td className="px-2 py-2 text-right">
-                          {c.diferencia > 0 ? "+" : ""}
-                          {c.diferencia}
+                        {/* La cifra de diferencia lleva el mismo color que su
+                            badge -- rojo si baja, verde si sube, neutro si es
+                            cero -- para poder barrer la columna sin leer el
+                            estado fila por fila. */}
+                        <td
+                          className={`px-2 py-2 text-right font-medium tabular-nums ${
+                            c.diferencia < 0
+                              ? "text-destructive"
+                              : c.diferencia > 0
+                              ? "text-success"
+                              : "text-muted-foreground"
+                          }`}
+                        >
+                          {c.diferencia > 0 ? "+" : c.diferencia < 0 ? "−" : ""}
+                          {Math.abs(c.diferencia)}
                         </td>
                         <td className="px-2 py-2 text-right font-medium whitespace-nowrap">
                           {formatearImporte(importeFila)}
                         </td>
                         <td className="px-2 py-2">
-                          <Badge variant={BADGE_POR_ESTADO[c.estado]}>{c.estado}</Badge>
+                          <Badge variant={BADGE_POR_ESTADO[c.estado]}>{LABEL_ESTADO[c.estado] ?? c.estado}</Badge>
                         </td>
                         <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={c.usuarioEmail}>
                           {c.usuarioEmail}
