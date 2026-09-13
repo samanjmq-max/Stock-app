@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Pencil, Trash2, Loader2, Search, ArrowUp, ArrowDown, ArrowUpDown, Check, X } from "lucide-react";
+import { Pencil, Trash2, Loader2, ArrowUp, ArrowDown, ArrowUpDown, Check, X, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import type { Producto } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,20 @@ const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
   { key: "precioUnitario", label: "Precio", alineacion: "right" },
   { key: "importe", label: "Importe", alineacion: "right" },
 ];
+
+/*
+  Paginado real.
+
+  Antes la tabla cortaba en los primeros 300 y avisaba "seguí filtrando para
+  acotar" -- con 12.400 artículos en el catálogo eso significaba que los
+  restantes 12.100 simplemente no existían para quien no supiera exactamente
+  qué buscar, y ordenar por importe para ver los diez más caros mostraba diez
+  de esos 300, no del catálogo. Virtualizar la lista sería lo ideal pero
+  implica una dependencia nueva; el paginado resuelve el problema real (llegar
+  a cualquier producto) sin agregar nada al bundle.
+*/
+const TAMANOS_PAGINA = [100, 300, 1000] as const;
+const TAMANO_INICIAL = 300;
 
 function formatearImporte(valor: number): string {
   return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
@@ -63,6 +77,9 @@ export function ProductosTable({
   const [editandoPrecioId, setEditandoPrecioId] = useState<string | null>(null);
   const [precioBorrador, setPrecioBorrador] = useState("");
   const [guardandoPrecio, setGuardandoPrecio] = useState(false);
+  const [pagina, setPagina] = useState(1);
+  const [tamanoPagina, setTamanoPagina] = useState<number>(TAMANO_INICIAL);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   // Borrado individual con "Deshacer" (reel 1 -- "wait for the undo"): al
   // tocar el tacho, la fila se arruga y colapsa YA (ver `ocultos` en
@@ -105,7 +122,27 @@ export function ProductosTable({
   }, [productos, ordenColumna, ordenDireccion]);
 
   const noOcultos = useMemo(() => ordenados.filter((p) => !ocultos.has(p.id)), [ordenados, ocultos]);
-  const visibles = noOcultos.slice(0, 300);
+
+  const totalPaginas = Math.max(1, Math.ceil(noOcultos.length / tamanoPagina));
+  // Se acota en vez de resetear: si el filtro achica la lista y la página
+  // actual ya no existe, cae en la última en vez de saltar a la 1 sin avisar.
+  const paginaActual = Math.min(pagina, totalPaginas);
+  const desde = (paginaActual - 1) * tamanoPagina;
+  const visibles = noOcultos.slice(desde, desde + tamanoPagina);
+
+  // Una búsqueda nueva es una lista nueva: quedarse en la página 7 de la
+  // consulta anterior es siempre un error.
+  useEffect(() => {
+    setPagina(1);
+  }, [busqueda, tamanoPagina, ordenColumna, ordenDireccion]);
+
+  function irAPagina(n: number) {
+    setPagina(Math.min(Math.max(1, n), totalPaginas));
+    // La selección es "todo lo de esta página": arrastrarla a la siguiente
+    // haría que "Eliminar seleccionados (300)" borre filas que ya no se ven.
+    setSeleccionados(new Set());
+    scrollRef.current?.scrollTo({ top: 0 });
+  }
 
   const resumen = useMemo(() => {
     const importe = noOcultos.reduce((acc, p) => acc + importeProducto(p), 0);
@@ -256,7 +293,7 @@ export function ProductosTable({
           </div>
         ) : (
           <div className="-mx-5">
-            <div className="overflow-auto max-h-[520px]">
+            <div ref={scrollRef} className="overflow-auto max-h-[520px]">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-muted-foreground border-b border-border sticky top-0 bg-background z-10">
@@ -395,12 +432,89 @@ export function ProductosTable({
                   </AnimatePresence>
                 </tbody>
               </table>
-              {ordenados.length > 300 && (
-                <p className="text-xs text-muted-foreground text-center py-3">
-                  <Search size={12} className="inline mr-1 -mt-0.5" />
-                  Mostrando los primeros 300 de {ordenados.length} — seguí escribiendo o filtrando para acotar.
-                </p>
-              )}
+            </div>
+
+            {/* Paginado. Siempre visible el rango exacto que se está viendo:
+                en una tabla de 12.000 filas, "1–300 de 12.416" es la única
+                forma de saber dónde está uno parado. */}
+            <div className="flex items-center justify-between gap-3 flex-wrap px-5 pt-3 border-t border-border">
+              <p className="text-xs text-muted-foreground tabular-nums">
+                {noOcultos.length === 0 ? (
+                  "Sin resultados"
+                ) : (
+                  <>
+                    <span className="font-medium text-foreground">
+                      {desde + 1}–{Math.min(desde + tamanoPagina, noOcultos.length)}
+                    </span>
+                    {" de "}
+                    <span className="font-medium text-foreground">{noOcultos.length}</span>
+                  </>
+                )}
+              </p>
+
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span className="hidden sm:inline">Por página</span>
+                  <select
+                    value={tamanoPagina}
+                    onChange={(e) => setTamanoPagina(Number(e.target.value))}
+                    aria-label="Productos por página"
+                    className="h-8 rounded-md border border-input bg-background px-2 text-xs text-foreground cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    {TAMANOS_PAGINA.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => irAPagina(1)}
+                    disabled={paginaActual === 1}
+                    aria-label="Primera página"
+                  >
+                    <ChevronsLeft size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => irAPagina(paginaActual - 1)}
+                    disabled={paginaActual === 1}
+                    aria-label="Página anterior"
+                  >
+                    <ChevronLeft size={14} />
+                  </Button>
+                  <span className="text-xs text-muted-foreground tabular-nums px-1 min-w-16 text-center">
+                    {paginaActual} / {totalPaginas}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => irAPagina(paginaActual + 1)}
+                    disabled={paginaActual === totalPaginas}
+                    aria-label="Página siguiente"
+                  >
+                    <ChevronRight size={14} />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => irAPagina(totalPaginas)}
+                    disabled={paginaActual === totalPaginas}
+                    aria-label="Última página"
+                  >
+                    <ChevronsRight size={14} />
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         )}

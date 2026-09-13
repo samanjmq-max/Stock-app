@@ -80,26 +80,67 @@ export default function DashboardCharts({
           <CardContent>
             {stats.totalContados === 0
               ? <p className="text-sm text-muted-foreground py-8 text-center">Todavía no hay conteos. Andá a "Contar stock" para empezar.</p>
-              : <ResponsiveContainer width="100%" height={220}>
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      dataKey="value"
-                      nameKey="name"
-                      innerRadius={50}
-                      outerRadius={80}
-                      paddingAngle={2}
-                      // Etiqueta directa (nombre + valor) en vez de depender
-                      // solo del color para distinguir las porciones -- se
-                      // omiten las de valor 0 para no ensuciar el gráfico.
-                      label={({ name, value }) => (value ? `${name}: ${value}` : "")}
-                      labelLine={false}
-                    >
-                      {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                    </Pie>
-                    <Tooltip {...tooltipStyle} />
-                  </PieChart>
-                </ResponsiveContainer>}
+              : (
+                <>
+                  {/*
+                    Las etiquetas ya NO se dibujan alrededor de la torta.
+                    Recharts las coloca por fuera del radio y, en el ancho de
+                    un celular, se salen del área del gráfico y se cortan: se
+                    leía "oinciden: 882" en vez de "Coinciden: 882".
+
+                    En su lugar, el agujero de la dona muestra el total (que
+                    antes estaba vacío) y la identidad de cada porción va en
+                    una leyenda debajo, que se acomoda sola y nunca se recorta.
+                    El nombre y la cifra van en color de texto, no en el color
+                    de la serie: el cuadradito de color al lado es el que
+                    carga la identidad.
+                  */}
+                  <div className="relative">
+                    <ResponsiveContainer width="100%" height={200}>
+                      <PieChart>
+                        <Pie
+                          data={pieData}
+                          dataKey="value"
+                          nameKey="name"
+                          innerRadius={58}
+                          outerRadius={85}
+                          paddingAngle={2}
+                          stroke="hsl(var(--card))"
+                          strokeWidth={2}
+                        >
+                          {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                        </Pie>
+                        <Tooltip {...tooltipStyle} />
+                      </PieChart>
+                    </ResponsiveContainer>
+
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                      <span className="font-display text-[26px] font-bold leading-none tabular-nums">
+                        {stats.totalContados.toLocaleString("es-UY")}
+                      </span>
+                      <span className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                        Contados
+                      </span>
+                    </div>
+                  </div>
+
+                  <ul className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+                    {pieData.filter((d) => d.value > 0).map((d) => (
+                      <li key={d.name} className="flex items-center gap-1.5 text-xs">
+                        <span
+                          aria-hidden="true"
+                          className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                          style={{ backgroundColor: d.color }}
+                        />
+                        <span className="text-muted-foreground">{d.name}</span>
+                        <span className="font-mono font-medium tabular-nums">
+                          {d.value.toLocaleString("es-UY")}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
           </CardContent>
         </Card>
 

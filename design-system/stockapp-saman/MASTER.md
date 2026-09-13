@@ -409,8 +409,21 @@ padding reservado para la tab bar fija y el área segura; inputs en 16px.
 | 1 | Tokens, superficies, elevación, motion, tipografía, este documento | Aplicada |
 | 2 | Sistema de botones, CardTitle, jerarquía en Productos | Aplicada |
 | 3 | Tab bar con FAB, sidebar agrupado y colapsable, jerarquía del Dashboard | Aplicada |
-| 4 | Escáner: siete estados, haptics, transición marco → ficha | Pendiente |
-| 5 | Fila de producto responsive, paginado o virtualización para 12.400+ ítems | Pendiente |
+| 4 | Escáner: siete estados, haptics, transición marco → ficha | Aplicada |
+| 5 | Paginado del catálogo para 12.400+ ítems | Aplicada |
 
-Las fases 4 y 5 tienen su especificación en la propuesta de diseño; la 5 es
-tanto rendimiento como estética y por eso va al final.
+Sobre la fase 4: el marco del escáner ES el indicador de estado. Las dos
+animaciones que duran en el tiempo viven en `globals.css`
+(`.escaneo-barrido` para "buscando", `.escaneo-pulso` para "consultando");
+los otros cinco estados son transiciones de color. El componente no sabe
+nada de SAP: recibe una función `onResolver` que le contesta qué es el
+código, y si no se le pasa ninguna se comporta como antes (lee y cierra).
+Ese límite es lo que lo mantiene reutilizable desde cualquier pantalla.
+
+Sobre la fase 5: se eligió paginado y no virtualización porque virtualizar
+implica una dependencia nueva, y el problema real era poder **llegar** a
+cualquier artículo — el orden por columna trabaja sobre todo el catálogo
+filtrado, no sobre la página visible, así que ordenar por importe muestra
+los artículos más caros del depósito y no los más caros de los primeros
+300. La selección por casilla se limpia al cambiar de página: si no, un
+"Eliminar seleccionados (300)" borraría filas que ya no están en pantalla.

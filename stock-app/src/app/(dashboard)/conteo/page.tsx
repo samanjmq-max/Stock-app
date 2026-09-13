@@ -8,7 +8,8 @@ import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Save, Loader2, PackageX, Camera, Clock, WifiOff, ScanText, MapPin, MapPinOff, Filter, ListChecks } from "lucide-react";
 import { conteoSchema, type ConteoInput } from "@/lib/validations";
-import { AGENCIAS, type Agencia, type Producto } from "@/types";
+import { AGENCIAS, type Agencia, type Conteo, type Producto } from "@/types";
+import type { ResultadoEscaneo } from "@/features/escaneo/components/BarcodeScanner";
 import { calcularDiferencia, estadoDesdeDiferencia } from "@/lib/utils";
 import { productosService } from "@/services/productos.service";
 import { conteosService } from "@/services/conteos.service";
@@ -67,8 +68,10 @@ export default function ConteoPage() {
   const [ubicacionFiltro, setUbicacionFiltro] = useState<string[]>([]);
   const [familiaFiltro, setFamiliaFiltro] = useState<string[]>([]);
   const [catalogoAgencia, setCatalogoAgencia] = useState<Producto[]>([]);
-  const [conteosAgencia, setConteosAgencia] = useState<{ codigo: string }[]>([]);
-  const [localesPendientes, setLocalesPendientes] = useState<{ codigo: string }[]>([]);
+  // Tipados completos (no solo `codigo`) porque el escáner necesita poder
+  // decir CON QUIÉN y A QUÉ HORA se contó un código que ya está contado.
+  const [conteosAgencia, setConteosAgencia] = useState<Conteo[]>([]);
+  const [localesPendientes, setLocalesPendientes] = useState<ConteoLocal[]>([]);
   const [mostrarPendientesZona, setMostrarPendientesZona] = useState(false);
 
   const [codigoBuscado, setCodigoBuscado] = useState("");
@@ -138,6 +141,71 @@ export default function ConteoPage() {
   const pendientesZona = productosZona.filter((p) => !codigosContadosZona.has(normalizarCodigo(p.codigo)));
   const hayFiltroZona = ubicacionFiltro.length > 0 || familiaFiltro.length > 0;
 
+  // Un solo lugar donde se resuelve "código -> producto": primero la caché
+  // local (que es lo que hace funcionar el modo sin conexión), y recién si no
+  // está, el servidor. Lo usan tanto la búsqueda manual como el escáner.
+  const buscarProducto = useCallback(
+    async (c: string): Promise<Producto | undefined> => {
+      const enCache = await getProductoCachePorCodigo(c);
+      if (enCache) return enCache;
+      const todos = await productosService.listar(agenciaOperativa);
+      return todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase());
+    },
+    [agenciaOperativa]
+  );
+
+  /*
+    Lo que el escáner le pregunta a esta pantalla apenas lee un código, para
+    poder mostrar el desenlace sin cerrarse (ver BarcodeScanner.tsx). Es una
+    consulta de solo lectura: no guarda nada, no toca la cola offline, no
+    cambia el formulario. Quien decide qué hacer con el resultado sigue
+    siendo la persona.
+  */
+  const resolverCodigo = useCallback(
+    async (codigo: string): Promise<ResultadoEscaneo> => {
+      const c = codigo.trim();
+      if (!c) return { tipo: "error", mensaje: "El código vino vacío" };
+
+      try {
+        const encontrado = await buscarProducto(c);
+        if (!encontrado) return { tipo: "no_existe" };
+
+        // ¿Ya se contó hoy? Se miran los conteos del servidor de esta agencia
+        // y también la cola local todavía sin sincronizar, porque en el
+        // depósito lo más común es justamente re-escanear algo que uno mismo
+        // acaba de contar y que aún no subió.
+        const hoy = new Date().toLocaleDateString("es-UY");
+        const norm = normalizarCodigo(c);
+        const previos = [...conteosAgencia, ...localesPendientes].filter(
+          (x) => normalizarCodigo(x.codigo) === norm && x.fecha === hoy
+        );
+        const ultimo = previos[previos.length - 1];
+        if (ultimo) {
+          return {
+            tipo: "ya_contado",
+            descripcion: encontrado.descripcion,
+            usuarioEmail: ultimo.usuarioEmail || "otro usuario",
+            fecha: ultimo.fecha,
+            hora: ultimo.hora,
+          };
+        }
+
+        return {
+          tipo: "encontrado",
+          descripcion: encontrado.descripcion,
+          ubicacion: encontrado.ubicacion,
+          stockSap: encontrado.stockSap,
+        };
+      } catch (err) {
+        return {
+          tipo: "error",
+          mensaje: err instanceof Error ? err.message : "No se pudo consultar el catálogo",
+        };
+      }
+    },
+    [buscarProducto, conteosAgencia, localesPendientes]
+  );
+
   const buscarCodigo = useCallback(
     async (codigo: string) => {
       const c = codigo.trim();
@@ -151,12 +219,7 @@ export default function ConteoPage() {
       reset({ codigo: c, stockContado: undefined, observaciones: "", ubicacionNueva: "" });
 
       try {
-        let encontrado = await getProductoCachePorCodigo(c);
-        if (!encontrado) {
-          // Si no está en caché, busca contra el servidor (agencia operativa actual).
-          const todos = await productosService.listar(agenciaOperativa);
-          encontrado = todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase());
-        }
+        const encontrado = await buscarProducto(c);
 
         if (encontrado) {
           setProducto(encontrado);
@@ -172,7 +235,7 @@ export default function ConteoPage() {
         setBuscando(false);
       }
     },
-    [reset, agenciaOperativa]
+    [reset, buscarProducto]
   );
 
   useHardwareScanner((codigo) => buscarCodigo(codigo), true);
@@ -330,6 +393,9 @@ export default function ConteoPage() {
       <Card>
         <CardContent className="pt-5 space-y-3">
           <Label htmlFor="buscador">Código de producto</Label>
+          {/* Toda esta pantalla se usa parado, con guantes y una caja en la
+              otra mano: los blancos táctiles van a 48px, no a los 40-44 del
+              resto de la app (design-system: "Contar stock = campo"). */}
           <div className="flex gap-2">
             <Input
               id="buscador"
@@ -337,17 +403,24 @@ export default function ConteoPage() {
               value={codigoBuscado}
               onChange={(e) => setCodigoBuscado(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && buscarCodigo(codigoBuscado)}
+              className="h-12 text-base"
               autoFocus
             />
-            <Button onClick={() => buscarCodigo(codigoBuscado)} disabled={buscando} size="icon">
-              {buscando ? <Loader2 className="animate-spin" size={16} /> : <Search size={16} />}
+            <Button
+              onClick={() => buscarCodigo(codigoBuscado)}
+              disabled={buscando}
+              size="icon"
+              aria-label="Buscar código"
+              className="h-12 w-12 shrink-0"
+            >
+              {buscando ? <Loader2 className="animate-spin" size={18} /> : <Search size={18} />}
             </Button>
           </div>
-          <Button variant="secondary" className="w-full" onClick={() => setMostrarCamara(true)}>
-            <Camera size={16} /> Escanear con la cámara
+          <Button variant="secondary" size="lg" className="w-full" onClick={() => setMostrarCamara(true)}>
+            <Camera size={18} /> Escanear con la cámara
           </Button>
-          <Button variant="secondary" className="w-full" onClick={() => setMostrarCamaraOcr(true)}>
-            <ScanText size={16} /> Tomar foto del número
+          <Button variant="secondary" size="lg" className="w-full" onClick={() => setMostrarCamaraOcr(true)}>
+            <ScanText size={18} /> Tomar foto del número
           </Button>
           <p className="text-xs text-muted-foreground text-center">
             Compatible con EAN13, EAN8, UPC, Code128, Code39 y QR — también con lectores Bluetooth.
@@ -394,12 +467,22 @@ export default function ConteoPage() {
 
                 <div className="space-y-1.5">
                   <Label htmlFor="stockContado">Cantidad encontrada</Label>
-                  <Input id="stockContado" type="number" inputMode="decimal" step="any" {...register("stockContado")} />
+                  {/* El campo protagonista de la pantalla: alto, cifra grande y
+                      tabular, para poder verificarla de un vistazo antes de
+                      guardar. */}
+                  <Input
+                    id="stockContado"
+                    type="number"
+                    inputMode="decimal"
+                    step="any"
+                    className="h-14 text-center font-display text-2xl tabular-nums"
+                    {...register("stockContado")}
+                  />
                   {errors.stockContado && <p className="text-xs text-destructive">{errors.stockContado.message}</p>}
                 </div>
 
                 <div className="space-y-2">
-                  <Button type="button" variant={ubicacionIncorrecta ? "default" : "secondary"} className="w-full"
+                  <Button type="button" variant={ubicacionIncorrecta ? "default" : "secondary"} size="lg" className="w-full"
                     onClick={() => setUbicacionIncorrecta((v) => !v)}>
                     {ubicacionIncorrecta ? <MapPinOff size={16} /> : <MapPin size={16} />}
                     {ubicacionIncorrecta ? "La ubicación no es correcta" : "La ubicación es correcta"}
@@ -430,8 +513,8 @@ export default function ConteoPage() {
                     importante de la pantalla, no a todos los botones (design-system:
                     "Animate 1-2 key elements per view max"), y "Guardar conteo" es
                     justo esa acción principal de Contar stock. */}
-                <Button type="submit" className="w-full btn-shiny" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                <Button type="submit" size="lg" className="w-full btn-shiny" loading={isSubmitting}>
+                  {!isSubmitting && <Save size={18} />}
                   Guardar conteo
                 </Button>
               </CardContent>
@@ -461,6 +544,7 @@ export default function ConteoPage() {
 
       {mostrarCamara && (
         <BarcodeScanner
+          onResolver={resolverCodigo}
           onDetected={(codigo) => { setMostrarCamara(false); buscarCodigo(codigo); }}
           onClose={() => setMostrarCamara(false)}
         />

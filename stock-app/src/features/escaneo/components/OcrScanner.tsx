@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { X, Loader2, Check, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -166,16 +167,31 @@ export function OcrScanner({ onDetected, onClose }: Props) {
           <X size={20} />
         </Button>
         <p className="text-white text-sm font-medium">Fotografiá el número del artículo</p>
-        <div className="w-10" />
+        <div className="w-11" />
       </div>
 
       <div className="flex-1 relative flex items-center justify-center overflow-hidden">
         <video ref={videoRef} className="w-full h-full object-cover" muted playsInline autoPlay />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          {/* Mismo lenguaje que el escáner de códigos: el marco cambia de
+              color según el estado (leyendo / número reconocido) en vez de
+              quedarse siempre blanco. */}
           <div
             ref={guiaRef}
-            className="w-64 h-20 border-2 border-white/70 rounded-xl shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]"
-          />
+            className={cn(
+              "relative w-64 h-20 rounded-xl border-2 transition-colors duration-base",
+              "shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]",
+              codigoDetectado
+                ? "border-success shadow-[0_0_0_9999px_rgba(0,0,0,0.6),0_0_26px_2px_hsl(var(--success)/0.5)]"
+                : procesando
+                ? "border-info escaneo-pulso"
+                : "border-white/45"
+            )}
+          >
+            {!procesando && !codigoDetectado && (
+              <div className="escaneo-barrido-corto absolute left-2 right-2 top-1 h-0.5 rounded-full bg-gradient-to-r from-transparent via-primary to-transparent shadow-[0_0_14px_2px_hsl(var(--primary)/0.7)]" />
+            )}
+          </div>
         </div>
         <p className="absolute bottom-3 inset-x-0 text-center text-white/80 text-xs px-6 pointer-events-none">
           Encuadrá SOLO el número dentro del recuadro
@@ -204,24 +220,23 @@ export function OcrScanner({ onDetected, onClose }: Props) {
                 id="codigo-detectado"
                 value={codigoDetectado}
                 onChange={(e) => setCodigoDetectado(e.target.value.toUpperCase())}
-                className="text-center text-lg font-medium tracking-wide"
+                className="h-12 text-center font-mono text-lg font-medium tracking-wide"
                 autoFocus
               />
             </div>
             <div className="flex gap-2">
-              <Button variant="secondary" className="flex-1" onClick={reintentar}>
+              <Button variant="secondary" size="lg" className="flex-1" onClick={reintentar}>
                 <RotateCcw size={16} />
                 Sacar otra foto
               </Button>
-              <Button className="flex-1" onClick={confirmar}>
+              <Button size="lg" className="flex-1" onClick={confirmar}>
                 <Check size={16} />
                 Usar este código
               </Button>
             </div>
           </>
         ) : (
-          <Button className="w-full" size="lg" onClick={capturar} disabled={procesando}>
-            {procesando ? <Loader2 className="animate-spin" size={18} /> : null}
+          <Button className="w-full" size="lg" onClick={capturar} loading={procesando}>
             Capturar
           </Button>
         )}

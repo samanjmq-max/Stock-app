@@ -70,10 +70,15 @@ export default function LoginPage() {
       };
 
   return (
-    /* Oscuro fijo, no bg-background: ese token en modo claro es casi blanco
-       y se colaba como un halo blanquecino por los bordes del video. */
+    /* `dark` fijo en el contenedor: el login SIEMPRE es oscuro, se haya
+       elegido el tema que se haya elegido. Sin esto, quien tenía la app en
+       modo claro veía la pantalla oscura pero con los tokens del modo claro
+       -- el botón "Ingresar" salía con el terracota oscuro (pensado para
+       texto sobre fondo blanco) y quedaba apagado contra el video, y
+       cualquier superficie que usara --background aportaba su blanco al
+       halo. El color de fondo va igual en style por si el video tarda. */
     <div
-      className="relative flex min-h-dvh items-center justify-center overflow-hidden px-4"
+      className="dark relative flex min-h-dvh items-center justify-center overflow-hidden px-4"
       style={{ backgroundColor: "hsl(20 25% 5%)" }}
     >
       <RiceFieldVideoBackground />
