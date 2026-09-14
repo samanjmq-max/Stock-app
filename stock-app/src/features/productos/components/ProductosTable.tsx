@@ -369,7 +369,14 @@ export function ProductosTable({
                       <td className="px-2 py-2 whitespace-nowrap">{p.ubicacion || "—"}</td>
                       <td className="px-2 py-2 whitespace-nowrap">{p.familia || "—"}</td>
                       <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={p.proveedor}>{p.proveedor || "—"}</td>
-                      <td className="px-2 py-2 text-right tabular-nums">{p.stockSap}</td>
+                      {/* La unidad va pegada a la cifra y no en columna propia:
+                          la tabla ya tiene ocho columnas, y "450 L" se lee de
+                          una sola pasada mientras que una columna suelta
+                          obliga a cruzar la vista. */}
+                      <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
+                        {p.stockSap}
+                        {p.unidadMedida ? <span className="ml-1 text-[10px] text-muted-foreground">{p.unidadMedida}</span> : null}
+                      </td>
                       <td className="px-2 py-2 text-right tabular-nums">
                         {/* Edición inline -- ediciones simples de precio no necesitan
                             abrir el modal completo (design-system pages/productos.md). */}

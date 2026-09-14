@@ -1,8 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
-import { leerArchivoProductos, type ResultadoLectura } from "@/lib/importacion";
+import { Loader2, Upload, AlertTriangle, CheckCircle2, Download, FileWarning } from "lucide-react";
+import {
+  leerArchivoProductos,
+  descargarPlantillaProductos,
+  esErrorDeColumnas,
+  COLUMNAS_REQUERIDAS,
+  COLUMNA_PRECIO,
+  COLUMNA_UNIDAD,
+  type ResultadoLectura,
+  type ErrorDeColumnas,
+} from "@/lib/importacion";
 import { productosService } from "@/services/productos.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -68,6 +77,28 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
   const [importando, setImportando] = useState(false);
   const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /*
+    El archivo mal armado tiene su propio estado, separado de `error`.
+
+    Un error suelto en una línea de texto roja es lo que se le muestra a
+    alguien cuando algo salió mal y no hay nada que hacer. Acá sí hay algo
+    que hacer -- arreglar el archivo -- así que la pantalla tiene que decir
+    exactamente qué columna falta, con qué nombre se puede escribir, y dar
+    la planilla modelo ahí mismo.
+  */
+  const [errorColumnas, setErrorColumnas] = useState<ErrorDeColumnas | null>(null);
+  const [bajandoPlantilla, setBajandoPlantilla] = useState(false);
+
+  async function bajarPlantilla() {
+    setBajandoPlantilla(true);
+    try {
+      await descargarPlantillaProductos();
+    } catch {
+      setError("No se pudo generar la plantilla");
+    } finally {
+      setBajandoPlantilla(false);
+    }
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -77,15 +108,21 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
       return;
     }
     setError(null);
+    setErrorColumnas(null);
     setLeyendo(true);
     setNombreArchivo(file.name);
     try {
       const res = await leerArchivoProductos(file);
       setResultado(res);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo leer el archivo");
+      if (esErrorDeColumnas(err)) setErrorColumnas(err);
+      else setError(err instanceof Error ? err.message : "No se pudo leer el archivo");
     } finally {
       setLeyendo(false);
+      // Se limpia el input para que elegir OTRA VEZ el mismo archivo, después
+      // de corregirlo en Excel, vuelva a disparar la lectura. Sin esto el
+      // navegador ve el mismo valor y no emite el evento.
+      e.target.value = "";
     }
   }
 
@@ -133,6 +170,7 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
     setResultado(null);
     setNombreArchivo("");
     setError(null);
+    setErrorColumnas(null);
     setProgreso(null);
     setAgenciaSeleccionada("");
     onOpenChange(false);
@@ -144,8 +182,8 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
         <DialogHeader>
           <DialogTitle>Importar productos</DialogTitle>
           <DialogDescription>
-            Archivo .xlsx, .xls o .csv con columnas: código, descripción, ubicación, familia, proveedor, stockSap.
-            Los códigos que ya existen en esa agencia se actualizan; los nuevos se agregan. Nunca toca productos de otras agencias.
+            Archivo .xlsx, .xls o .csv con las columnas del formato estándar. Los códigos que ya existen en esa
+            agencia se actualizan; los nuevos se agregan. Nunca toca productos de otras agencias.
           </DialogDescription>
         </DialogHeader>
 
@@ -159,6 +197,7 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
                 setAgenciaSeleccionada(v as Agencia);
                 setResultado(null);
                 setError(null);
+                setErrorColumnas(null);
               }}
             >
               <SelectTrigger>
@@ -169,6 +208,59 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
               </SelectContent>
             </Select>
           </div>
+
+          {/*
+            Archivo rechazado por formato. Es un bloqueo, no una advertencia:
+            si le falta una columna, importarlo le borra ese dato a todos los
+            artículos de la planta. Y es la única forma de que las nueve
+            plantas manden la misma planilla en vez de nueve variantes.
+          */}
+          {errorColumnas && (
+            <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/5 p-3.5">
+              <div className="flex items-start gap-2">
+                <FileWarning size={17} className="mt-px shrink-0 text-destructive" />
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-destructive">
+                    Este archivo no tiene el formato que necesita la app
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{nombreArchivo}</p>
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                  {errorColumnas.columnasFaltantes.length === 1 ? "Falta esta columna" : "Faltan estas columnas"}
+                </p>
+                <ul className="space-y-1">
+                  {errorColumnas.columnasFaltantes.map((c) => (
+                    <li key={c.campo} className="flex flex-wrap items-baseline gap-x-2 text-xs">
+                      <span className="font-medium text-foreground">{c.etiqueta}</span>
+                      <span className="text-muted-foreground">
+                        — encabezado: {c.acepta.map((a) => `"${a}"`).join(" o ")}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {errorColumnas.columnasEncontradas.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-foreground">El archivo trae:</span>{" "}
+                  {errorColumnas.columnasEncontradas.join(" · ")}
+                </p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-2 border-t border-destructive/20 pt-3">
+                <Button variant="outline" size="sm" onClick={bajarPlantilla} disabled={bajandoPlantilla}>
+                  {bajandoPlantilla ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                  Descargar plantilla
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  Corregí el archivo y volvé a elegirlo.
+                </span>
+              </div>
+            </div>
+          )}
 
           {!resultado && (
             <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl py-10 transition-colors ${agenciaSeleccionada ? "cursor-pointer hover:bg-secondary/50" : "opacity-50 cursor-not-allowed"}`}>
@@ -186,16 +278,68 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
             </label>
           )}
 
+          {/* El formato, a la vista ANTES de elegir el archivo. Enterarse de
+              que falta una columna recién después de buscar el archivo en el
+              disco es enterarse tarde. */}
+          {!resultado && !errorColumnas && (
+            <div className="space-y-2 rounded-lg bg-muted/50 px-3 py-2.5">
+              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
+                Columnas obligatorias
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {COLUMNAS_REQUERIDAS.map((c) => c.etiqueta).join(" · ")}
+                <span className="opacity-70">
+                  {" "}· {COLUMNA_UNIDAD.etiqueta} y {COLUMNA_PRECIO.etiqueta} (opcionales)
+                </span>
+              </p>
+              <button
+                type="button"
+                onClick={bajarPlantilla}
+                disabled={bajandoPlantilla}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary underline decoration-dotted underline-offset-2 hover:no-underline disabled:opacity-60"
+              >
+                {bajandoPlantilla ? <Loader2 className="animate-spin" size={12} /> : <Download size={12} />}
+                Descargar plantilla
+              </button>
+            </div>
+          )}
+
           {resultado && (
             <div className="space-y-3">
               <p className="text-sm font-medium truncate">{nombreArchivo}</p>
               <p className="text-xs text-muted-foreground">Agencia destino: <span className="font-medium text-foreground">{agenciaSeleccionada}</span></p>
+              {!resultado.traeUnidad && (
+                /* Misma lógica que el precio: no se pierde nada, pero si
+                   alguien sube el archivo para cargar las unidades de los
+                   líquidos y no cambia nada, el silencio parece una falla. */
+                <div className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+                  <AlertTriangle size={14} className="mt-px shrink-0" />
+                  <span>
+                    El archivo no trae columna de unidad de medida ({COLUMNA_UNIDAD.acepta.map((a) => `"${a}"`).join(" o ")}).
+                    Las que ya están cargadas se mantienen. Bajá la plantilla si querés sumarla —
+                    para los líquidos es la diferencia entre contar bidones y contar litros.
+                  </span>
+                </div>
+              )}
+              {!resultado.traePrecio && (
+                /* No es un error: el script no pisa el precio si la fila no
+                   lo trae, así que lo ya cargado queda intacto. Se avisa
+                   igual porque subir el archivo esperando actualizar precios
+                   y que no cambie nada se parece demasiado a una falla. */
+                <div className="flex items-start gap-2 rounded-lg bg-warning/10 px-3 py-2 text-xs text-warning">
+                  <AlertTriangle size={14} className="mt-px shrink-0" />
+                  <span>
+                    El archivo no trae columna de precio ({COLUMNA_PRECIO.acepta.map((a) => `"${a}"`).join(" o ")}).
+                    Se importa igual y los precios que ya están cargados se mantienen, pero no se actualiza ninguno.
+                  </span>
+                </div>
+              )}
               <div className="flex items-center gap-2 text-sm bg-success/10 text-success rounded-lg px-3 py-2">
                 <CheckCircle2 size={16} />
                 {resultado.filasValidas.length} de {resultado.totalFilas} filas listas para importar
               </div>
               {resultado.filasInvalidas.length > 0 && (
-                <div className="text-sm bg-warning/15 text-warning-foreground rounded-lg px-3 py-2">
+                <div className="text-sm bg-warning/15 text-warning rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2 font-medium mb-1">
                     <AlertTriangle size={16} />
                     {resultado.filasInvalidas.length} filas con errores (se omiten)

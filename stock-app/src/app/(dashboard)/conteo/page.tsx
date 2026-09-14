@@ -482,12 +482,31 @@ export default function ConteoPage() {
                     <span className="text-muted-foreground">Ubicación</span>
                     <span className="text-right font-medium">{producto.ubicacion || "—"}</span>
                     <span className="text-muted-foreground">Stock SAP</span>
-                    <span className="text-right font-medium">{producto.stockSap}</span>
+                    <span className="text-right font-medium">
+                      {producto.stockSap}
+                      {producto.unidadMedida ? (
+                        <span className="ml-1 text-xs text-muted-foreground">{producto.unidadMedida}</span>
+                      ) : null}
+                    </span>
                   </div>
                 )}
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="stockContado">Cantidad encontrada</Label>
+                  {/*
+                    La unidad va EN LA ETIQUETA del campo, no como adorno al
+                    costado. Es la razón por la que existe esta columna: para
+                    un artículo a granel, "cantidad encontrada" es ambiguo
+                    hasta que dice "en L", y la diferencia entre anotar 45
+                    bidones y 45 litros es todo el inventario de ese artículo.
+                  */}
+                  <Label htmlFor="stockContado">
+                    Cantidad encontrada
+                    {producto?.unidadMedida ? (
+                      <span className="ml-1.5 font-mono text-[11px] font-medium uppercase tracking-wide text-primary">
+                        en {producto.unidadMedida}
+                      </span>
+                    ) : null}
+                  </Label>
                   {/* El campo protagonista de la pantalla: alto, cifra grande y
                       tabular, para poder verificarla de un vistazo antes de
                       guardar. */}

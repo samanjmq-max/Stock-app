@@ -60,6 +60,8 @@ function crearProducto_(input) {
     familia: input.familia || "",
     proveedor: input.proveedor || "",
     stockSap: Number(input.stockSap) || 0,
+    // UN, KG, L... Vacío significa "todavía no cargada".
+    unidadMedida: input.unidadMedida ? String(input.unidadMedida).trim().toUpperCase() : "",
     // Precio de una sola unidad, en pesos. 0 significa "todavía no cargado".
     precioUnitario: input.precioUnitario !== undefined ? Number(input.precioUnitario) || 0 : 0,
     agencia: input.agencia,
@@ -100,6 +102,7 @@ function actualizarProducto_(input) {
     "familia",
     "proveedor",
     "stockSap",
+    "unidadMedida",
     "precioUnitario",
     "agencia"
   ].forEach((campo) => {
@@ -193,6 +196,7 @@ function importarProductos_(input) {
   const familiaCol = headers.indexOf("familia");
   const proveedorCol = headers.indexOf("proveedor");
   const stockSapCol = headers.indexOf("stockSap");
+  const unidadMedidaCol = headers.indexOf("unidadMedida");
   const precioUnitarioCol = headers.indexOf("precioUnitario");
   const actualizadoEnCol = headers.indexOf("actualizadoEn");
 
@@ -230,6 +234,12 @@ function importarProductos_(input) {
       values[filaExistente][familiaCol] = p.familia || "";
       values[filaExistente][proveedorCol] = p.proveedor || "";
       values[filaExistente][stockSapCol] = Number(p.stockSap) || 0;
+      // La unidad, como el precio, SOLO se pisa si la fila trae una. La
+      // columna es opcional todavía y hay productos con la unidad ya
+      // cargada a mano: un archivo sin esa columna no tiene que borrarla.
+      if (unidadMedidaCol !== -1 && p.unidadMedida) {
+        values[filaExistente][unidadMedidaCol] = String(p.unidadMedida).trim().toUpperCase();
+      }
       // El precio SOLO se pisa si esta importación trajo un precio nuevo.
       // Así, la importación diaria del stock simplificado (que no trae
       // precio) no borra el precio ya cargado en una importación anterior.
@@ -249,6 +259,7 @@ function importarProductos_(input) {
         familia: p.familia || "",
         proveedor: p.proveedor || "",
         stockSap: Number(p.stockSap) || 0,
+        unidadMedida: p.unidadMedida ? String(p.unidadMedida).trim().toUpperCase() : "",
         precioUnitario: p.precioUnitario !== undefined ? Number(p.precioUnitario) || 0 : 0,
         agencia: agencia,
         actualizadoEn: timestamp,

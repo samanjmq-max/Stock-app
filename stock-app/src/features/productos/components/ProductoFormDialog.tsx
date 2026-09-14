@@ -44,9 +44,10 @@ export function ProductoFormDialog({ open, onOpenChange, productoEditando, onGua
               familia: productoEditando.familia,
               proveedor: productoEditando.proveedor,
               stockSap: productoEditando.stockSap,
+              unidadMedida: productoEditando.unidadMedida ?? "",
               agencia: productoEditando.agencia,
             }
-          : { codigo: "", descripcion: "", ubicacion: "", familia: "", proveedor: "", stockSap: 0, agencia: agenciaPorDefecto }
+          : { codigo: "", descripcion: "", ubicacion: "", familia: "", proveedor: "", stockSap: 0, unidadMedida: "", agencia: agenciaPorDefecto }
       );
     }
   }, [open, productoEditando, agenciaPorDefecto, reset]);
@@ -78,9 +79,22 @@ export function ProductoFormDialog({ open, onOpenChange, productoEditando, onGua
               <Label>Ubicación</Label>
               <Input {...register("ubicacion")} />
             </div>
+            {/* Stock y unidad comparten celda: son el mismo dato partido en
+                dos. "450" no significa nada hasta saber si son litros o
+                bidones, así que se cargan juntos y no en extremos opuestos
+                del formulario. */}
             <div className="space-y-1.5">
               <Label>Stock SAP</Label>
-              <Input type="number" step="any" {...register("stockSap")} />
+              <div className="grid grid-cols-[1fr_76px] gap-2">
+                <Input type="number" step="any" {...register("stockSap")} />
+                <Input
+                  {...register("unidadMedida")}
+                  placeholder="UN"
+                  maxLength={8}
+                  aria-label="Unidad de medida"
+                  className="text-center uppercase"
+                />
+              </div>
               {errors.stockSap && <p className="text-xs text-destructive">{errors.stockSap.message}</p>}
             </div>
             <div className="space-y-1.5">

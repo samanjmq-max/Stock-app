@@ -63,6 +63,15 @@ export interface Producto {
   familia: string;
   proveedor: string;
   stockSap: number;
+  /**
+   * Unidad de medida del artículo tal como viene de SAP: UN, KG, L, M...
+   *
+   * No es cosmética. Para un líquido, "45" no quiere decir nada sin saber si
+   * son 45 bidones o 45 litros, y el que cuenta necesita verlo en la pantalla
+   * antes de escribir la cantidad. Opcional porque los productos cargados
+   * antes de esta columna no la tienen.
+   */
+  unidadMedida?: string;
   // Precio de una sola unidad, en pesos. Se calcula al importar como
   // (Valor libre util. ÷ Libre utilización) del export de SAP, o se puede
   // cargar directo si el Excel ya trae una columna de precio. Puede no

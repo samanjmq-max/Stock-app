@@ -35,6 +35,7 @@ export const productoSchema = z.object({
   familia: z.string().optional().default(""),
   proveedor: z.string().optional().default(""),
   stockSap: z.coerce.number().min(0, "No puede ser negativo"),
+  unidadMedida: z.string().optional().default(""),
   precioUnitario: z.coerce.number().min(0, "No puede ser negativo").optional().default(0),
   agencia: z.enum(AGENCIAS),
 });

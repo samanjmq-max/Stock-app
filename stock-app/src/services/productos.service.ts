@@ -14,6 +14,8 @@ export interface FilaImportacion {
   familia?: string;
   proveedor?: string;
   stockSap: number;
+  /** UN, KG, L... Si no viene, no se toca la que ya está cargada. */
+  unidadMedida?: string;
   /** Precio de una sola unidad, en pesos. Si no viene, no se toca el precio ya cargado. */
   precioUnitario?: number;
 }

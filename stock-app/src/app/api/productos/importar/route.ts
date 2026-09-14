@@ -12,6 +12,9 @@ const filaSchema = z.object({
   familia: z.string().optional().default(""),
   proveedor: z.string().optional().default(""),
   stockSap: z.coerce.number().min(0),
+  // Opcional igual que el precio: si la fila no la trae, el script deja la
+  // que ya estaba cargada en vez de vaciarla.
+  unidadMedida: z.string().optional(),
   // Opcional: si la fila no trae precio, no se pisa el que ya estaba
   // cargado en el producto (ver Productos.gs — importarProductos_).
   precioUnitario: z.coerce.number().min(0).optional(),
