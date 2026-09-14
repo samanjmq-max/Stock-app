@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Moon, Sun, LogOut, WifiOff, RefreshCw } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSync } from "@/hooks/useSync";
+import { PERFILES, perfilDe } from "@/lib/permisos";
 import { Button } from "@/components/ui/button";
 
 const COLOR_OSCURO = "#100c0a";
@@ -39,6 +40,26 @@ export function Topbar({ title }: { title: string }) {
     localStorage.setItem("theme", next ? "dark" : "light");
     sincronizarColorDeBarra(next);
   }
+
+  /*
+    Lo que va debajo del nombre es el PERFIL, no el rol.
+
+    `rol` quedó como mecanismo interno -- el control grueso que usan el
+    middleware y algunas rutas -- y solo tiene dos valores: "administrador" y
+    "operador". Mostrarlo hacía que un encargado de almacén leyera "Operador"
+    debajo de su nombre, y un gerente leyera "Administrador": las dos cosas
+    ciertas por dentro y equivocadas para la persona que las lee. El rol no
+    debería verse en ninguna pantalla.
+
+    Se saca el `capitalize` de paso: las etiquetas ya vienen escritas como
+    corresponde, y esa regla convertía "Encargado de Almacén" en "Encargado
+    De Almacén".
+  */
+  const etiquetaPerfil = user
+    ? user.esSuperAdmin
+      ? "Super administrador"
+      : PERFILES[perfilDe(user)].etiqueta
+    : "";
 
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-background/95 backdrop-blur px-4 md:px-6 py-3.5">
@@ -94,7 +115,7 @@ export function Topbar({ title }: { title: string }) {
         </Button>
         <div className="hidden sm:flex flex-col items-end mr-1">
           <span className="text-xs font-medium leading-none">{user?.nombre}</span>
-          <span className="text-[11px] text-muted-foreground capitalize leading-none mt-0.5">{user?.rol}</span>
+          <span className="text-[11px] text-muted-foreground leading-none mt-0.5">{etiquetaPerfil}</span>
         </div>
         <Button variant="ghost" size="icon-sm" onClick={logout} aria-label="Cerrar sesión">
           <LogOut size={17} />
