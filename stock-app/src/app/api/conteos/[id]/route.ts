@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { editarConteo, eliminarConteo, registrarHistorial } from "@/lib/sheets";
+import { leerSesion } from "@/lib/sesion";
 import type { Rol } from "@/types";
 import { z } from "zod";
 
@@ -51,23 +52,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-// Eliminar un conteo SOLO puede hacerlo un administrador (super
-// administrador o jefe de planta) — un operador puede corregir un
-// conteo propio, pero no borrarlo.
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
+/*
+  Borrar un conteo pide la capacidad `borrarLineas`, no "ser administrador".
 
-  if (!rol) {
+  La diferencia importa desde que existe el Encargado de Almacén: su rol es
+  "operador" -- no entra a Usuarios ni al catálogo -- pero borrar líneas mal
+  cargadas es justamente su tarea. Con el control viejo, atado al rol, se
+  quedaba afuera.
+
+  Vaciar el inventario entero sigue siendo otra cosa y de nadie más que del
+  super admin: eso vive en conteos/reset.
+*/
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const sesion = leerSesion(request);
+  if (!sesion) {
     return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
   }
-  if (rol !== "administrador") {
+  if (!sesion.capacidades.borrarLineas) {
     return NextResponse.json(
-      { ok: false, error: "Solo un administrador puede eliminar un conteo" },
+      { ok: false, error: "Tu perfil no puede eliminar conteos" },
       { status: 403 }
     );
   }
+  const { rol, id: userId, email } = sesion;
 
   try {
     const { id } = await params;

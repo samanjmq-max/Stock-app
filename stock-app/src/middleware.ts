@@ -1,13 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verificarToken, AUTH_COOKIE_NAME } from "@/lib/auth";
-import { esSuperAdmin } from "@/lib/permisos";
+import { capacidadesDe, esSuperAdmin, perfilDe, type Capacidades } from "@/lib/permisos";
 const RUTAS_PUBLICAS = ["/login", "/api/auth/login", "/recuperar", "/api/auth/recuperar"];
 // /historial y /api/historial: el log de auditoría es de toda la empresa
 // (login/logout, altas/bajas, ediciones de productos y usuarios de TODAS
 // las plantas) y hoy no tiene forma de filtrarse por agencia porque
 // HistorialEntry no guarda ese dato -- se restringe a admin para no
 // exponer actividad de otras plantas a un operador.
-const RUTAS_SOLO_ADMIN = ["/configuracion", "/usuarios", "/api/usuarios", "/etiquetas", "/historial", "/api/historial"];
+/*
+  Cada ruta restringida pide una capacidad concreta, no "ser administrador".
+
+  Con los dos roles de antes daba lo mismo: administrador podía todo y
+  operador nada. Ahora no -- un encargado de almacén borra líneas pero no
+  entra a Usuarios, y un jefe de planta entra a Usuarios pero solo maneja
+  su propia gente. Nombrar la capacidad y no el rol es lo que hace que
+  agregar un perfil mañana no obligue a revisar esta lista.
+*/
+const RUTAS_RESTRINGIDAS: { prefijo: string; capacidad: keyof Capacidades }[] = [
+  { prefijo: "/usuarios", capacidad: "gestionarUsuarios" },
+  { prefijo: "/api/usuarios", capacidad: "gestionarUsuarios" },
+  { prefijo: "/etiquetas", capacidad: "etiquetas" },
+  { prefijo: "/api/etiquetas", capacidad: "etiquetas" },
+  { prefijo: "/historial", capacidad: "verHistorial" },
+  { prefijo: "/api/historial", capacidad: "verHistorial" },
+  { prefijo: "/configuracion", capacidad: "gestionarCatalogo" },
+];
 // Carpetas de estáticos públicos en /public (imágenes, video, fuentes, audio, etc.)
 // servidas directamente por Next — nunca requieren sesión, sin importar la ruta.
 const ES_ASSET_DIR = /^\/(?:videos|images|img|fonts|audio)\//;
@@ -36,19 +53,33 @@ export async function middleware(request: NextRequest) {
     loginUrl.searchParams.set("next", pathname);
     return NextResponse.redirect(loginUrl);
   }
-  const requiereAdmin = RUTAS_SOLO_ADMIN.some((r) => pathname.startsWith(r));
-  if (requiereAdmin && payload.rol !== "administrador") {
+  const perfil = perfilDe(payload);
+  const capacidades = capacidadesDe(payload);
+
+  const restriccion = RUTAS_RESTRINGIDAS.find((r) => pathname.startsWith(r.prefijo));
+  if (restriccion && !capacidades[restriccion.capacidad]) {
     if (pathname.startsWith("/api")) {
-      return NextResponse.json({ ok: false, error: "Acceso restringido a administradores" }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "No tenés permiso para esta operación" }, { status: 403 });
     }
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
+
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-user-id", payload.sub);
   requestHeaders.set("x-user-email", payload.email);
   requestHeaders.set("x-user-rol", payload.rol);
   requestHeaders.set("x-user-nombre", payload.nombre);
   requestHeaders.set("x-user-agencia", payload.agencia || "Centro Logístico");
+  requestHeaders.set("x-user-perfil", perfil);
+  /*
+    Las plantas van codificadas a propósito. Los nombres traen acentos
+    ("Centro Logístico") y una cabecera HTTP con caracteres fuera de ASCII
+    ya dio problemas antes -- por eso /api/auth/me hace decodeURIComponent
+    sobre nombre y agencia. Acá se codifica de forma explícita en la ida y
+    se decodifica en la vuelta, así el comportamiento es el mismo siempre y
+    no depende de quién codifique por el camino.
+  */
+  requestHeaders.set("x-user-agencias", encodeURIComponent(payload.agencias || ""));
   requestHeaders.set("x-user-es-super-admin", esSuperAdmin(payload.email) ? "1" : "0");
   return NextResponse.next({ request: { headers: requestHeaders } });
 }

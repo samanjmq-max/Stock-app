@@ -4,6 +4,7 @@ import { getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
 import { crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { compararPassword } from "@/lib/password";
 import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes } from "@/lib/rateLimit";
+import { perfilDe, rolDePerfil } from "@/lib/permisos";
 import type { Agencia } from "@/types";
 export async function POST(request: NextRequest) {
   try {
@@ -38,12 +39,21 @@ export async function POST(request: NextRequest) {
     limpiarIntentos(claveLimite);
     // La agencia queda grabada en el token — el frontend la usa para filtrar
     // productos, conteos y Dashboard sin tener que pedirla de nuevo.
+    /*
+      El perfil manda sobre el rol, no al revés. Si la fila de la planilla
+      tiene los dos y no coinciden -- porque alguien editó la celda `rol` a
+      mano -- gana el perfil, y el rol se recalcula. Así no hay forma de
+      darse permisos tocando una sola celda.
+    */
+    const perfil = perfilDe(usuario);
     const token = await crearToken({
       userId: usuario.id,
       email: usuario.email,
-      rol: usuario.rol,
+      rol: rolDePerfil(perfil),
       nombre: usuario.nombre,
       agencia: (usuario.agencia || "Centro Logístico") as Agencia,
+      perfil,
+      agencias: usuario.agencias || "",
     });
     await registrarHistorial({
       usuarioId: usuario.id,
@@ -59,8 +69,10 @@ export async function POST(request: NextRequest) {
         id: usuario.id,
         nombre: usuario.nombre,
         email: usuario.email,
-        rol: usuario.rol,
+        rol: rolDePerfil(perfil),
+        perfil,
         agencia: usuario.agencia || "Centro Logístico",
+        agencias: usuario.agencias || "",
       },
     });
     response.cookies.set(AUTH_COOKIE_NAME, token, {

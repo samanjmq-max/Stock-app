@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { eliminarConteos, registrarHistorial } from "@/lib/sheets";
-import type { Rol } from "@/types";
+import { leerSesion } from "@/lib/sesion";
 import { z } from "zod";
 
 const eliminarLoteSchema = z.object({
@@ -8,29 +8,29 @@ const eliminarLoteSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
+  /*
+    Este control faltaba por completo.
 
-  if (!rol) {
+    El DELETE de a un conteo (conteos/[id]) sí verificaba permisos, pero
+    esta ruta -- que borra decenas de una -- solo miraba que hubiera sesión.
+    La interfaz esconde el botón de borrado múltiple a los operarios, así
+    que nadie llegaba por accidente; pero el endpoint estaba abierto a
+    cualquiera con sesión iniciada. Botón escondido, puerta abierta.
+
+    Pide la misma capacidad que el borrado de a uno: no tendría sentido que
+    borrar cincuenta fuera más fácil que borrar uno.
+  */
+  const sesion = leerSesion(request);
+  if (!sesion) {
     return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
   }
-  /*
-    Este control faltaba.
-
-    El DELETE de a un conteo (conteos/[id]) sí exigía administrador, pero
-    esta ruta -- que borra decenas de una -- solo verificaba que hubiera
-    sesión. La interfaz esconde el botón de borrado múltiple a los operarios
-    (`isAdmin && algunoSeleccionado` en ConteosTable), así que nadie llegaba
-    por accidente; pero el endpoint estaba abierto a cualquiera con sesión
-    iniciada. Botón escondido, puerta abierta.
-  */
-  if (rol !== "administrador") {
+  if (!sesion.capacidades.borrarLineas) {
     return NextResponse.json(
-      { ok: false, error: "Solo un administrador puede eliminar conteos" },
+      { ok: false, error: "Tu perfil no puede eliminar conteos" },
       { status: 403 }
     );
   }
+  const { rol, id: userId, email } = sesion;
 
   try {
     const body = await request.json();

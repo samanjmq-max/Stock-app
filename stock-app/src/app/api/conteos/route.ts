@@ -3,27 +3,37 @@ import { getConteos, guardarConteo, getProductoPorCodigo, registrarHistorial } f
 import { conteoSchema } from "@/lib/validations";
 import { calcularDiferencia, estadoDesdeDiferencia, formatFecha, formatHora } from "@/lib/utils";
 import { leerHeaderTexto } from "@/lib/headers";
+import { leerSesion } from "@/lib/sesion";
 import type { Agencia } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
-    const agencia = leerHeaderTexto(request, "x-user-agencia") as Agencia | null;
-    const esSuper = leerHeaderTexto(request, "x-user-es-super-admin") === "1";
+    const sesion = leerSesion(request);
+    if (!sesion) {
+      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    }
 
     /*
-      Quién puede pedir los conteos de OTRA planta: solo el super admin.
+      Qué planta se puede pedir: cualquiera que esté dentro del alcance.
 
       Antes la condición era `rol === "administrador"`, y como un jefe de
       planta también es administrador, le alcanzaba con escribir
       ?agencia=Lascano en la barra de direcciones para leer los conteos de
-      una planta que no es la suya. La interfaz nunca le ofrece ese selector
-      -- solo lo ve el super admin -- pero esconder el control no cierra la
-      puerta: el que decide es el servidor, y el servidor no estaba mirando.
+      una planta que no es la suya. La interfaz nunca le ofrece ese selector,
+      pero esconder el control no cierra la puerta: el que decide es el
+      servidor, y el servidor no estaba mirando.
+
+      Ahora el alcance sale del perfil: el gerente y el super admin ven las
+      nueve plantas; un jefe, las que tenga asignadas; los demás, la suya. Si
+      piden una que no les toca, se les devuelve la suya en vez de un error
+      -- es un filtro, no un intento de intrusión, y romper la pantalla por
+      un parámetro de más sería peor que ignorarlo.
     */
     const agenciaPedida = request.nextUrl.searchParams.get("agencia") as Agencia | null;
-    const agenciaFiltro = esSuper
-      ? agenciaPedida ?? agencia ?? undefined
-      : agencia ?? undefined;
+    const agenciaFiltro =
+      agenciaPedida && sesion.alcance.includes(agenciaPedida)
+        ? agenciaPedida
+        : sesion.agencia ?? undefined;
     const conteos = await getConteos(agenciaFiltro);
     return NextResponse.json({ ok: true, data: conteos });
   } catch (err) {

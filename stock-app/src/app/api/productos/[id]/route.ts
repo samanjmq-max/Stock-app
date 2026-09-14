@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { actualizarProducto, eliminarProducto, registrarHistorial } from "@/lib/sheets";
 import { productoSchema } from "@/lib/validations";
-import type { Rol } from "@/types";
+import { leerSesion } from "@/lib/sesion";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
+  const sesion = leerSesion(request);
 
-  if (rol !== "administrador") {
-    return NextResponse.json({ ok: false, error: "Solo un administrador puede editar productos" }, { status: 403 });
+  if (!sesion?.capacidades.gestionarCatalogo) {
+    return NextResponse.json({ ok: false, error: "Tu perfil no puede editar productos" }, { status: 403 });
   }
+  const { rol, id: userId, email } = sesion;
 
   try {
     const { id } = await params;
@@ -39,13 +38,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
+  const sesion = leerSesion(request);
 
-  if (rol !== "administrador") {
-    return NextResponse.json({ ok: false, error: "Solo un administrador puede eliminar productos" }, { status: 403 });
+  if (!sesion?.capacidades.gestionarCatalogo) {
+    return NextResponse.json({ ok: false, error: "Tu perfil no puede eliminar productos" }, { status: 403 });
   }
+  const { rol, id: userId, email } = sesion;
 
   try {
     const { id } = await params;

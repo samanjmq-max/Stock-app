@@ -1,5 +1,5 @@
 import { SignJWT, jwtVerify } from "jose";
-import type { JwtPayload, Rol, Agencia } from "@/types";
+import type { JwtPayload, Perfil, Rol, Agencia } from "@/types";
 
 const secretKey = process.env.JWT_SECRET;
 if (!secretKey && process.env.NODE_ENV === "production") {
@@ -16,6 +16,13 @@ export async function crearToken(payload: {
   rol: Rol;
   nombre: string;
   agencia: Agencia;
+  /* Perfil y plantas viajan DENTRO del token, no se consultan por request.
+     El middleware corre en el Edge y no puede hablar con Apps Script, así
+     que si los permisos no viajan en el token no hay forma de verificarlos
+     antes de entrar a la ruta. Contrapartida: un cambio de permisos recién
+     se aplica cuando la persona vuelve a iniciar sesión (el token dura 8h). */
+  perfil?: Perfil;
+  agencias?: string;
 }): Promise<string> {
   return new SignJWT({
     sub: payload.userId,
@@ -23,6 +30,8 @@ export async function crearToken(payload: {
     rol: payload.rol,
     nombre: payload.nombre,
     agencia: payload.agencia,
+    perfil: payload.perfil,
+    agencias: payload.agencias,
   })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()

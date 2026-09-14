@@ -18,12 +18,32 @@ export type Agencia = (typeof AGENCIAS)[number];
 
 export type Rol = "administrador" | "operador";
 
+/*
+  Perfil de usuario. Es el control FINO de permisos; `rol` sigue siendo el
+  grueso (a qué pantallas se entra) y se deriva del perfil, nunca se carga a
+  mano. Ver src/lib/permisos.ts para la tabla completa de capacidades.
+
+  Los usuarios cargados antes de que esto existiera no tienen perfil: se
+  deduce del rol, así que nadie cambia de permisos al salir a producción.
+*/
+export type Perfil = "operario" | "encargado" | "jefe" | "gerente";
+
 export interface Usuario {
   id: string;
   nombre: string;
   email: string;
   rol: Rol;
+  /** Perfil de permisos. Opcional: los usuarios viejos no lo tienen y se deduce del rol. */
+  perfil?: Perfil;
+  /** Planta principal. Es la que se usa por defecto al contar. */
   agencia: Agencia;
+  /**
+   * Todas las plantas a cargo, separadas por barra ("Tres Gomensoro|Salto").
+   * Es texto y no una lista porque vive en una sola celda de la planilla.
+   * Vacío = vale `agencia` sola. Un jefe de planta puede tener varias; a
+   * veces la misma persona está a cargo de dos o tres depósitos.
+   */
+  agencias?: string;
   activo: boolean;
   creadoEn: string;
 }
@@ -126,6 +146,10 @@ export interface JwtPayload {
   rol: Rol;
   nombre: string;
   agencia: Agencia;
+  /** Opcional: un token emitido antes de que existieran los perfiles no lo trae. */
+  perfil?: Perfil;
+  /** Lista separada por barra, igual que en la planilla. */
+  agencias?: string;
   iat?: number;
   exp?: number;
 }
