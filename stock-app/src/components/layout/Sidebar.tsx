@@ -9,43 +9,67 @@ import {
   PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import type { Capacidades } from "@/lib/permisos";
 import { cn } from "@/lib/utils";
 
 /*
   Sidebar de escritorio.
 
-  Dos cambios respecto de la versión anterior:
+  Tres cosas a tener presentes:
 
-  1. LOS SIETE ÍTEMS SE AGRUPAN. Antes eran una lista plana donde "Contar
-     stock" y "Configuración" pesaban lo mismo. Ahora hay dos bloques
-     separados por un filete: lo que se usa todos los días (operación) y lo
-     que se toca de vez en cuando (administración).
+  1. LOS ÍTEMS SE AGRUPAN. Antes eran una lista plana donde "Contar stock" y
+     "Configuración" pesaban lo mismo. Ahora hay dos bloques separados por un
+     filete: lo que se usa todos los días (operación) y lo que se toca de vez
+     en cuando (administración).
 
   2. SE PUEDE COLAPSAR a solo íconos, y la preferencia se recuerda. En una
      pantalla de 1280px, 240px de sidebar permanente es mucho para una app
      cuyo contenido principal son tablas anchas.
+
+  3. CADA ÍTEM PIDE UNA CAPACIDAD, no "ser admin". Antes era un booleano
+     `soloAdmin`, que alcanzaba cuando había dos roles y uno podía todo. Con
+     los perfiles no: un encargado de almacén no es administrador pero sí
+     imprime etiquetas. Nombrar la capacidad -- la misma que verifica el
+     middleware -- es lo que evita que el menú y el servidor opinen distinto:
+     si acá apareciera un ítem que la ruta rechaza, el clic termina en un 403
+     o en una redirección, que es peor que no mostrarlo.
 
   El indicador del ítem activo es el mismo lenguaje de luz que el tab bar de
   móvil, pero como resaltado de fila completa en vez de barra corta: el
   contenedor acá es una fila con ícono y texto, no un ícono suelto. Mismo
   significado, forma distinta según el contenedor.
 */
-const GRUPOS = [
+type Item = {
+  href: string;
+  label: string;
+  icon: typeof LayoutDashboard;
+  /** Capacidad necesaria. Sin ella, el ítem lo ve cualquiera con sesión. */
+  capacidad?: keyof Capacidades;
+};
+
+const GRUPOS: { titulo: string; items: Item[] }[] = [
   {
     titulo: "Operación",
     items: [
-      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard, soloAdmin: false },
-      { href: "/conteo", label: "Contar stock", icon: ScanLine, soloAdmin: false },
-      { href: "/productos", label: "Productos", icon: Package, soloAdmin: false },
+      { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/conteo", label: "Contar stock", icon: ScanLine, capacidad: "contar" },
+      { href: "/productos", label: "Productos", icon: Package },
+      /*
+        Generar etiqueta vive acá y ya no en Administración: la tienen los
+        cuatro perfiles. Imprimir una etiqueta para un artículo cuyo código
+        no se puede leer es parte de contar, no un privilegio -- y dejarla
+        en el bloque de administración, viéndola todo el mundo, diría algo
+        falso sobre quién puede usarla.
+      */
+      { href: "/etiquetas", label: "Generar etiqueta", icon: Barcode, capacidad: "etiquetas" },
     ],
   },
   {
     titulo: "Administración",
     items: [
-      { href: "/etiquetas", label: "Generar etiqueta", icon: Barcode, soloAdmin: true },
-      { href: "/historial", label: "Historial", icon: History, soloAdmin: true },
-      { href: "/usuarios", label: "Usuarios", icon: Users, soloAdmin: true },
-      { href: "/configuracion", label: "Configuración", icon: Settings, soloAdmin: true },
+      { href: "/historial", label: "Historial", icon: History, capacidad: "verHistorial" },
+      { href: "/usuarios", label: "Usuarios", icon: Users, capacidad: "gestionarUsuarios" },
+      { href: "/configuracion", label: "Configuración", icon: Settings, capacidad: "gestionarCatalogo" },
     ],
   },
 ];
@@ -54,7 +78,7 @@ const CLAVE_COLAPSADO = "sidebar-colapsado";
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { isAdmin } = useAuth();
+  const { capacidades } = useAuth();
   const prefersReducedMotion = useReducedMotion();
   const [colapsado, setColapsado] = useState(false);
 
@@ -77,8 +101,17 @@ export function Sidebar() {
     ? { duration: 0 }
     : { type: "spring" as const, stiffness: 380, damping: 32 };
 
+  /*
+    Mientras la sesión carga, `capacidades` es null y solo se muestran los
+    ítems sin requisito. Falla cerrado a propósito: es preferible que un
+    ítem aparezca medio segundo tarde a que parpadee uno que esta persona
+    no puede usar.
+  */
   const gruposVisibles = GRUPOS
-    .map((g) => ({ ...g, items: g.items.filter((i) => !i.soloAdmin || isAdmin) }))
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => !i.capacidad || capacidades?.[i.capacidad]),
+    }))
     .filter((g) => g.items.length > 0);
 
   return (
