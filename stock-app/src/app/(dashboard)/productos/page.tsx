@@ -95,7 +95,22 @@ function MenuExportar({ onExportar }: { onExportar: (formato: "xlsx" | "csv" | "
 }
 
 export default function ProductosPage() {
-  const { isAdmin, esSuperAdmin, agencia } = useAuth();
+  const { esSuperAdmin, agencia, capacidades } = useAuth();
+
+  /*
+    Importar y "Nuevo" dejan de ser el mismo permiso.
+
+    Subir el archivo de SAP es la operación del inventario cíclico y la hace
+    el encargado de almacén. Dar de alta un artículo a mano, editarlo o
+    borrarlo es gestionar el catálogo, y eso queda de jefe para arriba.
+    Estaban juntos bajo `isAdmin` solo porque antes había un rol solo.
+
+    Falla cerrado mientras la sesión carga (`capacidades` es null): mejor
+    que el botón aparezca medio segundo tarde a que parpadee uno que esta
+    persona no puede usar.
+  */
+  const puedeImportar = capacidades?.importarStock ?? false;
+  const puedeGestionarCatalogo = capacidades?.gestionarCatalogo ?? false;
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -343,17 +358,17 @@ export default function ProductosPage() {
         <div className="flex gap-2 flex-wrap">
           <MenuExportar onExportar={exportar} />
 
-          {isAdmin && (
-            <>
-              <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
-                <Upload size={15} />
-                Importar
-              </Button>
-              <Button onClick={() => { setProductoEditando(null); setDialogOpen(true); }}>
-                <Plus size={15} />
-                Nuevo
-              </Button>
-            </>
+          {puedeImportar && (
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <Upload size={15} />
+              Importar
+            </Button>
+          )}
+          {puedeGestionarCatalogo && (
+            <Button onClick={() => { setProductoEditando(null); setDialogOpen(true); }}>
+              <Plus size={15} />
+              Nuevo
+            </Button>
           )}
         </div>
       </div>
@@ -362,14 +377,14 @@ export default function ProductosPage() {
 
       <ProductosTable
         productos={filtrados}
-        isAdmin={isAdmin}
+        isAdmin={puedeGestionarCatalogo}
         busqueda={busqueda}
         onEditar={(p) => { setProductoEditando(p); setDialogOpen(true); }}
         onEliminar={eliminarProducto}
         onEliminarVarios={eliminarVariosProductos}
         onGuardarPrecio={guardarPrecioInline}
         onLimpiarFiltros={busqueda || familiaFiltro.length > 0 || ubicacionFiltro.length > 0 ? limpiarFiltros : undefined}
-        onAgregarPrimero={isAdmin ? () => { setProductoEditando(null); setDialogOpen(true); } : undefined}
+        onAgregarPrimero={puedeGestionarCatalogo ? () => { setProductoEditando(null); setDialogOpen(true); } : undefined}
       />
 
       <ProductoFormDialog

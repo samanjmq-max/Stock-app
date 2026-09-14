@@ -173,11 +173,25 @@ export default function DashboardPage() {
   // aplicados arriba, así que siempre tiene datos reales para mostrar (no
   // depende de que todas las plantas estén cargadas, a diferencia del
   // intento anterior con "más pedidos" multi-planta).
-  const topValorStock = [...productos]
+  const valorPorArticulo = productos
     .map((p) => ({ codigo: p.codigo, descripcion: p.descripcion, valor: (Number(p.precioUnitario) || 0) * Number(p.stockSap || 0) }))
-    .filter((p) => p.valor > 0)
-    .sort((a, b) => b.valor - a.valor)
-    .slice(0, 20);
+    .filter((p) => p.valor > 0);
+
+  const topValorStock = [...valorPorArticulo].sort((a, b) => b.valor - a.valor).slice(0, 20);
+
+  /*
+    El denominador del resumen del Top 20: cuánto vale TODO el stock que se
+    está viendo, y sobre cuántos artículos. Se calcula sobre la misma lista
+    ya filtrada (`valorPorArticulo`), así que respeta agencia, ubicación y
+    familia igual que las barras -- si el total saliera del catálogo entero
+    mientras las barras son de una planta, el porcentaje diría cualquier cosa.
+
+    Solo cuentan los que tienen precio y stock: un artículo sin precio
+    cargado no vale $0, es que todavía no sabemos cuánto vale. Meterlo en el
+    denominador como cero infla artificialmente la concentración.
+  */
+  const valorStockTotal = valorPorArticulo.reduce((suma, p) => suma + p.valor, 0);
+  const articulosConValor = valorPorArticulo.length;
 
   // Progreso del conteo en el tiempo: cuántos códigos únicos distintos ya se
   // contaron, acumulado a medida que van entrando los conteos (orden
@@ -614,6 +628,8 @@ export default function DashboardPage() {
         progresoTiempo={progresoTiempo}
         totalContable={totalContable}
         saltoTicksTiempo={saltoTicksTiempo}
+        valorStockTotal={valorStockTotal}
+        articulosConValor={articulosConValor}
       />
 
       {vista === "pendientes"

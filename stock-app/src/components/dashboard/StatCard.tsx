@@ -26,6 +26,18 @@ type Tono = "default" | "success" | "warning" | "destructive" | "info" | "avance
   Jerarquía interna, de más a menos peso: la cifra (Archivo, 40px, tabular),
   el título (mono, mayúsculas, 12px, con su ícono en un chip del color), el
   importe al pie y, cuando corresponde, el aviso.
+
+  EL IMPORTE. Estaba en 12.5px, mono, con color de texto secundario, y se
+  perdía adentro de la tarjeta: en una reunión, proyectado, directamente no
+  se leía. Ahora va en 18px, Archivo semibold y color de texto pleno --
+  sigue siendo el segundo dato de la tarjeta, pero deja de ser una nota al
+  pie. Se mantiene por debajo de la cifra grande a propósito: la tarjeta
+  responde "cuántos", y el importe es el "cuánto vale eso", no al revés.
+
+  Va pegado abajo (`mt-auto`) en vez de suelto debajo del número. Así los
+  cuatro importes de la fila quedan a la misma altura aunque una tarjeta
+  tenga aviso y las otras no -- antes el de "Diferencias −" quedaba un
+  renglón más abajo que sus vecinas y la fila se veía desprolija.
 */
 
 /** Colores por tono. Un solo lugar donde vive el mapeo tono -> token. */
@@ -211,11 +223,6 @@ export function StatCard({
             <p className={cn("font-display text-[40px] font-bold leading-none tracking-tight tabular-nums", t.texto)}>
               {value}
             </p>
-            {importe !== undefined && (
-              <p className="mt-2.5 font-mono text-[12.5px] tabular-nums text-muted-foreground">
-                {formatearImporte(importe)}
-              </p>
-            )}
             {aviso && (
               <p className={cn("mt-1.5 flex items-center gap-1 text-[12px] font-medium", t.texto)}>
                 <AlertTriangle size={12} className="shrink-0" />
@@ -241,6 +248,28 @@ export function StatCard({
             </span>
           )}
         </div>
+
+        {importe !== undefined && (
+          <div className="mt-auto border-t border-border/70 pt-2.5">
+            {/*
+              El filete separa el importe de la cifra sin ponerle otro color
+              encima: son dos magnitudes distintas (unidades y pesos) y sin
+              esa línea, a 18px, se leían como un solo bloque de dos
+              renglones.
+
+              El rótulo va ARRIBA y no al lado. En celular la fila son dos
+              columnas: la tarjeta mide unos 175px y al contenido le quedan
+              ~140. Con "IMPORTE" al costado, un importe de siete cifras no
+              entra y se corta justo donde más importa.
+            */}
+            <p className="font-mono text-[9.5px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
+              Importe
+            </p>
+            <p className="mt-1 truncate font-display text-[18px] font-semibold leading-none tabular-nums text-foreground">
+              {formatearImporte(importe)}
+            </p>
+          </div>
+        )}
       </CardContent>
 
       {curva && (

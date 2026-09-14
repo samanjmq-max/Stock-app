@@ -36,8 +36,32 @@ export interface Capacidades {
   borrarLineas: boolean;
   /** Alta, baja y edición de usuarios. El alcance lo pone `alcanceDe`. */
   gestionarUsuarios: boolean;
-  /** Importar productos, editarlos, borrarlos, tocar precios. */
+  /**
+   * Dar de alta productos a mano, editarlos, borrarlos y tocar precios.
+   * También abre Configuración.
+   */
   gestionarCatalogo: boolean;
+  /**
+   * Subir el archivo de SAP con el stock a contar.
+   *
+   * Está SEPARADA de `gestionarCatalogo` a propósito. Son dos cosas
+   * distintas aunque toquen la misma hoja:
+   *
+   *   - Importar es la operación del inventario cíclico: se sube el archivo
+   *     y se actualizan las cantidades a contar. Los códigos que ya existen
+   *     mantienen su ficha; los que no están, se agregan. Es trabajo diario
+   *     de depósito, y el que lo hace es el encargado de almacén -- él corre
+   *     los cíclicos, el jefe y el gerente miran los resultados.
+   *
+   *   - Gestionar el catálogo es editar la ficha de un artículo a mano,
+   *     borrarlo o cambiarle el precio de a uno. Eso sigue arriba.
+   *
+   * Si le hubiera dado `gestionarCatalogo` al encargado para que pudiera
+   * importar, de yapa le habría abierto Configuración y el alta/baja manual
+   * de productos. Una capacidad nueva cuesta una línea por perfil; agrandar
+   * una que ya existe cuesta permisos que nadie pidió.
+   */
+  importarStock: boolean;
   /** Ver el historial de auditoría. */
   verHistorial: boolean;
   /**
@@ -71,6 +95,10 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
       contar: true,
       borrarLineas: false,
       gestionarUsuarios: false,
+      // El operario NO sube el archivo. Subirlo reescribe las cantidades a
+      // contar de la planta entera: es el arranque del cíclico, y eso lo
+      // decide y lo hace el encargado de almacén.
+      importarStock: false,
       gestionarCatalogo: false,
       verHistorial: false,
       etiquetas: true,
@@ -79,11 +107,13 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
   },
   encargado: {
     etiqueta: "Encargado de Almacén",
-    descripcion: "Cuenta, corrige, borra líneas de conteo e imprime etiquetas. Solo su planta.",
+    descripcion:
+      "Cuenta, corrige, borra líneas de conteo, imprime etiquetas y sube el archivo de SAP para arrancar el cíclico. Solo su planta.",
     capacidades: {
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: false,
+      importarStock: true,
       gestionarCatalogo: false,
       verHistorial: false,
       etiquetas: true,
@@ -98,6 +128,7 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: true,
+      importarStock: true,
       gestionarCatalogo: true,
       verHistorial: true,
       etiquetas: true,
@@ -111,6 +142,7 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: true,
+      importarStock: true,
       gestionarCatalogo: true,
       verHistorial: true,
       etiquetas: true,
@@ -155,6 +187,7 @@ export function capacidadesDe(u: { perfil?: string | null; rol?: Rol | null; ema
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: true,
+      importarStock: true,
       gestionarCatalogo: true,
       verHistorial: true,
       etiquetas: true,

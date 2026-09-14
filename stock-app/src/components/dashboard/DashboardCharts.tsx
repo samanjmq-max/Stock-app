@@ -43,10 +43,27 @@ interface Props {
   progresoTiempo: { momento: string; acumulado: number }[];
   totalContable: number;
   saltoTicksTiempo: number;
+  /** Valor total en stock (precio × SAP) de TODO lo que se está viendo. */
+  valorStockTotal: number;
+  /** Cuántos artículos tienen precio y stock, o sea cuántos entran en ese total. */
+  articulosConValor: number;
 }
 
 function formatearImporte(valor: number): string {
   return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+}
+
+/**
+ * Porcentaje con la precisión justa. Con un decimal alcanza casi siempre,
+ * pero "20 de 12.416 artículos" da 0,16 %: redondeado a un decimal se ve
+ * "0,2 %" y con cero decimales directamente "0 %", que es falso y además
+ * arruina la comparación, que es todo el punto del resumen.
+ */
+function formatearPorcentaje(parte: number, total: number): string {
+  if (!total) return "0";
+  const p = (parte / total) * 100;
+  const decimales = p >= 10 ? 1 : p >= 1 ? 1 : 2;
+  return p.toLocaleString("es-UY", { minimumFractionDigits: decimales, maximumFractionDigits: decimales });
 }
 
 const tooltipStyle = {
@@ -71,7 +88,19 @@ export default function DashboardCharts({
   progresoTiempo,
   totalContable,
   saltoTicksTiempo,
+  valorStockTotal,
+  articulosConValor,
 }: Props) {
+  /*
+    Lo que concentran los 20 de arriba. Es la lectura que faltaba: el gráfico
+    mostraba cuáles son los más caros, pero no cuánto pesan. "$ 7.120.000 de
+    $ 16.480.000" convierte veinte barras en una decisión -- si esos veinte
+    son la mitad del dinero del depósito, son los que hay que contar seguido,
+    y el resto puede esperar.
+  */
+  const valorTop = topValorStock.reduce((suma, p) => suma + p.valor, 0);
+  const porcentajeValor = valorStockTotal > 0 ? (valorTop / valorStockTotal) * 100 : 0;
+
   return (
     <>
       <div className="grid md:grid-cols-2 gap-4">
@@ -228,7 +257,54 @@ export default function DashboardCharts({
         <CardContent>
           {topValorStock.length === 0
             ? <p className="text-sm text-muted-foreground py-8 text-center">Sin importes para mostrar — cargá precios unitarios en el catálogo.</p>
-            : <ResponsiveContainer width="100%" height={560}>
+            : <>
+              {/*
+                El resumen va ARRIBA del gráfico, no abajo: es la conclusión,
+                y una conclusión al pie de 560px de barras la lee solo el que
+                llega hasta el final. Acá se lee primero y las barras pasan a
+                ser el detalle de algo que ya se entendió.
+              */}
+              <div className="mb-5 rounded-xl border border-border bg-elevated/60 p-4">
+                <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-4">
+                  <div className="shrink-0">
+                    <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
+                      Concentración del valor
+                    </p>
+                    <p className="mt-2 font-display text-[34px] font-bold leading-none tracking-tight tabular-nums text-warning">
+                      {formatearPorcentaje(valorTop, valorStockTotal)} %
+                    </p>
+                    <p className="mt-2 max-w-[42ch] text-xs text-muted-foreground">
+                      Estos 20 artículos son el {formatearPorcentaje(topValorStock.length, articulosConValor)} % del
+                      catálogo con precio ({articulosConValor.toLocaleString("es-UY")} artículos) y concentran esa
+                      parte del dinero en stock.
+                    </p>
+                  </div>
+
+                  <div className="min-w-[240px] flex-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+                      <span className="font-display text-[20px] font-bold leading-none tabular-nums text-warning">
+                        {formatearImporte(valorTop)}
+                      </span>
+                      <span className="font-mono text-[12.5px] tabular-nums text-muted-foreground">
+                        de {formatearImporte(valorStockTotal)}
+                      </span>
+                    </div>
+                    {/* La barra hace innecesario comparar dos números largos
+                        de memoria: la proporción se ve, no se calcula. */}
+                    <div className="mt-2.5 h-[9px] w-full overflow-hidden rounded-full bg-muted">
+                      <div
+                        className="h-full rounded-full bg-warning transition-[width] duration-base ease-out-soft"
+                        style={{ width: `${Math.min(100, Math.max(0, porcentajeValor))}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-[11px] text-muted-foreground">
+                      Valor total en stock de lo que estás viendo ahora (precio unitario × stock SAP).
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <ResponsiveContainer width="100%" height={560}>
                 <BarChart data={topValorStock} layout="vertical" margin={{ left: 8, right: 72 }}>
                   <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
                   <XAxis type="number" fontSize={10} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
@@ -250,7 +326,8 @@ export default function DashboardCharts({
                     />
                   </Bar>
                 </BarChart>
-              </ResponsiveContainer>}
+              </ResponsiveContainer>
+            </>}
         </CardContent>
       </Card>
     </>

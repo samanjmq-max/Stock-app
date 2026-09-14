@@ -4,6 +4,21 @@ export interface DatosEtiqueta {
   codigo: string;
   descripcion: string;
   ubicacion?: string;
+  /**
+   * Cuántas copias imprimir de esta etiqueta. Si no viene, el servidor
+   * asume 1 -- el campo es opcional en la pantalla justamente para que no
+   * trance a nadie por no completarlo.
+   *
+   * Las copias se expanden en el servidor, no acá: mandar 50 veces el
+   * mismo artículo en el body sería 50 veces la misma descripción viajando
+   * por la red, y el PDF igual se arma allá.
+   */
+  copias?: number;
+}
+
+/** Total de etiquetas que va a tener el PDF (no de renglones de la lista). */
+export function contarEtiquetas(lista: DatosEtiqueta[]): number {
+  return lista.reduce((suma, item) => suma + Math.max(1, Math.floor(item.copias || 1)), 0);
 }
 
 /**

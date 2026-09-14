@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2, Upload, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { leerArchivoProductos, type ResultadoLectura } from "@/lib/importacion";
 import { productosService } from "@/services/productos.service";
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
-import { AGENCIAS } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 import type { Agencia } from "@/types";
 
 /**
@@ -32,7 +32,36 @@ interface Props {
 }
 
 export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Props) {
+  /*
+    El desplegable ofrece SOLO las plantas que esta persona tiene a cargo,
+    no las nueve.
+
+    Antes listaba `AGENCIAS` entero para cualquiera. El servidor igual
+    rechazaba las ajenas, así que no era un agujero -- era peor de usar: un
+    encargado de Lascano veía ocho opciones que terminaban en un 403 después
+    de haber elegido el archivo y esperado la lectura. Ofrecer algo que se
+    va a rechazar es una promesa que la pantalla no puede cumplir.
+
+    `alcance` viene resuelto del servidor (son las nueve para el gerente y
+    el super admin), así que acá no se reimplementa ninguna regla.
+  */
+  const { alcance, agencia: agenciaPropia } = useAuth();
+  const plantasDisponibles: Agencia[] = alcance.length > 0 ? alcance : agenciaPropia ? [agenciaPropia] : [];
+
   const [agenciaSeleccionada, setAgenciaSeleccionada] = useState<Agencia | "">("");
+
+  /*
+    Con una sola planta a cargo no hay nada que elegir: se preselecciona al
+    abrir. Es el caso del encargado de almacén, que es justamente quien más
+    veces por mes va a pasar por acá.
+  */
+  useEffect(() => {
+    if (!open) return;
+    if (plantasDisponibles.length === 1) setAgenciaSeleccionada(plantasDisponibles[0]!);
+    // `plantasDisponibles` se arma en cada render; listarlo acá reabriría
+    // el efecto en cada pasada.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, plantasDisponibles.length]);
   const [resultado, setResultado] = useState<ResultadoLectura | null>(null);
   const [nombreArchivo, setNombreArchivo] = useState("");
   const [leyendo, setLeyendo] = useState(false);
@@ -136,7 +165,7 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
                 <SelectValue placeholder="Seleccioná la agencia..." />
               </SelectTrigger>
               <SelectContent>
-                {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                {plantasDisponibles.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { importarProductos, registrarHistorial } from "@/lib/sheets";
-import { esSuperAdmin } from "@/lib/permisos";
-import type { Rol, Agencia } from "@/types";
+import { leerSesion } from "@/lib/sesion";
+import type { Agencia } from "@/types";
 import { AGENCIAS } from "@/types";
 
 const filaSchema = z.object({
@@ -18,13 +18,22 @@ const filaSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
-  const agenciaPropia = request.headers.get("x-user-agencia") as Agencia | null;
-  if (rol !== "administrador") {
-    return NextResponse.json({ ok: false, error: "Solo un administrador puede importar productos" }, { status: 403 });
+  /*
+    PERMISO. Antes era `rol !== "administrador"`, o sea jefe de planta y
+    gerente. Pero subir el archivo de SAP es el arranque del inventario
+    cíclico, y el cíclico lo corre el encargado de almacén -- el jefe y el
+    gerente miran los resultados. Por eso ahora pregunta por la capacidad
+    `importarStock`, que es del encargado para arriba.
+
+    Importar NO es gestionar el catálogo: dar de alta un artículo a mano,
+    borrarlo o cambiarle el precio de a uno sigue pidiendo
+    `gestionarCatalogo`, que el encargado no tiene.
+  */
+  const sesion = leerSesion(request);
+  if (!sesion || !sesion.capacidades.importarStock) {
+    return NextResponse.json({ ok: false, error: "No tenés permiso para importar stock" }, { status: 403 });
   }
+
   try {
     const body = await request.json();
     // La agencia es obligatoria en la importación — debe venir en el body.
@@ -32,17 +41,26 @@ export async function POST(request: NextRequest) {
     if (!agencia || !(AGENCIAS as readonly string[]).includes(agencia)) {
       return NextResponse.json({ ok: false, error: "Seleccioná una agencia válida para importar" }, { status: 400 });
     }
-    // SEC-01: solo el super-admin puede importar en una agencia distinta de
-    // la propia (operar en nombre de otra planta) -- mismo criterio ya
-    // aplicado en sync-batch y POST /api/productos. Sin esto, cualquier
-    // administrador de planta podía sobrescribir en lote el catálogo de
-    // OTRA agencia con solo cambiar el campo `agencia` del body.
-    if (agenciaPropia && agencia !== agenciaPropia && !esSuperAdmin(email)) {
+
+    /*
+      SEC-01: no se puede importar a una planta que no sea la propia. El
+      criterio es el mismo que en sync-batch y en POST /api/productos; lo
+      que cambia es CONTRA QUÉ se compara.
+
+      Antes se comparaba contra `x-user-agencia`, la planta principal. Eso
+      dejaba afuera al jefe de planta a cargo de varias -- el de Tomás
+      Gomensoro que también lleva Salto no podía importar a Salto, aunque
+      la pantalla se la ofreciera. Ahora se compara contra el ALCANCE, que
+      es la lista completa de plantas que esa persona maneja (y son las
+      nueve para el gerente y el super admin).
+    */
+    if (!sesion.alcance.includes(agencia)) {
       return NextResponse.json(
-        { ok: false, error: "Solo podés importar productos a tu propia agencia" },
+        { ok: false, error: `No tenés ${agencia} a tu cargo, así que no podés importar productos ahí` },
         { status: 403 }
       );
     }
+
     const filas = z.array(filaSchema).safeParse(body.productos);
     if (!filas.success) {
       return NextResponse.json({ ok: false, error: "El archivo tiene filas con columnas inválidas" }, { status: 400 });
@@ -52,9 +70,9 @@ export async function POST(request: NextRequest) {
     }
     const resultado = await importarProductos(filas.data as any, agencia);
     await registrarHistorial({
-      usuarioId: userId,
-      usuarioEmail: email,
-      rol,
+      usuarioId: sesion.id,
+      usuarioEmail: sesion.email,
+      rol: sesion.rol,
       accion: "importar_productos",
       valorNuevo: `${resultado.importados} nuevos, ${resultado.actualizados} actualizados — agencia: ${agencia}`,
     });

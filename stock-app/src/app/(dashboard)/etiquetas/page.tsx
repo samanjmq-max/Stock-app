@@ -7,18 +7,80 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { descargarEtiquetas, type DatosEtiqueta } from "@/lib/etiquetas";
+import { descargarEtiquetas, contarEtiquetas, type DatosEtiqueta } from "@/lib/etiquetas";
 
 type EstadoBusqueda = "idle" | "buscando" | "encontrado" | "no-encontrado";
+
+/*
+  Tope de copias por artículo. El mismo que aplica el servidor -- acá está
+  para avisar en el momento, allá para que el tope exista aunque la
+  petición no venga de esta pantalla.
+*/
+const MAX_COPIAS = 100;
+
+/**
+ * Cuántas copias pidió la persona.
+ *
+ * REGLA: vacío es 1, no es un error. El pedido fue explícito -- "si no le
+ * pongo ningún número en cantidad de copias, que entienda que es una sola
+ * por defecto, que no me tranque por no poner una cantidad". Así que este
+ * campo nunca valida ni bloquea: interpreta.
+ */
+function leerCopias(texto: string): number {
+  const n = Math.floor(Number(String(texto).trim()));
+  if (!Number.isFinite(n) || n < 1) return 1;
+  return Math.min(n, MAX_COPIAS);
+}
+
+/*
+  Un renglón de la lista guarda el texto CRUDO de copias, no el número ya
+  interpretado.
+
+  Si guardara el número, borrar el dígito de un "5" para escribir "12"
+  dejaría el campo vacío por un instante, leerCopias() lo convertiría en 1
+  al toque, y el "2" siguiente se escribiría al lado del 1 que apareció
+  solo: uno quiere 12 y le queda 12 de casualidad, o 120, o cualquier cosa.
+  Guardando el texto, el campo se comporta como un campo de texto mientras
+  se escribe y el número se interpreta recién cuando hace falta.
+
+  El `id` estable es lo que permite borrar un renglón del medio sin que los
+  demás se re-numeren y React recicle el input equivocado.
+*/
+interface Renglon {
+  id: string;
+  codigo: string;
+  descripcion: string;
+  ubicacion?: string;
+  copiasTexto: string;
+}
+
+let proximoId = 0;
+function nuevoId(): string {
+  proximoId += 1;
+  return `etq-${proximoId}`;
+}
 
 export default function EtiquetasPage() {
   const [codigo, setCodigo] = useState("");
   const [descripcion, setDescripcion] = useState("");
   const [ubicacion, setUbicacion] = useState("");
+  const [copias, setCopias] = useState("");
   const [estadoBusqueda, setEstadoBusqueda] = useState<EstadoBusqueda>("idle");
-  const [lista, setLista] = useState<DatosEtiqueta[]>([]);
+  const [lista, setLista] = useState<Renglon[]>([]);
   const [generando, setGenerando] = useState(false);
   const [cargandoExcel, setCargandoExcel] = useState(false);
+
+  // Lo que se le manda al servidor, ya con las copias interpretadas.
+  const paraGenerar: DatosEtiqueta[] = lista.map((r) => ({
+    codigo: r.codigo,
+    descripcion: r.descripcion,
+    ubicacion: r.ubicacion,
+    copias: leerCopias(r.copiasTexto),
+  }));
+
+  // Renglones de la lista vs. etiquetas que va a tener el PDF: con copias
+  // dejan de ser el mismo número, y el botón tiene que decir el segundo.
+  const totalEtiquetas = contarEtiquetas(paraGenerar);
 
   async function buscarEnCatalogo(codigoBuscado: string) {
     const limpio = codigoBuscado.trim();
@@ -47,27 +109,48 @@ export default function EtiquetasPage() {
     return true;
   }
 
+  function limpiarFormulario() {
+    setCodigo("");
+    setDescripcion("");
+    setCopias("");
+    setEstadoBusqueda("idle");
+  }
+
   function agregar() {
     if (!validar()) return;
     setLista((prev) => [
       ...prev,
-      { codigo: codigo.trim(), descripcion: descripcion.trim(), ubicacion: ubicacion.trim() || undefined },
+      {
+        id: nuevoId(),
+        codigo: codigo.trim(),
+        descripcion: descripcion.trim(),
+        ubicacion: ubicacion.trim() || undefined,
+        copiasTexto: String(leerCopias(copias)),
+      },
     ]);
-    setCodigo("");
-    setDescripcion("");
-    setEstadoBusqueda("idle");
+    limpiarFormulario();
   }
 
-  function quitar(index: number) {
-    setLista((prev) => prev.filter((_, i) => i !== index));
+  function quitar(id: string) {
+    setLista((prev) => prev.filter((r) => r.id !== id));
+  }
+
+  /** Corregir las copias de un renglón ya cargado, sin borrarlo y volver a agregarlo. */
+  function cambiarCopias(id: string, texto: string) {
+    setLista((prev) => prev.map((r) => (r.id === id ? { ...r, copiasTexto: texto } : r)));
+  }
+
+  /** Al salir del campo se normaliza: lo que quedó vacío o inválido pasa a ser 1. */
+  function normalizarCopiasDe(id: string) {
+    setLista((prev) => prev.map((r) => (r.id === id ? { ...r, copiasTexto: String(leerCopias(r.copiasTexto)) } : r)));
   }
 
   async function generarPdf() {
-    if (lista.length === 0) return;
+    if (paraGenerar.length === 0) return;
     setGenerando(true);
     try {
-      await descargarEtiquetas(lista, "etiquetas-nuevas");
-      toast.success(`${lista.length} etiqueta${lista.length === 1 ? "" : "s"} generada${lista.length === 1 ? "" : "s"}`);
+      await descargarEtiquetas(paraGenerar, "etiquetas-nuevas");
+      toast.success(`${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} generada${totalEtiquetas === 1 ? "" : "s"}`);
       setLista([]);
     } catch (err) {
       console.error("Error al generar el PDF:", err);
@@ -83,12 +166,11 @@ export default function EtiquetasPage() {
       codigo: codigo.trim(),
       descripcion: descripcion.trim(),
       ubicacion: ubicacion.trim() || undefined,
+      copias: leerCopias(copias),
     };
     try {
       await descargarEtiquetas([item], `etiqueta-${item.codigo}`);
-      setCodigo("");
-      setDescripcion("");
-      setEstadoBusqueda("idle");
+      limpiarFormulario();
     } catch (err) {
       console.error("Error al generar el PDF:", err);
       toast.error(err instanceof Error ? err.message : "No se pudo generar el PDF");
@@ -111,7 +193,7 @@ export default function EtiquetasPage() {
       const hoja = wb.Sheets[nombreHoja]!;
       const filas: Record<string, unknown>[] = XLSX.utils.sheet_to_json(hoja, { defval: "" });
 
-      const nuevos: DatosEtiqueta[] = [];
+      const nuevos: Renglon[] = [];
       let omitidas = 0;
       for (const fila of filas) {
         const obtener = (nombres: string[]) => {
@@ -124,12 +206,21 @@ export default function EtiquetasPage() {
         const codigoFila = obtener(["codigo", "código"]);
         const descripcionFila = obtener(["descripcion", "descripción"]);
         const ubicacionFila = obtener(["ubicacion", "ubicación"]);
+        // Misma regla que el formulario: columna ausente o vacía = 1 copia.
+        // Se aceptan los tres nombres que la gente escribe en la práctica.
+        const copiasFila = obtener(["copias", "cantidad", "unidades"]);
 
         if (!codigoFila || !descripcionFila) {
           omitidas++;
           continue;
         }
-        nuevos.push({ codigo: codigoFila, descripcion: descripcionFila, ubicacion: ubicacionFila || undefined });
+        nuevos.push({
+          id: nuevoId(),
+          codigo: codigoFila,
+          descripcion: descripcionFila,
+          ubicacion: ubicacionFila || undefined,
+          copiasTexto: String(leerCopias(copiasFila)),
+        });
       }
 
       setLista((prev) => [...prev, ...nuevos]);
@@ -194,10 +285,44 @@ export default function EtiquetasPage() {
               placeholder="Ej: ALMENDRA PEL. TOST. Y SAL. L.A. 100 G"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label>Ubicación (opcional)</Label>
-            <Input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Ej: CL-A-A-001" />
+
+          {/*
+            Ubicación y copias comparten renglón. Copias va acá, pegado al
+            artículo y no al lado del botón "Agregar": es un dato de ESTA
+            etiqueta, igual que la ubicación -- si estuviera junto al botón
+            parecería una opción de la lista entera.
+          */}
+          <div className="grid grid-cols-[1fr_92px] gap-2">
+            <div className="space-y-1.5">
+              <Label>Ubicación (opcional)</Label>
+              <Input value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} placeholder="Ej: CL-A-A-001" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Copias</Label>
+              <Input
+                type="number"
+                min={1}
+                max={MAX_COPIAS}
+                inputMode="numeric"
+                value={copias}
+                onChange={(e) => setCopias(e.target.value)}
+                onKeyDown={(e) => {
+                  // Enter agrega: es el último campo del formulario y es lo
+                  // que uno espera después de tipear un número corto.
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    agregar();
+                  }
+                }}
+                placeholder="1"
+                className="text-center tabular-nums"
+              />
+            </div>
           </div>
+          <p className="text-xs text-muted-foreground">
+            Dejalo vacío y sale una sola etiqueta. Poné 5 y salen las 5 iguales, sin cargar el artículo cinco veces
+            (máximo {MAX_COPIAS} por artículo).
+          </p>
 
           <div className="flex flex-wrap gap-2 pt-1">
             <Button type="button" variant="secondary" onClick={agregar}>
@@ -218,7 +343,7 @@ export default function EtiquetasPage() {
             <span className="text-sm text-muted-foreground text-center px-4">
               {cargandoExcel
                 ? "Leyendo archivo..."
-                : "Archivo .xlsx con columnas codigo, descripcion y ubicacion (opcional)"}
+                : "Archivo .xlsx con columnas codigo, descripcion, ubicacion y copias (las dos últimas opcionales)"}
             </span>
             <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleArchivoExcel} disabled={cargandoExcel} />
           </label>
@@ -229,26 +354,49 @@ export default function EtiquetasPage() {
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
             <CardTitle className="text-sm">
-              Por generar <span className="text-muted-foreground font-normal">({lista.length})</span>
+              Por generar{" "}
+              <span className="text-muted-foreground font-normal">
+                ({lista.length} {lista.length === 1 ? "artículo" : "artículos"}
+                {totalEtiquetas !== lista.length ? ` · ${totalEtiquetas} etiquetas` : ""})
+              </span>
             </CardTitle>
             <Button size="sm" onClick={generarPdf} disabled={generando}>
               {generando ? <Loader2 className="animate-spin" size={15} /> : <Download size={15} />}
-              Generar PDF ({lista.length})
+              Generar PDF ({totalEtiquetas})
             </Button>
           </CardHeader>
           <CardContent className="pt-0">
             <div className="divide-y divide-border max-h-[400px] overflow-auto">
-              {lista.map((item, i) => (
-                <div key={i} className="flex items-center justify-between py-2 text-sm">
+              {lista.map((item) => (
+                <div key={item.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                   <div className="min-w-0">
                     <p className="font-medium truncate">
                       {item.codigo} — {item.descripcion}
                     </p>
                     {item.ubicacion && <p className="text-xs text-muted-foreground">Ubic.: {item.ubicacion}</p>}
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => quitar(i)}>
-                    <Trash2 size={14} />
-                  </Button>
+                  {/*
+                    Las copias se corrigen acá mismo. Darse cuenta de que
+                    eran 10 y no 5 después de agregar el renglón no debería
+                    obligar a borrarlo y cargar el artículo de nuevo.
+                  */}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    <span className="font-mono text-[11px] text-muted-foreground">×</span>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={MAX_COPIAS}
+                      inputMode="numeric"
+                      value={item.copiasTexto}
+                      onChange={(e) => cambiarCopias(item.id, e.target.value)}
+                      onBlur={() => normalizarCopiasDe(item.id)}
+                      aria-label={`Copias de ${item.codigo}`}
+                      className="h-7 w-14 px-1.5 text-center text-xs tabular-nums"
+                    />
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => quitar(item.id)}>
+                      <Trash2 size={14} />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
