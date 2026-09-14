@@ -15,6 +15,22 @@ export async function POST(request: NextRequest) {
   if (!rol) {
     return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
   }
+  /*
+    Este control faltaba.
+
+    El DELETE de a un conteo (conteos/[id]) sí exigía administrador, pero
+    esta ruta -- que borra decenas de una -- solo verificaba que hubiera
+    sesión. La interfaz esconde el botón de borrado múltiple a los operarios
+    (`isAdmin && algunoSeleccionado` en ConteosTable), así que nadie llegaba
+    por accidente; pero el endpoint estaba abierto a cualquiera con sesión
+    iniciada. Botón escondido, puerta abierta.
+  */
+  if (rol !== "administrador") {
+    return NextResponse.json(
+      { ok: false, error: "Solo un administrador puede eliminar conteos" },
+      { status: 403 }
+    );
+  }
 
   try {
     const body = await request.json();
@@ -29,7 +45,7 @@ export async function POST(request: NextRequest) {
       usuarioId: userId,
       usuarioEmail: email,
       rol,
-      accion: "guardar_conteo",
+      accion: "eliminar_conteo",
       entidad: `conteos: ${parsed.data.ids.length} seleccionados`,
       observacion: "Eliminación múltiple de conteos",
     });

@@ -8,11 +8,21 @@ import type { Agencia } from "@/types";
 export async function GET(request: NextRequest) {
   try {
     const agencia = leerHeaderTexto(request, "x-user-agencia") as Agencia | null;
-    const rol = leerHeaderTexto(request, "x-user-rol");
-    // Admin puede ver todas las agencias o filtrar por una.
-    // Operador solo ve la suya.
-    const agenciaFiltro = rol === "administrador"
-      ? (request.nextUrl.searchParams.get("agencia") as Agencia | null) ?? agencia ?? undefined
+    const esSuper = leerHeaderTexto(request, "x-user-es-super-admin") === "1";
+
+    /*
+      Quién puede pedir los conteos de OTRA planta: solo el super admin.
+
+      Antes la condición era `rol === "administrador"`, y como un jefe de
+      planta también es administrador, le alcanzaba con escribir
+      ?agencia=Lascano en la barra de direcciones para leer los conteos de
+      una planta que no es la suya. La interfaz nunca le ofrece ese selector
+      -- solo lo ve el super admin -- pero esconder el control no cierra la
+      puerta: el que decide es el servidor, y el servidor no estaba mirando.
+    */
+    const agenciaPedida = request.nextUrl.searchParams.get("agencia") as Agencia | null;
+    const agenciaFiltro = esSuper
+      ? agenciaPedida ?? agencia ?? undefined
       : agencia ?? undefined;
     const conteos = await getConteos(agenciaFiltro);
     return NextResponse.json({ ok: true, data: conteos });
