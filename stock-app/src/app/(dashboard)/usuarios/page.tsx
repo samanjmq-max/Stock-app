@@ -6,6 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Loader2, Plus, Pencil, Trash2, ShieldCheck, ShieldOff } from "lucide-react";
 import { usuariosService } from "@/services/usuarios.service";
 import type { UsuarioInput } from "@/lib/validations";
+import { PERFILES, perfilDe } from "@/lib/permisos";
 import type { Usuario } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -124,7 +125,12 @@ export default function UsuariosPage() {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-medium truncate">{u.nombre}</p>
-                  <Badge variant={u.rol === "administrador" ? "default" : "secondary"}>{u.rol}</Badge>
+                  {/* El perfil, no el rol: "operador" no distingue a un operario de
+                      un encargado de almacén, que es justamente lo que
+                      alguien viene a mirar a esta tabla. */}
+                  <Badge variant={PERFILES[perfilDe(u)].capacidades.gestionarUsuarios ? "default" : "secondary"}>
+                    {PERFILES[perfilDe(u)].etiqueta}
+                  </Badge>
                   {!u.activo && <Badge variant="destructive">Inactivo</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>

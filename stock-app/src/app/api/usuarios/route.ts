@@ -2,19 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUsuarios, crearUsuario, registrarHistorial } from "@/lib/sheets";
 import { usuarioSchema } from "@/lib/validations";
 import { hashPassword } from "@/lib/password";
-import { esSuperAdmin } from "@/lib/permisos";
-import type { Rol, Agencia, Usuario } from "@/types";
+import { esSuperAdmin, puedeGestionarA, perfilesQuePuedeCrear, serializarAgencias, rolDePerfil } from "@/lib/permisos";
+import { leerSesion } from "@/lib/sesion";
+import type { Usuario } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
-    const email = request.headers.get("x-user-email");
-    const agenciaPropia = request.headers.get("x-user-agencia") as Agencia | null;
+    const sesion = leerSesion(request);
+    if (!sesion) {
+      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    }
 
     const usuarios = await getUsuarios();
 
-    const visibles = esSuperAdmin(email)
+    /*
+      Qué usuarios ve cada uno: los de las plantas que tiene a cargo.
+
+      Antes era `u.agencia === agenciaPropia`, una sola planta. Con un jefe a
+      cargo de dos o tres depósitos eso le escondía a su propia gente. Ahora
+      se compara contra el alcance completo, que para el gerente y el super
+      admin son las nueve.
+    */
+    const visibles = sesion.capacidades.todasLasPlantas
       ? usuarios
-      : usuarios.filter((u) => u.agencia === agenciaPropia);
+      : usuarios.filter((u) => sesion.alcance.includes(u.agencia));
 
     return NextResponse.json({ ok: true, data: visibles });
   } catch (err) {
@@ -24,14 +35,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
-  const agenciaPropia = request.headers.get("x-user-agencia") as Agencia | null;
-
-  if (rol !== "administrador") {
-    return NextResponse.json({ ok: false, error: "Solo un administrador puede crear usuarios" }, { status: 403 });
+  const sesion = leerSesion(request);
+  if (!sesion) {
+    return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
   }
+  if (!sesion.capacidades.gestionarUsuarios) {
+    return NextResponse.json({ ok: false, error: "Tu perfil no puede crear usuarios" }, { status: 403 });
+  }
+  const { rol, id: userId, email } = sesion;
 
   try {
     const body = await request.json();
@@ -43,17 +54,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "La contraseña es obligatoria para un usuario nuevo" }, { status: 400 });
     }
 
-    const esSuper = esSuperAdmin(email);
     // Un nuevo usuario creado desde el formulario NUNCA es el super
     // administrador (ese es fijo, por variable de entorno) — así que
-    // la agencia siempre es obligatoria acá, sin excepción.
+    // la planta siempre es obligatoria acá, sin excepción.
     if (!parsed.data.agencia) {
-      return NextResponse.json({ ok: false, error: "La agencia es obligatoria" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "La planta es obligatoria" }, { status: 400 });
     }
 
-    if (!esSuper && parsed.data.agencia !== agenciaPropia) {
+    /*
+      Dos controles, y hacen falta los dos.
+
+      El primero: no se puede otorgar un perfil por encima del propio. Un
+      jefe de planta que pudiera crear otro jefe se fabricaría permisos --
+      se crea un usuario nuevo, le asigna las nueve plantas y entra con ese.
+
+      El segundo: todas las plantas del nuevo usuario tienen que caer dentro
+      del alcance de quien lo crea. Eso es lo que hace `puedeGestionarA`, y
+      cubre tanto la planta principal como las extra.
+    */
+    if (!perfilesQuePuedeCrear(sesion).includes(parsed.data.perfil)) {
       return NextResponse.json(
-        { ok: false, error: "Solo podés crear usuarios para tu propia agencia" },
+        { ok: false, error: `Tu perfil no puede crear un usuario con perfil "${parsed.data.perfil}"` },
+        { status: 403 }
+      );
+    }
+
+    const agencias = serializarAgencias(
+      parsed.data.perfil === "jefe" && parsed.data.agencias?.length
+        ? parsed.data.agencias
+        : [parsed.data.agencia]
+    );
+
+    if (!puedeGestionarA(sesion, { perfil: parsed.data.perfil, agencia: parsed.data.agencia, agencias })) {
+      return NextResponse.json(
+        { ok: false, error: "No podés asignar plantas que no tenés a cargo" },
         { status: 403 }
       );
     }
@@ -72,8 +106,13 @@ export async function POST(request: NextRequest) {
         nombre: parsed.data.nombre,
         email: parsed.data.email.toLowerCase().trim(),
         passwordHash,
-        rol: parsed.data.rol,
+        // El rol se deriva del perfil, nunca llega del formulario. Apps
+        // Script lo recalcula igual: la misma regla puesta dos veces, que en
+        // permisos es donde la redundancia vale la pena.
+        rol: rolDePerfil(parsed.data.perfil),
+        perfil: parsed.data.perfil,
         agencia: parsed.data.agencia,
+        agencias,
       });
     } catch (err) {
       const mensaje = err instanceof Error ? err.message : "No se pudo crear el usuario";
@@ -93,7 +132,7 @@ export async function POST(request: NextRequest) {
         rol,
         accion: "crear_usuario",
         entidad: `usuario:${usuario.email}`,
-        valorNuevo: `rol:${usuario.rol}, agencia:${usuario.agencia}`,
+        valorNuevo: `perfil:${parsed.data.perfil}, plantas:${agencias}`,
       });
     } catch (err) {
       console.error("Usuario creado, pero falló el registro en historial:", err);

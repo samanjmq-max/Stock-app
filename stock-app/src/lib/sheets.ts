@@ -1,5 +1,5 @@
 import "server-only";
-import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia } from "@/types";
+import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia, Perfil } from "@/types";
 
 const GAS_URL = process.env.GAS_WEB_APP_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -118,10 +118,17 @@ export async function getUsuarios(): Promise<Usuario[]> { return gasGet<Usuario[
 export async function getUsuarioPorEmail(email: string): Promise<(Usuario & { passwordHash: string }) | null> {
   return gasGet<(Usuario & { passwordHash: string }) | null>("obtenerUsuarioPorEmail", { email });
 }
-export async function crearUsuario(input: { nombre: string; email: string; passwordHash: string; rol: Rol; agencia: Agencia; }): Promise<Usuario> {
+/*
+  `perfil` y `agencias` son columnas nuevas de la hoja Usuarios.
+  `agencias` viaja como texto separado por barras ("Tres Gomensoro|Salto")
+  porque del otro lado es una sola celda. Apps Script valida que cada nombre
+  sea una planta real y recalcula `rol` a partir del perfil, así que lo que
+  se manda acá es una propuesta, no la última palabra.
+*/
+export async function crearUsuario(input: { nombre: string; email: string; passwordHash: string; rol: Rol; perfil: Perfil; agencia: Agencia; agencias: string; }): Promise<Usuario> {
   return gasPost<Usuario>("crearUsuario", input);
 }
-export async function actualizarUsuario(id: string, input: Partial<{ nombre: string; email: string; passwordHash: string; rol: Rol; agencia: Agencia; activo: boolean }>): Promise<Usuario> {
+export async function actualizarUsuario(id: string, input: Partial<{ nombre: string; email: string; passwordHash: string; rol: Rol; perfil: Perfil; agencia: Agencia; agencias: string; activo: boolean }>): Promise<Usuario> {
   return gasPost<Usuario>("actualizarUsuario", { id, ...input });
 }
 export async function eliminarUsuario(id: string): Promise<{ id: string }> {

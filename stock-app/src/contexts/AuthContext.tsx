@@ -1,13 +1,18 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import type { Rol, Agencia } from "@/types";
+import type { Capacidades } from "@/lib/permisos";
+import type { Perfil, Rol, Agencia } from "@/types";
 interface SessionUser {
   id: string;
   nombre: string;
   email: string;
   rol: Rol;
+  perfil: Perfil;
   agencia: Agencia;
+  /** Todas las plantas que puede ver, ya resueltas por el servidor. */
+  alcance: Agencia[];
+  capacidades: Capacidades;
   esSuperAdmin: boolean;
 }
 interface AuthContextValue {
@@ -16,6 +21,16 @@ interface AuthContextValue {
   isAdmin: boolean;
   esSuperAdmin: boolean;
   agencia: Agencia | null;
+  perfil: Perfil | null;
+  /*
+    Las capacidades vienen resueltas del servidor y NO se recalculan acá.
+    Si el frontend reimplementara la tabla de permisos, tarde o temprano
+    quedaría desalineada con el servidor y la interfaz mostraría botones que
+    la API rechaza. Esto es solo para dibujar: quien decide sigue siendo
+    cada ruta de API.
+  */
+  capacidades: Capacidades | null;
+  alcance: Agencia[];
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -64,6 +79,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isAdmin: user?.rol === "administrador",
       esSuperAdmin: user?.esSuperAdmin ?? false,
       agencia: user?.agencia ?? null,
+      perfil: user?.perfil ?? null,
+      capacidades: user?.capacidades ?? null,
+      alcance: user?.alcance ?? [],
       login,
       logout,
       refresh,
