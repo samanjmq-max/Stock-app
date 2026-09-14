@@ -92,7 +92,21 @@ interface Props {
 }
 
 export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onEliminado, precios = {} }: Props) {
-  const { isAdmin } = useAuth();
+  /*
+    Borrar una línea se decide por CAPACIDAD, no por "ser administrador".
+
+    Todos los controles de borrado de esta tabla -- la casilla de cada fila,
+    el botón de borrado múltiple y el tacho de la fila -- dependen de lo
+    mismo, y de lo mismo que verifica el servidor en
+    /api/conteos/[id] y /api/conteos/eliminar-lote. Si acá apareciera un
+    tacho que la ruta rechaza, el clic termina en un 403.
+
+    El caso que esto resuelve: un operario carga 15 donde iban 150. Alguien
+    de la planta tiene que poder sacar esa línea sin llamar a Montevideo, y
+    ese alguien es el encargado de almacén -- que NO es administrador.
+  */
+  const { capacidades } = useAuth();
+  const puedeBorrar = capacidades?.borrarLineas ?? false;
   const [busqueda, setBusqueda] = useState("");
   const [ordenColumna, setOrdenColumna] = useState<Columna | null>(null);
   const [ordenDireccion, setOrdenDireccion] = useState<Direccion>("asc");
@@ -219,7 +233,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
           </span>
         </CardTitle>
         <div className="flex items-center gap-2">
-          {isAdmin && algunoSeleccionado && (
+          {puedeBorrar && algunoSeleccionado && (
             <Button
               variant="destructive"
               size="sm"
@@ -278,7 +292,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
               <table className="w-full text-xs">
                 <thead>
                   <tr className="text-left text-muted-foreground border-b border-border sticky top-0 bg-background z-10">
-                    {isAdmin && (
+                    {puedeBorrar && (
                       <th className="px-5 py-2 font-medium w-8">
                         <input
                           type="checkbox"
@@ -292,7 +306,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                     {COLUMNAS.map((col, i) => {
                       const activa = ordenColumna === col.key;
                       const Icono = activa ? (ordenDireccion === "asc" ? ArrowUp : ArrowDown) : ArrowUpDown;
-                      const esPrimera = i === 0 && !isAdmin;
+                      const esPrimera = i === 0 && !puedeBorrar;
                       return (
                         <th
                           key={col.key}
@@ -322,7 +336,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                           seleccionados.has(c.id) ? "bg-primary/5" : ""
                         }`}
                       >
-                        {isAdmin && (
+                        {puedeBorrar && (
                           <td className="px-5 py-2">
                             <input
                               type="checkbox"
@@ -333,7 +347,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                             />
                           </td>
                         )}
-                        <td className={`py-2 font-medium whitespace-nowrap ${isAdmin ? "px-2" : "px-5"}`}>{c.codigo || "—"}</td>
+                        <td className={`py-2 font-medium whitespace-nowrap ${puedeBorrar ? "px-2" : "px-5"}`}>{c.codigo || "—"}</td>
                         <td className="px-2 py-2 max-w-[180px] truncate" title={c.descripcion}>
                           {c.descripcion || "—"}
                         </td>
@@ -380,7 +394,7 @@ export function ConteosTable({ conteos, filtro, onQuitarFiltro, onEditar, onElim
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onEditar(c)}>
                             <Pencil size={13} />
                           </Button>
-                          {isAdmin && (
+                          {puedeBorrar && (
                             <Button
                               variant="ghost"
                               size="icon"
