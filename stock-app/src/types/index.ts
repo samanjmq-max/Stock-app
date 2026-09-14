@@ -46,6 +46,13 @@ export interface Usuario {
   agencias?: string;
   activo: boolean;
   creadoEn: string;
+  /**
+   * Calculado por la API al listar, NUNCA guardado en la planilla: el super
+   * administrador sale de una variable de entorno del servidor. Se manda
+   * resuelto porque el navegador no puede saberlo -- esa variable no existe
+   * del lado del cliente, y está bien que no exista.
+   */
+  esSuperAdmin?: boolean;
 }
 
 export interface Producto {

@@ -7,6 +7,26 @@ import { Loader2, Plus, Pencil, Trash2, ShieldCheck, ShieldOff } from "lucide-re
 import { usuariosService } from "@/services/usuarios.service";
 import type { UsuarioInput } from "@/lib/validations";
 import { PERFILES, perfilDe } from "@/lib/permisos";
+import type { Perfil } from "@/types";
+
+/*
+  Un color por nivel de mando, para reconocer a alguien sin leer la etiqueta.
+
+  Operario va en gris y no en azul a propósito: es el perfil más numeroso de
+  todos -- en la lista de arriba son seis de ocho -- y si el que más se repite
+  grita, los tres que de verdad importan dejan de resaltar. El gris es el
+  fondo contra el que se recortan los demás. Si lo preferís azul, es una
+  palabra.
+
+  Encargado de Almacén queda en ámbar, que era el color que sobraba y encima
+  le calza: manda sobre las líneas de conteo pero no sobre la gente.
+*/
+const COLOR_PERFIL: Record<Perfil, "info" | "destructive" | "warning" | "secondary"> = {
+  gerente: "info",        // azul
+  jefe: "destructive",    // rojo
+  encargado: "warning",   // ámbar
+  operario: "secondary",  // gris
+};
 import type { Usuario } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useConfirm } from "@/hooks/useConfirm";
@@ -128,9 +148,11 @@ export default function UsuariosPage() {
                   {/* El perfil, no el rol: "operador" no distingue a un operario de
                       un encargado de almacén, que es justamente lo que
                       alguien viene a mirar a esta tabla. */}
-                  <Badge variant={PERFILES[perfilDe(u)].capacidades.gestionarUsuarios ? "default" : "secondary"}>
-                    {PERFILES[perfilDe(u)].etiqueta}
-                  </Badge>
+                  {u.esSuperAdmin ? (
+                    <Badge variant="success">Super administrador</Badge>
+                  ) : (
+                    <Badge variant={COLOR_PERFIL[perfilDe(u)]}>{PERFILES[perfilDe(u)].etiqueta}</Badge>
+                  )}
                   {!u.activo && <Badge variant="destructive">Inactivo</Badge>}
                 </div>
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>

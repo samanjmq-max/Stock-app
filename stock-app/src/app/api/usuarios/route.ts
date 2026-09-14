@@ -27,7 +27,19 @@ export async function GET(request: NextRequest) {
       ? usuarios
       : usuarios.filter((u) => sesion.alcance.includes(u.agencia));
 
-    return NextResponse.json({ ok: true, data: visibles });
+    /*
+      Se marca acá quién es el super admin, en vez de que la pantalla lo
+      deduzca comparando contra el usuario logueado. Esa comparación solo
+      acertaba en la fila propia: para un gerente mirando la lista, la fila
+      del super admin aparecía como "Jefe de Planta", que es lo que su rol
+      dice pero no lo que la persona es.
+
+      El dato tiene que venir del servidor sí o sí: sale de
+      SUPER_ADMIN_EMAIL, que en el navegador no existe.
+    */
+    const conMarca = visibles.map((u) => ({ ...u, esSuperAdmin: esSuperAdmin(u.email) }));
+
+    return NextResponse.json({ ok: true, data: conMarca });
   } catch (err) {
     console.error("Error al listar usuarios:", err);
     return NextResponse.json({ ok: false, error: "No se pudieron obtener los usuarios" }, { status: 500 });
