@@ -40,7 +40,14 @@ export interface Capacidades {
   gestionarCatalogo: boolean;
   /** Ver el historial de auditoría. */
   verHistorial: boolean;
-  /** Generar e imprimir etiquetas de código de barras. */
+  /**
+   * Generar e imprimir etiquetas de código de barras.
+   *
+   * Hoy la tienen los CUATRO perfiles, a pedido: imprimir una etiqueta para
+   * un artículo sin código legible es parte de contar, no un privilegio. La
+   * bandera se mantiene igual de que existe -- si algún día hay que
+   * restringirla, es una palabra por perfil y no hay que tocar nada más.
+   */
   etiquetas: boolean;
   /** Ve todas las plantas, sin importar cuáles tenga asignadas. */
   todasLasPlantas: boolean;
@@ -59,27 +66,27 @@ export function puedeVaciarInventario(email: string | null): boolean {
 export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; capacidades: Capacidades }> = {
   operario: {
     etiqueta: "Operario",
-    descripcion: "Cuenta y corrige. No borra nada y solo ve su planta.",
+    descripcion: "Cuenta, corrige e imprime etiquetas. No borra nada y solo ve su planta.",
     capacidades: {
       contar: true,
       borrarLineas: false,
       gestionarUsuarios: false,
       gestionarCatalogo: false,
       verHistorial: false,
-      etiquetas: false,
+      etiquetas: true,
       todasLasPlantas: false,
     },
   },
   encargado: {
     etiqueta: "Encargado de Almacén",
-    descripcion: "Cuenta, corrige y borra líneas de conteo. Solo su planta.",
+    descripcion: "Cuenta, corrige, borra líneas de conteo e imprime etiquetas. Solo su planta.",
     capacidades: {
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: false,
       gestionarCatalogo: false,
       verHistorial: false,
-      etiquetas: false,
+      etiquetas: true,
       todasLasPlantas: false,
     },
   },
