@@ -273,15 +273,17 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
             equivocado. Se lee antes de buscar el archivo en el disco, no
             después de que rebotó.
 
-            Es ámbar y no rojo a propósito: todavía no pasó nada malo, esto es
-            la instrucción. El rojo queda reservado para el archivo que se
-            rechazó de verdad, que es el panel de más arriba. Si los dos fueran
-            rojos, el que importa dejaría de destacarse.
+            Va en rojo. La duda era si el rojo correspondía -- todavía no pasó
+            nada malo, esto es la instrucción y no un error. Pero los dos
+            paneles son EXCLUYENTES: este se muestra mientras no hay archivo,
+            y el del archivo rechazado lo reemplaza. Nunca conviven, así que
+            no hay dos rojos compitiendo, y en un depósito la advertencia
+            tiene que frenar a alguien que está apurado.
           */}
           {!resultado && !errorColumnas && (
-            <div className="rounded-xl border border-warning/45 bg-warning/10 p-3.5">
+            <div className="rounded-xl border border-destructive/50 bg-destructive/10 p-3.5">
               <div className="flex items-start gap-2.5">
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-warning/20 text-warning">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-destructive/20 text-destructive">
                   <FileSpreadsheet size={15} />
                 </span>
                 <div className="min-w-0 flex-1">
@@ -292,7 +294,7 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
                     {COLUMNAS_REQUERIDAS.map((c) => (
                       <span
                         key={c.campo}
-                        className="rounded-md bg-warning/20 px-2 py-1 text-[11px] font-semibold text-warning"
+                        className="rounded-md bg-destructive/20 px-2 py-1 text-[11px] font-semibold text-destructive"
                       >
                         {c.etiqueta}
                       </span>

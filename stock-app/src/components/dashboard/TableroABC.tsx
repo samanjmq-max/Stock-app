@@ -17,8 +17,8 @@ import { cn } from "@/lib/utils";
   1. LAS TRES COLUMNAS VAN ENCENDIDAS. Una versión anterior bajaba el brillo
      de A a C para que la clase más pesada fuese la más luminosa. Se veía
      bien y dejaba a B y C medio muertas -- y son justo las que se miran
-     cuando hay que decidir qué NO contar. La escala la cargan el tono (tres
-     pasos de la misma familia dorada) y las barras, no la opacidad.
+     cuando hay que decidir qué NO contar. El peso lo cargan las barras (ver
+     abajo), no la opacidad.
 
   2. CADA COLUMNA LLEVA DOS BARRAS: la plata sobre el total y los artículos
      sobre el total. Los dos rieles miden SIEMPRE el total completo, así que
@@ -27,10 +27,26 @@ import { cn } from "@/lib/utils";
      en A la barra de plata está casi llena y la de artículos es una raya; en
      C es exactamente al revés.
 
-  3. DORADO Y NO VERDE/AZUL/ROJO. Esos tres ya significan coincidencia,
-     sobrante y faltante en toda la app; un tablero verde se leería como
-     "está todo bien" cuando en realidad habla de plata. El dorado es el
-     color del valor -- el mismo que tenía el Top 20 al que reemplaza.
+  3. UN COLOR DISTINTO POR CLASE, no tres pasos del mismo dorado.
+
+     La primera versión usaba oro en tres intensidades, con el argumento de
+     que ABC es una escala y no tres categorías. En la pantalla no funcionó:
+     con las tres columnas encendidas por igual, tres tonos del mismo dorado
+     se veían casi idénticos y había que leer la letra para saber en cuál
+     estabas parado. Un argumento correcto que la pantalla desmintió.
+
+     Los tres que quedaron evitan a propósito el verde, el azul y el rojo de
+     los estados de conteo (coincide, diferencias +, diferencias −): un
+     tablero verde se leería como "está todo bien" cuando habla de plata.
+
+       A  oro      -- es el color del valor en toda la app, y A es la plata
+       B  cian     -- frío y claramente separado del oro
+       C  violeta  -- el más lejano de los tres, y un tono que no significa
+                      nada más en esta app
+
+     El violeta también es el que más contrasta con el fondo cálido del
+     tablero, que es lo que hace que la columna más larga -- la de los miles
+     de artículos baratos -- se despegue de un vistazo.
 
   Los colores van por `style` y no por clases de Tailwind a propósito: son
   tres tonos que se derivan entre sí (relleno, borde, halo) y Tailwind no
@@ -64,10 +80,22 @@ const ACUM_A = 0.8;
 const ACUM_B = 0.95;
 
 const TONOS: Record<Clave, string> = {
-  a: "#ffd75c",
-  b: "#f2b52e",
-  c: "#d99414",
+  a: "#ffc93c", // oro
+  b: "#2fd0e8", // cian
+  c: "#a78bfa", // violeta
 };
+
+/*
+  El total del catálogo va en color de TEXTO, no en oro.
+
+  Estaba del mismo dorado que la clase A y se confundían: son los dos números
+  grandes de la cabecera, uno al lado del otro, y el ojo los emparejaba como
+  si fueran lo mismo. No lo son -- el total es el denominador contra el que
+  se miden las tres clases, no una cuarta categoría.
+
+  Con el total en crema, todo lo que está coloreado en esta pantalla es una
+  clase y nada más. Es la regla que hace que el color signifique algo.
+*/
 
 const LETRA: Record<Clave, string> = { a: "A", b: "B", c: "C" };
 
@@ -173,7 +201,10 @@ function Columna({
   return (
     <div
       className="relative flex flex-col overflow-hidden rounded-xl"
-      style={{ background: "#12100a", border: `1px solid ${h}3d` }}
+      /* Fondo casi neutro y no marrón: era cálido de cuando las tres columnas
+         eran doradas, y contra el cian y el violeta ensuciaba el tono. El
+         color de cada columna lo pone el resplandor de abajo, no la base. */
+      style={{ background: "#100f11", border: `1px solid ${h}3d` }}
     >
       {/* Filete superior: el gesto que convierte la tarjeta en instrumento. */}
       <span
@@ -269,13 +300,13 @@ function Columna({
                 <tr>
                   <th
                     className="sticky top-0 z-[2] px-3 py-2 text-left font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
-                    style={{ background: "#12100a", borderBottom: `1px solid ${h}2e` }}
+                    style={{ background: "#100f11", borderBottom: `1px solid ${h}2e` }}
                   >
                     Artículo
                   </th>
                   <th
                     className="sticky top-0 z-[2] px-3 py-2 text-right font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
-                    style={{ background: "#12100a", borderBottom: `1px solid ${h}2e` }}
+                    style={{ background: "#100f11", borderBottom: `1px solid ${h}2e` }}
                   >
                     Valor
                   </th>
@@ -395,7 +426,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
               <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
                 Valor total del catálogo
               </p>
-              <p className="font-hud text-[26px] font-bold leading-none tabular-nums" style={{ color: TONOS.a }}>
+              <p className="font-hud text-[26px] font-bold leading-none tabular-nums text-foreground">
                 {pesos(totalValor)}
               </p>
             </div>
