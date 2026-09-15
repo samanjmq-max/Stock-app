@@ -23,7 +23,7 @@ const COLUMNAS_ESPERADAS = ["codigo", "descripcion", "ubicacion", "familia", "pr
   El formato del archivo
   ============================================================================
 
-  Estas seis columnas son obligatorias y el archivo se rechaza entero si le
+  Estas cinco columnas son obligatorias y el archivo se rechaza entero si le
   falta alguna. Es a propósito, y es más duro que antes.
 
   El motivo: cuando se importa un código que YA existe, Apps Script pisa su
@@ -38,8 +38,11 @@ const COLUMNAS_ESPERADAS = ["codigo", "descripcion", "ubicacion", "familia", "pr
   formatos diferentes. Rechazar acá es lo que mantiene el patrón: una sola
   planilla, la misma para las nueve.
 
-  El precio queda aparte, como opcional: no se borra nunca si no viene (tiene
-  su propia protección en el script), y hay plantas que todavía no lo cargan.
+  Las tres opcionales -- unidad de medida, precio y proveedor -- quedan
+  aparte, y ninguna se borra si no viene: cada una tiene su propia protección
+  en Apps Script. Son opcionales justamente porque el SAP de SAMAN no las
+  exporta todas, y exigir una columna que el ERP no da obliga a rellenar el
+  archivo a mano para conformar a la app.
 */
 export interface ColumnaRequerida {
   campo: string;
@@ -53,7 +56,6 @@ export const COLUMNAS_REQUERIDAS: ColumnaRequerida[] = [
   { campo: "descripcion", etiqueta: "Descripción", acepta: ["descripcion", "Texto breve de material"] },
   { campo: "ubicacion", etiqueta: "Ubicación", acepta: ["ubicacion"] },
   { campo: "familia", etiqueta: "Familia", acepta: ["familia", "Grupo de artículos"] },
-  { campo: "proveedor", etiqueta: "Proveedor", acepta: ["proveedor"] },
   { campo: "stockSap", etiqueta: "Stock SAP", acepta: ["stockSap", "Libre utilización"] },
 ];
 
@@ -75,6 +77,30 @@ export const COLUMNA_PRECIO: ColumnaRequerida = {
   Cuando las nueve plantas estén mandando la planilla nueva, pasarla a
   COLUMNAS_REQUERIDAS es mover una línea.
 */
+/*
+  Proveedor: se acepta si viene, pero NO se exige y NO se anuncia.
+
+  Estuvo un rato en la lista de obligatorias y fue un error mío: la incluí
+  porque el importador pisa ese campo, y todo campo que se pisa tiene que
+  venir en el archivo o se borra. El razonamiento era correcto; el problema
+  es que el SAP de SAMAN no exporta proveedor, así que exigirla obligaba a
+  agregar una columna vacía al archivo para conformar a la app -- exactamente
+  el tipo de trámite que hace que la gente deje de usar un sistema.
+
+  La solución no fue solo sacarla de la lista: además se protegió en Apps
+  Script para que un archivo sin esa columna NO le borre el proveedor a los
+  productos que sí lo tengan cargado a mano. Misma protección que el precio
+  y la unidad de medida.
+
+  Tampoco se muestra en el cartel de columnas. Anunciar una columna opcional
+  que nadie usa es ruido en el único lugar donde hay que leer con atención.
+*/
+export const COLUMNA_PROVEEDOR: ColumnaRequerida = {
+  campo: "proveedor",
+  etiqueta: "Proveedor",
+  acepta: ["proveedor"],
+};
+
 export const COLUMNA_UNIDAD: ColumnaRequerida = {
   campo: "unidadMedida",
   etiqueta: "Unidad de medida",
@@ -96,10 +122,10 @@ export function esErrorDeColumnas(e: unknown): e is ErrorDeColumnas {
 // tener que renombrar columnas a mano.
 //
 // OJO: que un nombre esté acá NO alcanza para que el archivo pase. El export
-// crudo de SAP no trae ubicación ni proveedor, y esas dos son obligatorias
-// (ver COLUMNAS_REQUERIDAS, más abajo), así que hay que agregárselas antes de
-// subirlo. Es deliberado: sin la columna de ubicación, importar le borra la
-// ubicación a todos los artículos de la planta.
+// crudo de SAP no trae ubicación, y esa sí es obligatoria (ver
+// COLUMNAS_REQUERIDAS, más abajo), así que hay que agregarla antes de subirlo.
+// Es deliberado: sin la columna de ubicación, importar le borra la ubicación a
+// todos los artículos de la planta.
 const ALIAS_COLUMNAS: Record<string, string> = {
   // Formato simplificado (uso diario)
   codigo: "codigo",
@@ -246,7 +272,9 @@ export async function leerArchivoProductos(file: File): Promise<ResultadoLectura
       descripcion,
       ubicacion: String(fila.ubicacion ?? ""),
       familia: String(fila.familia ?? ""),
-      proveedor: String(fila.proveedor ?? ""),
+      // Igual que la unidad: solo se manda si la celda trae algo, para que un
+      // archivo sin la columna no le vacíe el proveedor a nadie.
+      ...(String(fila.proveedor ?? "").trim() ? { proveedor: String(fila.proveedor).trim() } : {}),
       stockSap: stockSapFinal,
       ...(unidadMedida ? { unidadMedida } : {}),
       ...(precioUnitario !== undefined ? { precioUnitario } : {}),
@@ -267,18 +295,22 @@ export async function leerArchivoProductos(file: File): Promise<ResultadoLectura
 export async function descargarPlantillaProductos() {
   const XLSX = await import("xlsx");
 
+  // Las opcionales van al final y en este orden. Si alguna vez se agrega o
+  // se saca una columna, hay que tocar TAMBIÉN las filas de ejemplo y los
+  // anchos de abajo: si no, los valores se corren de columna y la plantilla
+  // enseña el formato equivocado, que es peor que no tener plantilla.
   const encabezados = [...COLUMNAS_REQUERIDAS.map((c) => c.campo), COLUMNA_UNIDAD.campo, COLUMNA_PRECIO.campo];
 
   // Dos filas de ejemplo, y la segunda es un líquido a propósito: es el caso
   // que hace falta la unidad. Con "45" a secas no se sabe si son 45 bidones
   // o 45 litros, y el que cuenta necesita saberlo.
   const ejemplos = [
-    ["50232", "ALMENDRA PEL. TOST. Y SAL. L.A. 100 G", "CL-A-A-001", "SECOS", "LA ANONIMA", 120, "UN", 85.5],
-    ["50418", "ACEITE DE GIRASOL A GRANEL", "CL-B-C-014", "ACEITES", "COUSA", 450, "L", 62],
+    ["50232", "ALMENDRA PEL. TOST. Y SAL. L.A. 100 G", "CL-A-A-001", "SECOS", 120, "UN", 85.5],
+    ["50418", "ACEITE DE GIRASOL A GRANEL", "CL-B-C-014", "ACEITES", 450, "L", 62],
   ];
 
   const hoja = XLSX.utils.aoa_to_sheet([encabezados, ...ejemplos]);
-  hoja["!cols"] = [{ wch: 12 }, { wch: 42 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 10 }, { wch: 16 }, { wch: 14 }];
+  hoja["!cols"] = [{ wch: 12 }, { wch: 42 }, { wch: 14 }, { wch: 14 }, { wch: 10 }, { wch: 16 }, { wch: 14 }];
 
   const libro = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(libro, hoja, "Productos");
