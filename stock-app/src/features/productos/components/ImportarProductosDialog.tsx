@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Loader2, Upload, AlertTriangle, CheckCircle2, Download, FileWarning } from "lucide-react";
+import { Loader2, Upload, AlertTriangle, CheckCircle2, Download, FileWarning, FileSpreadsheet } from "lucide-react";
 import {
   leerArchivoProductos,
   descargarPlantillaProductos,
@@ -262,6 +262,62 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
             </div>
           )}
 
+
+          {/*
+            EL CARTEL. Va ARRIBA del selector de archivo y no abajo, y pesa
+            visualmente: marco, fondo, ícono y las columnas como pastillas.
+
+            Antes era un renglón de texto chico del mismo marrón que todo lo
+            demás, y se perdía -- que es exactamente lo que no puede pasar con
+            la única instrucción que evita que alguien suba el archivo
+            equivocado. Se lee antes de buscar el archivo en el disco, no
+            después de que rebotó.
+
+            Es ámbar y no rojo a propósito: todavía no pasó nada malo, esto es
+            la instrucción. El rojo queda reservado para el archivo que se
+            rechazó de verdad, que es el panel de más arriba. Si los dos fueran
+            rojos, el que importa dejaría de destacarse.
+          */}
+          {!resultado && !errorColumnas && (
+            <div className="rounded-xl border border-warning/45 bg-warning/10 p-3.5">
+              <div className="flex items-start gap-2.5">
+                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-warning/20 text-warning">
+                  <FileSpreadsheet size={15} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    El archivo tiene que traer estas columnas
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {COLUMNAS_REQUERIDAS.map((c) => (
+                      <span
+                        key={c.campo}
+                        className="rounded-md bg-warning/20 px-2 py-1 text-[11px] font-semibold text-warning"
+                      >
+                        {c.etiqueta}
+                      </span>
+                    ))}
+                    {[COLUMNA_UNIDAD, COLUMNA_PRECIO].map((c) => (
+                      <span
+                        key={c.campo}
+                        className="rounded-md border border-border px-2 py-1 text-[11px] text-muted-foreground"
+                      >
+                        {c.etiqueta} — opcional
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-2.5 text-xs text-foreground/80">
+                    Si falta alguna de las obligatorias, el archivo se rechaza y no se importa nada.
+                  </p>
+                  <Button variant="outline" size="sm" className="mt-3" onClick={bajarPlantilla} disabled={bajandoPlantilla}>
+                    {bajandoPlantilla ? <Loader2 className="animate-spin" size={14} /> : <Download size={14} />}
+                    Descargar plantilla
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {!resultado && (
             <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed border-border rounded-xl py-10 transition-colors ${agenciaSeleccionada ? "cursor-pointer hover:bg-secondary/50" : "opacity-50 cursor-not-allowed"}`}>
               <Upload size={22} className="text-muted-foreground" />
@@ -276,32 +332,6 @@ export function ImportarProductosDialog({ open, onOpenChange, onImportado }: Pro
                 disabled={leyendo || !agenciaSeleccionada}
               />
             </label>
-          )}
-
-          {/* El formato, a la vista ANTES de elegir el archivo. Enterarse de
-              que falta una columna recién después de buscar el archivo en el
-              disco es enterarse tarde. */}
-          {!resultado && !errorColumnas && (
-            <div className="space-y-2 rounded-lg bg-muted/50 px-3 py-2.5">
-              <p className="font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-muted-foreground">
-                Columnas obligatorias
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {COLUMNAS_REQUERIDAS.map((c) => c.etiqueta).join(" · ")}
-                <span className="opacity-70">
-                  {" "}· {COLUMNA_UNIDAD.etiqueta} y {COLUMNA_PRECIO.etiqueta} (opcionales)
-                </span>
-              </p>
-              <button
-                type="button"
-                onClick={bajarPlantilla}
-                disabled={bajandoPlantilla}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-primary underline decoration-dotted underline-offset-2 hover:no-underline disabled:opacity-60"
-              >
-                {bajandoPlantilla ? <Loader2 className="animate-spin" size={12} /> : <Download size={12} />}
-                Descargar plantilla
-              </button>
-            </div>
           )}
 
           {resultado && (

@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Archivo, JetBrains_Mono } from "next/font/google";
+import { Inter, Archivo, Rajdhani, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/providers/AppProviders";
 import { PwaRegister } from "@/components/layout/PwaRegister";
 import { ToastProvider } from "@/components/layout/ToastProvider";
@@ -27,6 +27,23 @@ const archivo = Archivo({
   subsets: ["latin"],
   weight: ["500", "600", "700"],
   variable: "--font-display",
+  display: "swap",
+});
+
+/*
+  Rajdhani -- la única cara "de instrumento" del sistema, y por eso está
+  acotada a un solo lugar: las cifras del tablero ABC.
+
+  No reemplaza a Archivo. Archivo es la voz de la app entera; esta es la de
+  un panel de control, con numerales angostos y cuadrados que a 44px se leen
+  como display de tablero y no como titular de documento. Usarla en más
+  pantallas la convertiría en decoración y le sacaría el efecto justamente
+  donde sirve.
+*/
+const rajdhani = Rajdhani({
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+  variable: "--font-hud",
   display: "swap",
 });
 
@@ -106,7 +123,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="es"
       suppressHydrationWarning
-      className={`${inter.variable} ${archivo.variable} ${jetbrains.variable}`}
+      className={`${inter.variable} ${archivo.variable} ${rajdhani.variable} ${jetbrains.variable}`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: scriptTema }} />

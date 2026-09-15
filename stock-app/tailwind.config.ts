@@ -15,6 +15,8 @@ const config: Config = {
         sans: ["var(--font-sans)", "sans-serif"],
         // Archivo -- grotesca industrial. Solo titulación y cifras grandes.
         display: ["var(--font-display)", "sans-serif"],
+        // Rajdhani -- solo las cifras del tablero ABC. Ver src/app/layout.tsx.
+        hud: ["var(--font-hud)", "var(--font-display)", "sans-serif"],
         mono: ["var(--font-mono)", "monospace"],
       },
       colors: {

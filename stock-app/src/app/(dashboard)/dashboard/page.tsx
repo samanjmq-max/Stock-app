@@ -11,6 +11,7 @@ import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRel
 import { StatCard } from "@/components/dashboard/StatCard";
 import { FiltrosMoviles } from "@/components/layout/FiltrosMoviles";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
+import { TableroABC } from "@/components/dashboard/TableroABC";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
 import { EditarConteoDialog } from "@/components/dashboard/EditarConteoDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -75,7 +76,6 @@ const DashboardCharts = dynamic(() => import("@/components/dashboard/DashboardCh
         <Skeleton className="h-[280px]" />
       </div>
       <Skeleton className="h-[320px]" />
-      <Skeleton className="h-[560px]" />
     </div>
   ),
 });
@@ -168,30 +168,29 @@ export default function DashboardPage() {
     (p) => esContable(p) && !codigosContados.has(normalizarCodigo(p.codigo))
   );
 
-  // Top 20 más costosos en stock (precio unitario × Stock SAP) de lo que se
-  // está viendo ahora mismo -- respeta la agencia y el filtro de zona ya
-  // aplicados arriba, así que siempre tiene datos reales para mostrar (no
-  // depende de que todas las plantas estén cargadas, a diferencia del
-  // intento anterior con "más pedidos" multi-planta).
-  const valorPorArticulo = productos
-    .map((p) => ({ codigo: p.codigo, descripcion: p.descripcion, valor: (Number(p.precioUnitario) || 0) * Number(p.stockSap || 0) }))
-    .filter((p) => p.valor > 0);
-
-  const topValorStock = [...valorPorArticulo].sort((a, b) => b.valor - a.valor).slice(0, 20);
-
   /*
-    El denominador del resumen del Top 20: cuánto vale TODO el stock que se
-    está viendo, y sobre cuántos artículos. Se calcula sobre la misma lista
-    ya filtrada (`valorPorArticulo`), así que respeta agencia, ubicación y
-    familia igual que las barras -- si el total saliera del catálogo entero
-    mientras las barras son de una planta, el porcentaje diría cualquier cosa.
+    Los artículos con valor, que es lo que come el tablero ABC: precio
+    unitario × stock SAP. Sale de la misma lista ya filtrada que todo lo
+    demás de la pantalla, así que respeta agencia, ubicación y familia -- si
+    el tablero clasificara sobre el catálogo entero mientras el resto muestra
+    una planta, los porcentajes dirían cualquier cosa.
 
-    Solo cuentan los que tienen precio y stock: un artículo sin precio
-    cargado no vale $0, es que todavía no sabemos cuánto vale. Meterlo en el
-    denominador como cero infla artificialmente la concentración.
+    Solo entran los que tienen precio Y stock: un artículo sin precio cargado
+    no vale $0, es que todavía no sabemos cuánto vale. Meterlo como cero lo
+    mandaría a la clase C y ensuciaría el reparto.
+
+    Reemplaza al Top 20 más costosos, que era un subconjunto de esto: los 20
+    primeros de la clase A, sin decir cuánto pesaban.
   */
-  const valorStockTotal = valorPorArticulo.reduce((suma, p) => suma + p.valor, 0);
-  const articulosConValor = valorPorArticulo.length;
+  const articulosValor = productos
+    .map((p) => ({
+      codigo: p.codigo,
+      descripcion: p.descripcion,
+      unidadMedida: p.unidadMedida,
+      stockSap: Number(p.stockSap) || 0,
+      valor: (Number(p.precioUnitario) || 0) * Number(p.stockSap || 0),
+    }))
+    .filter((p) => p.valor > 0);
 
   // Progreso del conteo en el tiempo: cuántos códigos únicos distintos ya se
   // contaron, acumulado a medida que van entrando los conteos (orden
@@ -624,13 +623,12 @@ export default function DashboardPage() {
         tituloAgencia={tituloAgencia}
         pieData={pieData}
         importeData={importeData}
-        topValorStock={topValorStock}
         progresoTiempo={progresoTiempo}
         totalContable={totalContable}
         saltoTicksTiempo={saltoTicksTiempo}
-        valorStockTotal={valorStockTotal}
-        articulosConValor={articulosConValor}
       />
+
+      <TableroABC articulos={articulosValor} tituloAgencia={tituloAgencia} />
 
       {vista === "pendientes"
         ? <PendientesTable productos={productosPendientes} onQuitarFiltro={() => setVista(null)} />
