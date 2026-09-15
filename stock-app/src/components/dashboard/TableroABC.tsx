@@ -51,6 +51,27 @@ import { cn } from "@/lib/utils";
   Los colores van por `style` y no por clases de Tailwind a propósito: son
   tres tonos que se derivan entre sí (relleno, borde, halo) y Tailwind no
   puede generar clases que no aparezcan literales en el código fuente.
+
+  ---------------------------------------------------------------------------
+  ESTE TABLERO ES SIEMPRE OSCURO, TAMBIÉN EN MODO DÍA
+  ---------------------------------------------------------------------------
+
+  Y por eso NO usa los tokens de tema (`text-[#f2f4f7]`,
+  `text-[#9aa3b2]`, `border-[#32302c]`): todos los colores de texto están
+  escritos literales.
+
+  El bug que esto arregla: el fondo estaba fijo en oscuro pero las letras
+  usaban los tokens, que en modo día se dan vuelta a tinta oscura. Resultado:
+  texto casi negro sobre fondo casi negro, y el título, el total y los
+  rótulos de las barras desaparecían. Las cifras de colores se seguían viendo
+  porque esas sí tenían color propio, lo que hacía el problema más raro
+  todavía de mirar.
+
+  Se podría haber arreglado al revés -- que el tablero se aclare en modo día --
+  pero este diseño no sobrevive a un fondo claro: el resplandor de las
+  columnas, la rejilla y los tonos neón necesitan oscuridad para existir. Es
+  un instrumento embutido en la página, como la pantalla de un tablero de
+  control, y se comporta igual con la luz prendida o apagada.
 */
 
 export type CriterioABC = "montos" | "acumulado";
@@ -233,7 +254,7 @@ function Columna({
           >
             {LETRA[clave]}
           </span>
-          <span className="font-mono text-[10.5px] text-muted-foreground">{rango}</span>
+          <span className="font-mono text-[10.5px] text-[#9aa3b2]">{rango}</span>
         </div>
 
         <p
@@ -243,7 +264,7 @@ function Columna({
           {porcentaje(valor, totalValor)}
           <span className="ml-0.5 text-[19px] font-semibold opacity-70">%</span>
         </p>
-        <p className="relative mt-px text-[11.5px] text-muted-foreground">del valor total en stock</p>
+        <p className="relative mt-px text-[11.5px] text-[#9aa3b2]">del valor total en stock</p>
 
         {/*
           Las dos barras. El riel entero es SIEMPRE el total -- los dos
@@ -253,8 +274,8 @@ function Columna({
         <div className="relative mt-3.5 flex flex-col gap-[11px]">
           <div>
             <div className="mb-[5px] flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-muted-foreground">Plata</span>
-              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground">
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#9aa3b2]">Plata</span>
+              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-[#9aa3b2]">
                 <b className="font-semibold" style={{ color: h }}>{pesos(valor)}</b> de {pesos(totalValor)}
               </span>
             </div>
@@ -272,9 +293,9 @@ function Columna({
 
           <div>
             <div className="mb-[5px] flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-muted-foreground">Artículos</span>
-              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground">
-                <b className="font-semibold text-foreground">{miles(articulos.length)}</b> de {miles(totalItems)}
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#9aa3b2]">Artículos</span>
+              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-[#9aa3b2]">
+                <b className="font-semibold text-[#f2f4f7]">{miles(articulos.length)}</b> de {miles(totalItems)}
               </span>
             </div>
             {/* Gris y no dorada: es el contrapeso, no el protagonista. */}
@@ -291,7 +312,7 @@ function Columna({
       <div className="flex-1" style={{ borderTop: `1px solid ${h}2e` }}>
         <div className="max-h-[230px] overflow-y-auto">
           {articulos.length === 0 ? (
-            <p className="px-3 py-8 text-center text-xs text-muted-foreground">
+            <p className="px-3 py-8 text-center text-xs text-[#9aa3b2]">
               Ningún artículo cae en esta clase.
             </p>
           ) : (
@@ -299,13 +320,13 @@ function Columna({
               <thead>
                 <tr>
                   <th
-                    className="sticky top-0 z-[2] px-3 py-2 text-left font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                    className="sticky top-0 z-[2] px-3 py-2 text-left font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-[#9aa3b2]"
                     style={{ background: "#100f11", borderBottom: `1px solid ${h}2e` }}
                   >
                     Artículo
                   </th>
                   <th
-                    className="sticky top-0 z-[2] px-3 py-2 text-right font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                    className="sticky top-0 z-[2] px-3 py-2 text-right font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-[#9aa3b2]"
                     style={{ background: "#100f11", borderBottom: `1px solid ${h}2e` }}
                   >
                     Valor
@@ -316,8 +337,8 @@ function Columna({
                 {visibles.map((art) => (
                   <tr key={art.codigo} className="border-b border-white/[0.04] last:border-0">
                     <td className="max-w-px px-3 py-2 align-top">
-                      <span className="block font-mono text-[11px] text-muted-foreground">{art.codigo}</span>
-                      <span className="block truncate text-[11.5px] text-muted-foreground" title={art.descripcion}>
+                      <span className="block font-mono text-[11px] text-[#9aa3b2]">{art.codigo}</span>
+                      <span className="block truncate text-[11.5px] text-[#9aa3b2]" title={art.descripcion}>
                         {art.descripcion}
                       </span>
                     </td>
@@ -325,7 +346,7 @@ function Columna({
                       <span className="font-mono text-[11.5px] font-semibold" style={{ color: h }}>
                         {pesos(art.valor)}
                       </span>
-                      <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
+                      <span className="mt-0.5 block font-mono text-[10px] text-[#9aa3b2]">
                         {miles(art.stockSap)}
                         {art.unidadMedida ? ` ${art.unidadMedida}` : ""}
                       </span>
@@ -334,7 +355,7 @@ function Columna({
                 ))}
                 {restantes > 0 && (
                   <tr>
-                    <td colSpan={2} className="px-3 py-2.5 text-center text-[11.5px] text-muted-foreground">
+                    <td colSpan={2} className="px-3 py-2.5 text-center text-[11.5px] text-[#9aa3b2]">
                       y {miles(restantes)} artículo{restantes === 1 ? "" : "s"} más
                     </td>
                   </tr>
@@ -368,7 +389,13 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
   const totalItems = ordenados.length;
 
   return (
-    <Card className="overflow-hidden border-[1.5px]" style={{ background: "#0d0a05", borderColor: "#2b2110" }}>
+    <Card
+      className="overflow-hidden border-[1.5px]"
+      /* `color` explícito: la Card de shadcn trae `text-card-foreground`, que
+         en modo día es tinta oscura. Sin esto, todo lo que no declara su
+         propio color -- el título, por ejemplo -- se pierde contra el fondo. */
+      style={{ background: "#0d0a05", borderColor: "#2b2110", color: "#f2f4f7" }}
+    >
       <CardContent className="relative p-5">
         {/* Rejilla tenue: profundidad sin competir con nada. Se desvanece
             hacia abajo para no ensuciar las tarjetas. */}
@@ -389,7 +416,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
             <p className="font-hud text-[17px] font-semibold tracking-[0.02em]">
               Clasificación ABC — {tituloAgencia}
             </p>
-            <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+            <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#9aa3b2]">
               por valor en stock · precio unitario × stock SAP
             </p>
           </div>
@@ -402,7 +429,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
               dejan de ser números redondos. Cuál sirve depende de para qué
               se esté mirando, así que se puede cambiar y comparar.
             */}
-            <div className="flex rounded-lg border border-border p-0.5">
+            <div className="flex rounded-lg border border-[#32302c] p-0.5">
               {([
                 ["montos", "Montos fijos"],
                 ["acumulado", "80/15/5"],
@@ -414,7 +441,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
                   aria-pressed={criterio === valor}
                   className={cn(
                     "rounded-[6px] px-2.5 py-1 font-mono text-[10.5px] transition-colors duration-quick",
-                    criterio === valor ? "bg-elevated text-foreground" : "text-muted-foreground hover:text-foreground"
+                    criterio === valor ? "bg-white/10 text-[#f2f4f7]" : "text-[#9aa3b2] hover:text-[#f2f4f7]"
                   )}
                 >
                   {etiqueta}
@@ -423,10 +450,10 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
             </div>
 
             <div className="text-right">
-              <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#9aa3b2]">
                 Valor total del catálogo
               </p>
-              <p className="font-hud text-[26px] font-bold leading-none tabular-nums text-foreground">
+              <p className="font-hud text-[26px] font-bold leading-none tabular-nums text-[#f2f4f7]">
                 {pesos(totalValor)}
               </p>
             </div>
@@ -434,7 +461,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
         </div>
 
         {totalValor === 0 ? (
-          <p className="relative py-10 text-center text-sm text-muted-foreground">
+          <p className="relative py-10 text-center text-sm text-[#9aa3b2]">
             Sin importes para clasificar — cargá precios unitarios en el catálogo.
           </p>
         ) : (
