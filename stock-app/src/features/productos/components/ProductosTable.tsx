@@ -10,11 +10,25 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-// Proveedor salió de la tabla: el SAP de SAMAN no lo exporta, así que la
-// columna mostraba un guión en todas las filas. Una columna vacía no es
-// neutra -- ocupa ancho y obliga a mirarla para descubrir que no dice nada.
-// El campo sigue existiendo en el producto y se puede cargar a mano.
-type Columna = "codigo" | "descripcion" | "ubicacion" | "familia" | "stockSap" | "precioUnitario" | "importe";
+/*
+  Proveedor salió de la tabla: el SAP de SAMAN no lo exporta, así que la
+  columna mostraba un guión en todas las filas. El campo sigue existiendo en
+  el producto y se puede cargar a mano.
+
+  La unidad de medida hizo el camino inverso, y vale anotar por qué.
+
+  Primero se dibujó pegada a la cifra de stock ("450 L"), para no sumar una
+  novena columna a una tabla ya ancha. Con datos cargados se lee muy bien.
+  El problema aparece cuando NO hay datos: no se ve nada, y entonces no hay
+  forma de distinguir "esta app no tiene unidad de medida" de "la tiene pero
+  está vacía". Un campo invisible cuando está vacío no parece vacío: parece
+  que no existe.
+
+  Como columna propia muestra un guión, que es información: dice que el dato
+  falta y hay que cargarlo. Además ahora hay lugar, justamente porque
+  proveedor se fue.
+*/
+type Columna = "codigo" | "descripcion" | "ubicacion" | "familia" | "stockSap" | "unidadMedida" | "precioUnitario" | "importe";
 type Direccion = "asc" | "desc";
 
 const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
@@ -23,6 +37,9 @@ const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
   { key: "ubicacion", label: "Ubicación" },
   { key: "familia", label: "Familia" },
   { key: "stockSap", label: "Stock SAP", alineacion: "right" },
+  // "U.M." y no "Unidad de medida": el rótulo largo forzaba una columna tres
+  // veces más ancha que su contenido, que son dos o tres letras.
+  { key: "unidadMedida", label: "U.M." },
   { key: "precioUnitario", label: "Precio", alineacion: "right" },
   { key: "importe", label: "Importe", alineacion: "right" },
 ];
@@ -371,13 +388,9 @@ export function ProductosTable({
                       <td className="px-2 py-2 max-w-[220px] truncate" title={p.descripcion}>{p.descripcion}</td>
                       <td className="px-2 py-2 whitespace-nowrap">{p.ubicacion || "—"}</td>
                       <td className="px-2 py-2 whitespace-nowrap">{p.familia || "—"}</td>
-                      {/* La unidad va pegada a la cifra y no en columna propia:
-                          la tabla ya tiene ocho columnas, y "450 L" se lee de
-                          una sola pasada mientras que una columna suelta
-                          obliga a cruzar la vista. */}
-                      <td className="px-2 py-2 text-right tabular-nums whitespace-nowrap">
-                        {p.stockSap}
-                        {p.unidadMedida ? <span className="ml-1 text-[10px] text-muted-foreground">{p.unidadMedida}</span> : null}
+                      <td className="px-2 py-2 text-right tabular-nums">{p.stockSap}</td>
+                      <td className="px-2 py-2 whitespace-nowrap font-mono text-[11px]">
+                        {p.unidadMedida || <span className="text-muted-foreground">—</span>}
                       </td>
                       <td className="px-2 py-2 text-right tabular-nums">
                         {/* Edición inline -- ediciones simples de precio no necesitan
