@@ -10,7 +10,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-type Columna = "codigo" | "descripcion" | "ubicacion" | "familia" | "proveedor" | "stockSap" | "precioUnitario" | "importe";
+// Proveedor salió de la tabla: el SAP de SAMAN no lo exporta, así que la
+// columna mostraba un guión en todas las filas. Una columna vacía no es
+// neutra -- ocupa ancho y obliga a mirarla para descubrir que no dice nada.
+// El campo sigue existiendo en el producto y se puede cargar a mano.
+type Columna = "codigo" | "descripcion" | "ubicacion" | "familia" | "stockSap" | "precioUnitario" | "importe";
 type Direccion = "asc" | "desc";
 
 const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
@@ -18,7 +22,6 @@ const COLUMNAS: { key: Columna; label: string; alineacion?: "right" }[] = [
   { key: "descripcion", label: "Descripción" },
   { key: "ubicacion", label: "Ubicación" },
   { key: "familia", label: "Familia" },
-  { key: "proveedor", label: "Proveedor" },
   { key: "stockSap", label: "Stock SAP", alineacion: "right" },
   { key: "precioUnitario", label: "Precio", alineacion: "right" },
   { key: "importe", label: "Importe", alineacion: "right" },
@@ -368,7 +371,6 @@ export function ProductosTable({
                       <td className="px-2 py-2 max-w-[220px] truncate" title={p.descripcion}>{p.descripcion}</td>
                       <td className="px-2 py-2 whitespace-nowrap">{p.ubicacion || "—"}</td>
                       <td className="px-2 py-2 whitespace-nowrap">{p.familia || "—"}</td>
-                      <td className="px-2 py-2 whitespace-nowrap max-w-[140px] truncate" title={p.proveedor}>{p.proveedor || "—"}</td>
                       {/* La unidad va pegada a la cifra y no en columna propia:
                           la tabla ya tiene ocho columnas, y "450 L" se lee de
                           una sola pasada mientras que una columna suelta
