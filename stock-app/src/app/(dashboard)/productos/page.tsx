@@ -256,7 +256,6 @@ export default function ProductosPage() {
       Descripción: p.descripcion,
       Ubicación: p.ubicacion,
       Familia: p.familia,
-      Proveedor: p.proveedor,
       "Stock SAP": p.stockSap,
     }));
     if (formato === "xlsx") exportarExcel(datos, "Productos", "productos");
