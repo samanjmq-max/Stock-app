@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { descargarEtiquetas, contarEtiquetas, type DatosEtiqueta } from "@/lib/etiquetas";
+import { campoDe } from "@/lib/importacion";
 
 type EstadoBusqueda = "idle" | "buscando" | "encontrado" | "no-encontrado";
 
@@ -196,19 +197,36 @@ export default function EtiquetasPage() {
       const nuevos: Renglon[] = [];
       let omitidas = 0;
       for (const fila of filas) {
-        const obtener = (nombres: string[]) => {
-          for (const n of nombres) {
+        /*
+          Se traducen los encabezados del archivo al vocabulario de la app
+          con el MISMO diccionario que usa la importación de stock
+          (`campoDe`). Así esta pantalla acepta tanto la planilla
+          simplificada ("codigo", "descripcion") como el export crudo del
+          SAP ("Material", "Texto breve de material", "Ubicación") sin que
+          nadie tenga que renombrar columnas a mano.
+        */
+        const campos: Record<string, string> = {};
+        for (const [clave, valor] of Object.entries(fila)) {
+          const campo = campoDe(clave);
+          if (!campo) continue;
+          const texto = String(valor ?? "").trim();
+          if (texto && !campos[campo]) campos[campo] = texto;
+        }
+
+        // Las copias son propias de esta pantalla: no existen en la
+        // importación de stock, así que se buscan aparte por nombre.
+        // Misma regla que el formulario: columna ausente o vacía = 1 copia.
+        const copiasFila = (() => {
+          for (const n of ["copias", "cantidad", "unidades"]) {
             const clave = Object.keys(fila).find((k) => k.trim().toLowerCase() === n);
             if (clave && String(fila[clave]).trim()) return String(fila[clave]).trim();
           }
           return "";
-        };
-        const codigoFila = obtener(["codigo", "código"]);
-        const descripcionFila = obtener(["descripcion", "descripción"]);
-        const ubicacionFila = obtener(["ubicacion", "ubicación"]);
-        // Misma regla que el formulario: columna ausente o vacía = 1 copia.
-        // Se aceptan los tres nombres que la gente escribe en la práctica.
-        const copiasFila = obtener(["copias", "cantidad", "unidades"]);
+        })();
+
+        const codigoFila = campos.codigo ?? "";
+        const descripcionFila = campos.descripcion ?? "";
+        const ubicacionFila = campos.ubicacion ?? "";
 
         if (!codigoFila || !descripcionFila) {
           omitidas++;
@@ -229,7 +247,9 @@ export default function EtiquetasPage() {
       );
     } catch (err) {
       console.error("Error al leer el Excel:", err);
-      toast.error("No se pudo leer el archivo. Verificá que tenga columnas codigo y descripcion.");
+      toast.error(
+        "No se pudo leer el archivo. Tiene que tener una columna de código y una de descripción (sirven tanto codigo/descripcion como Material/Texto breve de material del SAP)."
+      );
     } finally {
       setCargandoExcel(false);
       e.target.value = "";
@@ -345,6 +365,11 @@ export default function EtiquetasPage() {
                 ? "Leyendo archivo..."
                 : "Archivo .xlsx con columnas codigo, descripcion, ubicacion y copias (las dos últimas opcionales)"}
             </span>
+            {!cargandoExcel && (
+              <span className="text-xs text-muted-foreground text-center px-4">
+                También sirve el archivo tal cual sale del SAP (Material, Texto breve de material, Ubicación).
+              </span>
+            )}
             <input type="file" accept=".xlsx,.xls" className="hidden" onChange={handleArchivoExcel} disabled={cargandoExcel} />
           </label>
         </CardContent>
