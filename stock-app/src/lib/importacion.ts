@@ -166,6 +166,22 @@ function normalizarEncabezado(h: string): string {
 }
 
 /**
+ * Traduce UN encabezado de archivo al nombre de campo que usa la app.
+ * Devuelve `undefined` si esa columna no le interesa a nadie.
+ *
+ * Está exportada a propósito: la pantalla de Etiquetas lee su propio Excel
+ * (necesita "copias", que la importación de stock no tiene) pero NO tiene
+ * por qué tener su propio diccionario de encabezados. Cuando esa pantalla
+ * conocía solo "codigo" y "descripcion", el export crudo del SAP --que dice
+ * "Material" y "Texto breve de material"-- le entraba con 1395 filas y
+ * salían 1395 omitidas, sin que nada estuviera roto. Un solo diccionario
+ * para las dos pantallas es lo que evita que vuelva a pasar.
+ */
+export function campoDe(encabezado: string): string | undefined {
+  return ALIAS_COLUMNAS[normalizarEncabezado(encabezado)];
+}
+
+/**
  * Lee un archivo .xlsx, .xls o .csv y devuelve las filas normalizadas +
  * errores por fila.
  *
