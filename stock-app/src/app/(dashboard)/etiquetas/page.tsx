@@ -1,13 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Download, Barcode as BarcodeIcon, Search, Upload, Loader2, CheckCircle2 } from "lucide-react";
+import {
+  Plus,
+  Minus,
+  Trash2,
+  Download,
+  Barcode as BarcodeIcon,
+  Search,
+  Upload,
+  Loader2,
+  CheckCircle2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { descargarEtiquetas, contarEtiquetas, type DatosEtiqueta } from "@/lib/etiquetas";
+import {
+  descargarEtiquetas,
+  descargarEtiquetasEnTandas,
+  contarEtiquetas,
+  MAX_POR_PDF,
+  type DatosEtiqueta,
+} from "@/lib/etiquetas";
 import { campoDe } from "@/lib/importacion";
 
 type EstadoBusqueda = "idle" | "buscando" | "encontrado" | "no-encontrado";
@@ -69,7 +85,24 @@ export default function EtiquetasPage() {
   const [estadoBusqueda, setEstadoBusqueda] = useState<EstadoBusqueda>("idle");
   const [lista, setLista] = useState<Renglon[]>([]);
   const [generando, setGenerando] = useState(false);
+  const [progreso, setProgreso] = useState<{ hechos: number; total: number } | null>(null);
   const [cargandoExcel, setCargandoExcel] = useState(false);
+  /*
+    En cuántos archivos quiere partir el PDF.
+
+    Arranca en 1 y NO se corrige solo cuando la lista crece: el piso se
+    calcula abajo (`minArchivos`) y se aplica al leerlo. Si en vez de eso
+    hubiera un efecto que sube este número al agregar artículos, el campo se
+    movería solo mientras la persona escribe, que es la clase de cosa que
+    hace desconfiar de una pantalla.
+  */
+  const [archivosTexto, setArchivosTexto] = useState("1");
+  // Mientras el campo está enfocado se muestra lo que la persona escribió;
+  // cuando no lo está, se muestra el valor que realmente se va a usar (que
+  // puede ser mayor, si la lista obliga a un mínimo de archivos). Sin esto,
+  // el campo diría "1" y el texto de al lado "3 PDF": la pantalla se
+  // contradiría a sí misma.
+  const [editandoArchivos, setEditandoArchivos] = useState(false);
 
   // Lo que se le manda al servidor, ya con las copias interpretadas.
   const paraGenerar: DatosEtiqueta[] = lista.map((r) => ({
@@ -82,6 +115,18 @@ export default function EtiquetasPage() {
   // Renglones de la lista vs. etiquetas que va a tener el PDF: con copias
   // dejan de ser el mismo número, y el botón tiene que decir el segundo.
   const totalEtiquetas = contarEtiquetas(paraGenerar);
+
+  // Piso obligado por el tope del servidor, y elección de la persona por
+  // encima de ese piso: puede pedir MÁS archivos de los necesarios (útil para
+  // repartir el trabajo entre dos impresoras), nunca menos.
+  const minArchivos = Math.max(1, Math.ceil(totalEtiquetas / MAX_POR_PDF));
+  const maxArchivos = Math.max(totalEtiquetas, 1);
+  // Igual que las copias: el campo guarda TEXTO y el número se interpreta
+  // acá. Si guardara el número, borrar el dígito para escribir otro haría
+  // que el campo se corrigiera solo mientras se escribe.
+  const archivosPedidos = Math.floor(Number(archivosTexto.trim())) || 1;
+  const archivos = Math.min(Math.max(minArchivos, archivosPedidos), maxArchivos);
+  const porArchivo = Math.ceil(totalEtiquetas / archivos);
 
   async function buscarEnCatalogo(codigoBuscado: string) {
     const limpio = codigoBuscado.trim();
@@ -149,15 +194,29 @@ export default function EtiquetasPage() {
   async function generarPdf() {
     if (paraGenerar.length === 0) return;
     setGenerando(true);
+    setProgreso({ hechos: 0, total: archivos });
     try {
-      await descargarEtiquetas(paraGenerar, "etiquetas-nuevas");
-      toast.success(`${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} generada${totalEtiquetas === 1 ? "" : "s"}`);
+      await descargarEtiquetasEnTandas(paraGenerar, "etiquetas-nuevas", porArchivo, (hechos, total) =>
+        setProgreso({ hechos, total })
+      );
+      toast.success(
+        archivos === 1
+          ? `${totalEtiquetas} etiqueta${totalEtiquetas === 1 ? "" : "s"} generada${totalEtiquetas === 1 ? "" : "s"}`
+          : `${totalEtiquetas} etiquetas en ${archivos} archivos`
+      );
       setLista([]);
+      setArchivosTexto("1");
     } catch (err) {
       console.error("Error al generar el PDF:", err);
+      /*
+        Si falla en el medio, la lista NO se borra. Con un solo archivo daba
+        igual; con tandas, borrarla dejaría a la persona sin saber cuáles de
+        las 1388 etiquetas ya salieron y cuáles no.
+      */
       toast.error(err instanceof Error ? err.message : "No se pudo generar el PDF");
     } finally {
       setGenerando(false);
+      setProgreso(null);
     }
   }
 
@@ -387,9 +446,92 @@ export default function EtiquetasPage() {
             </CardTitle>
             <Button size="sm" onClick={generarPdf} disabled={generando}>
               {generando ? <Loader2 className="animate-spin" size={15} /> : <Download size={15} />}
-              Generar PDF ({totalEtiquetas})
+              {generando && progreso
+                ? `Generando ${Math.max(1, progreso.hechos + (progreso.hechos < progreso.total ? 1 : 0))} de ${progreso.total}...`
+                : archivos === 1
+                  ? `Generar PDF (${totalEtiquetas})`
+                  : `Generar ${archivos} PDF (${totalEtiquetas})`}
             </Button>
           </CardHeader>
+
+          {/*
+            El repartidor de archivos. Está SIEMPRE, no solo cuando la lista
+            se pasa del tope: partir en dos también sirve cuando son 300
+            etiquetas y hay dos personas etiquetando pasillos distintos.
+            Cuando la lista se pasa, lo único que cambia es que el mínimo
+            deja de ser 1 y la pantalla explica por qué.
+          */}
+          <div className="mx-6 mb-3 rounded-lg border border-border bg-secondary/40 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <Label htmlFor="cantidad-archivos" className="text-xs">
+                ¿En cuántos archivos lo querés?
+              </Label>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Menos archivos"
+                  disabled={generando || archivos <= minArchivos}
+                  onClick={() => setArchivosTexto(String(Math.max(minArchivos, archivos - 1)))}
+                >
+                  <Minus size={14} />
+                </Button>
+                <Input
+                  id="cantidad-archivos"
+                  type="number"
+                  min={minArchivos}
+                  max={maxArchivos}
+                  inputMode="numeric"
+                  value={editandoArchivos ? archivosTexto : String(archivos)}
+                  disabled={generando}
+                  onChange={(e) => setArchivosTexto(e.target.value)}
+                  onFocus={() => {
+                    setArchivosTexto(String(archivos));
+                    setEditandoArchivos(true);
+                  }}
+                  onBlur={() => {
+                    setArchivosTexto(String(archivos));
+                    setEditandoArchivos(false);
+                  }}
+                  className="h-7 w-14 px-1.5 text-center text-xs tabular-nums"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="icon"
+                  className="h-7 w-7"
+                  aria-label="Más archivos"
+                  disabled={generando || archivos >= maxArchivos}
+                  onClick={() => setArchivosTexto(String(archivos + 1))}
+                >
+                  <Plus size={14} />
+                </Button>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              {archivos === 1
+                ? `Un solo PDF con las ${totalEtiquetas} etiquetas.`
+                : `${archivos} PDF de hasta ${porArchivo} etiquetas cada uno, numerados parte 1 de ${archivos}, parte 2 de ${archivos}...`}
+            </p>
+
+            {minArchivos > 1 && (
+              <p className="text-xs text-warning">
+                Son {totalEtiquetas} etiquetas y en un solo PDF entran {MAX_POR_PDF}, así que el mínimo para esta lista
+                es {minArchivos} {minArchivos === 1 ? "archivo" : "archivos"}.
+              </p>
+            )}
+
+            {archivos > 1 && (
+              <p className="text-xs text-muted-foreground">
+                Se descargan uno atrás del otro. Si el navegador pregunta si permitís descargar varios archivos, decile
+                que sí.
+              </p>
+            )}
+          </div>
+
           <CardContent className="pt-0">
             <div className="divide-y divide-border max-h-[400px] overflow-auto">
               {lista.map((item) => (
