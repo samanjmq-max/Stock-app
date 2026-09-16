@@ -3,6 +3,7 @@ import { Inter, Archivo, Rajdhani, JetBrains_Mono } from "next/font/google";
 import { AppProviders } from "@/providers/AppProviders";
 import { PwaRegister } from "@/components/layout/PwaRegister";
 import { ToastProvider } from "@/components/layout/ToastProvider";
+import { AvisoActualizacion } from "@/components/layout/AvisoActualizacion";
 import "./globals.css";
 
 /*
@@ -132,6 +133,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AppProviders>{children}</AppProviders>
         <ToastProvider />
         <PwaRegister />
+        {/*
+          Va en el layout raíz y no en una pantalla: el aviso de versión nueva
+          tiene que alcanzar a todo el mundo, esté donde esté parado. Un
+          operario puede pasarse el día entero en "Contar stock" sin volver al
+          dashboard nunca.
+        */}
+        <AvisoActualizacion />
       </body>
     </html>
   );
