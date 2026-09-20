@@ -19,8 +19,8 @@ export async function POST(request: NextRequest) {
     const { email, password } = parsed.data;
     const ip = request.headers.get("x-forwarded-for") || "sin-ip";
     const claveLimite = `${ip}:${email.toLowerCase().trim()}`;
-    if (estaLimitado(claveLimite)) {
-      const minutos = minutosRestantes(claveLimite);
+    if (await estaLimitado(claveLimite)) {
+      const minutos = await minutosRestantes(claveLimite);
       return NextResponse.json(
         { ok: false, error: `Demasiados intentos fallidos. Probá de nuevo en ${minutos} minuto${minutos === 1 ? "" : "s"}.` },
         { status: 429 }
@@ -28,15 +28,15 @@ export async function POST(request: NextRequest) {
     }
     const usuario = await getUsuarioPorEmail(email.toLowerCase().trim());
     if (!usuario || !usuario.activo) {
-      registrarIntentoFallido(claveLimite);
+      await registrarIntentoFallido(claveLimite);
       return NextResponse.json({ ok: false, error: "Email o contraseña incorrectos" }, { status: 401 });
     }
     const passwordOk = await compararPassword(password, usuario.passwordHash);
     if (!passwordOk) {
-      registrarIntentoFallido(claveLimite);
+      await registrarIntentoFallido(claveLimite);
       return NextResponse.json({ ok: false, error: "Email o contraseña incorrectos" }, { status: 401 });
     }
-    limpiarIntentos(claveLimite);
+    await limpiarIntentos(claveLimite);
     // La agencia queda grabada en el token — el frontend la usa para filtrar
     // productos, conteos y Dashboard sin tener que pedirla de nuevo.
     /*

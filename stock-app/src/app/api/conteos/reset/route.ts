@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resetearConteos, registrarHistorial } from "@/lib/sheets";
-import type { Rol, Agencia } from "@/types";
+import { leerSesion } from "@/lib/sesion";
+import type { Agencia } from "@/types";
 
 export async function POST(request: NextRequest) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
-  const agenciaHeader = request.headers.get("x-user-agencia") as Agencia | null;
-  const esSuper = request.headers.get("x-user-es-super-admin") === "1";
+  /*
+    Igual que sync-batch: se lee la sesión con `leerSesion`, no headers
+    sueltos. La lógica de permiso es la misma de antes, solo que la identidad
+    y el "es super admin" salen de la sesión ya resuelta.
+  */
+  const sesion = leerSesion(request);
+  if (!sesion) {
+    return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+  }
+  const { id: userId, email, rol, agencia: agenciaPropia, esSuperAdmin: esSuper } = sesion;
 
   if (rol !== "administrador") {
     return NextResponse.json({ ok: false, error: "Solo un administrador puede reiniciar los conteos" }, { status: 403 });
@@ -17,7 +23,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     // Si viene una agencia en el body, borra solo esa. Si no, usa la del usuario.
     // Para borrar TODAS las agencias, el body debe traer agencia: null explícito.
-    const agenciaPedida = "agencia" in body ? body.agencia : agenciaHeader;
+    const agenciaPedida = "agencia" in body ? (body.agencia as Agencia | null) : agenciaPropia;
 
     /*
       Vaciar el inventario COMPLETO -- las nueve plantas de una -- es del
@@ -33,7 +39,7 @@ export async function POST(request: NextRequest) {
         { status: 403 }
       );
     }
-    if (!esSuper && agenciaPedida !== agenciaHeader) {
+    if (!esSuper && agenciaPedida !== agenciaPropia) {
       return NextResponse.json(
         { ok: false, error: "Solo podés vaciar el inventario de tu propia planta" },
         { status: 403 }

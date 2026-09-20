@@ -1,17 +1,34 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getProductos, crearProducto, getProductoPorCodigo, registrarHistorial } from "@/lib/sheets";
 import { productoSchema } from "@/lib/validations";
-import { leerHeaderTexto } from "@/lib/headers";
 import { esSuperAdmin } from "@/lib/permisos";
+import { leerSesion } from "@/lib/sesion";
 import type { Agencia } from "@/types";
 
 export async function GET(request: NextRequest) {
   try {
-    const agencia = leerHeaderTexto(request, "x-user-agencia") as Agencia | null;
-    const rol = leerHeaderTexto(request, "x-user-rol");
-    const agenciaFiltro = rol === "administrador"
-      ? (request.nextUrl.searchParams.get("agencia") as Agencia | null) ?? agencia ?? undefined
-      : agencia ?? undefined;
+    const sesion = leerSesion(request);
+    if (!sesion) {
+      return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+    }
+
+    /*
+      Qué planta se puede pedir: cualquiera que esté dentro del alcance.
+
+      Antes la condición era `rol === "administrador"`, y como un jefe de
+      planta también es administrador, le alcanzaba con escribir
+      ?agencia=Lascano para leer el catálogo de una planta que no es la suya.
+      Mismo criterio que el GET de conteos: el alcance sale del perfil (el
+      gerente y el super admin ven las nueve; un jefe, las que tenga
+      asignadas; los demás, la suya). Si piden una que no les toca, se les
+      devuelve la suya en vez de un error -- es un filtro, no un intento de
+      intrusión.
+    */
+    const agenciaPedida = request.nextUrl.searchParams.get("agencia") as Agencia | null;
+    const agenciaFiltro =
+      agenciaPedida && sesion.alcance.includes(agenciaPedida)
+        ? agenciaPedida
+        : sesion.agencia ?? undefined;
 
     // Búsqueda puntual por código (usada por "Generar etiqueta" para
     // autocompletar descripción y ubicación) — devuelve un único producto
@@ -31,23 +48,37 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const rol = leerHeaderTexto(request, "x-user-rol");
-  const userId = leerHeaderTexto(request, "x-user-id") || "";
-  const email = leerHeaderTexto(request, "x-user-email") || "";
-  const agenciaHeader = leerHeaderTexto(request, "x-user-agencia") as Agencia | null;
-  if (rol !== "administrador") {
-    return NextResponse.json({ ok: false, error: "Solo un administrador puede crear productos" }, { status: 403 });
+  const sesion = leerSesion(request);
+  if (!sesion) {
+    return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
   }
+  /*
+    Crear un producto a mano es gestionar el catálogo -- se pide esa
+    capacidad, no "ser administrador". Hoy da el mismo resultado (jefe y
+    gerente la tienen, el encargado no), pero nombrar la capacidad es lo
+    que mantiene la coherencia con el resto de las rutas.
+  */
+  if (!sesion.capacidades.gestionarCatalogo) {
+    return NextResponse.json({ ok: false, error: "Tu perfil no puede crear productos" }, { status: 403 });
+  }
+  const { id: userId, email } = sesion;
+
   try {
     const body = await request.json();
-    if (!body.agencia && agenciaHeader) body.agencia = agenciaHeader;
-    // Solo el super-admin puede crear un producto en una agencia distinta de
-    // la suya propia (operar en nombre de otra planta, ej. Lascano). Para
-    // cualquier otro administrador, se corrige a su propia agencia en vez de
-    // confiar ciegamente en lo que mandó el cliente.
-    if (agenciaHeader && body.agencia !== agenciaHeader && !esSuperAdmin(email)) {
-      body.agencia = agenciaHeader;
+    if (!body.agencia && sesion.agencia) body.agencia = sesion.agencia;
+
+    /*
+      En qué planta se puede crear: solo dentro del alcance propio. El super
+      admin puede en cualquiera; los demás quedan corregidos a una planta
+      que efectivamente manejen, en vez de confiar en lo que mandó el
+      cliente.
+    */
+    if (!esSuperAdmin(email)) {
+      if (!body.agencia || !sesion.alcance.includes(body.agencia as Agencia)) {
+        body.agencia = sesion.agencia;
+      }
     }
+
     const parsed = productoSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: parsed.error.errors[0]?.message }, { status: 400 });
@@ -60,7 +91,7 @@ export async function POST(request: NextRequest) {
     await registrarHistorial({
       usuarioId: userId,
       usuarioEmail: email,
-      rol: "administrador",
+      rol: sesion.rol,
       accion: "crear_producto",
       entidad: `producto:${producto.codigo}`,
       valorNuevo: JSON.stringify(producto),

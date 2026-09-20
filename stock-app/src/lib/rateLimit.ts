@@ -1,42 +1,60 @@
 import "server-only";
+import { Redis } from "@upstash/redis";
 
 /**
- * rateLimit.ts — protege el login contra fuerza bruta (probar muchas
- * contraseñas seguidas).
+ * rateLimit.ts — protege el login (y la recuperación de contraseña) contra
+ * fuerza bruta contando los intentos fallidos.
  *
- * Cómo funciona por defecto (sin configurar nada):
- *   Cuenta los intentos fallidos en la memoria del propio servidor. Esto
- *   funciona perfecto en un servidor único (por ejemplo un droplet, o
- *   Vercel con una sola instancia activa). LIMITACIÓN: en plataformas
- *   serverless con mucho tráfico, Vercel puede levantar varias instancias
- *   en paralelo, cada una con su propia memoria — en ese caso el límite
- *   real efectivo puede terminar siendo más alto que MAX_INTENTOS.
+ * Cómo funciona ahora (dos modos, elige solo):
  *
- * Cómo mejorarlo en producción con tráfico alto:
- *   Crear una cuenta gratuita en https://upstash.com (Redis serverless),
- *   agregar las variables de entorno UPSTASH_REDIS_REST_URL y
- *   UPSTASH_REDIS_REST_TOKEN, instalar `@upstash/ratelimit` y
- *   `@upstash/redis`, y reemplazar la implementación de abajo por un
- *   limitador contra Redis (compartido entre todas las instancias). La
- *   función `estaLimitado` de este archivo es el único lugar que
- *   necesitaría cambiar — el resto del código no se toca.
+ *   1. CON Upstash Redis (recomendado en producción): si están las variables
+ *      de entorno UPSTASH_REDIS_REST_URL y UPSTASH_REDIS_REST_TOKEN, el
+ *      conteo vive en Redis, COMPARTIDO entre todas las instancias que Vercel
+ *      levante. Ahí el límite es real y firme aunque haya mucho tráfico.
+ *
+ *   2. SIN Upstash (memoria local): si esas variables no están —caso típico
+ *      del desarrollo local, o si todavía no configuraste Upstash— cae al
+ *      contador en memoria de siempre. Funciona perfecto en una sola
+ *      instancia; su única limitación es la que ya conocíamos (con varias
+ *      instancias en paralelo, cada una cuenta por su lado).
+ *
+ * Además, si Redis está configurado pero falla en caliente (se cae, timeout),
+ * NO tumba el login: esa llamada puntual degrada al contador en memoria y se
+ * registra el error. Preferimos seguir protegiendo con memoria antes que
+ * dejar a todo el mundo afuera por un problema de Redis.
+ *
+ * El resto del código (login/route.ts, recuperar/route.ts) solo tuvo que
+ * pasar a `await` estas funciones — la firma y el comportamiento son los
+ * mismos de antes.
  */
 
 const MAX_INTENTOS = 5;
 const VENTANA_MS = 10 * 60 * 1000; // 10 minutos
 
+// -------------------------------------------------------------------------
+// Cliente de Redis (solo si están las dos variables). Si falta alguna, queda
+// en null y todo el archivo usa el contador en memoria.
+// -------------------------------------------------------------------------
+const redis =
+  process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN
+    ? new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      })
+    : null;
+
+// -------------------------------------------------------------------------
+// Contador en memoria (fallback). Es el mismo de antes.
+// -------------------------------------------------------------------------
 interface Intento {
   cantidad: number;
   primerIntentoEn: number;
   ventanaMs: number;
-  maxIntentos: number;
 }
 
 const intentosPorClave = new Map<string, Intento>();
 
-// Limpieza periódica para no acumular memoria indefinidamente. Usa la
-// ventana más larga conocida como cota superior -- una entrada nunca
-// necesita sobrevivir más tiempo que su propia ventana.
+// Limpieza periódica para no acumular memoria indefinidamente.
 const VENTANA_LIMPIEZA_MS = 60 * 60 * 1000; // 1 hora
 setInterval(() => {
   const ahora = Date.now();
@@ -45,42 +63,105 @@ setInterval(() => {
   }
 }, VENTANA_LIMPIEZA_MS).unref?.();
 
-/**
- * Devuelve true si la clave (normalmente IP + email) superó el máximo de
- * intentos fallidos permitidos en la ventana de tiempo actual.
- *
- * `maxIntentos`/`ventanaMs` son opcionales -- por defecto usan el límite
- * genérico de login (5 / 10 min). SEC-04: la recuperación de contraseña
- * (RECOVERY_CODE) es, en la práctica, una llave maestra permanente para la
- * cuenta del super-admin -- vale la pena un límite más estricto ahí que en
- * un login normal, así que ese endpoint pasa sus propios valores.
- */
-export function estaLimitado(clave: string, maxIntentos = MAX_INTENTOS, ventanaMs = VENTANA_MS): boolean {
+function estaLimitadoEnMemoria(clave: string, maxIntentos: number, ventanaMs: number): boolean {
   const intento = intentosPorClave.get(clave);
   if (!intento) return false;
   const dentroDeVentana = Date.now() - intento.primerIntentoEn < ventanaMs;
   return dentroDeVentana && intento.cantidad >= maxIntentos;
 }
 
-/** Registra un intento fallido para esa clave (ver estaLimitado sobre los parámetros opcionales). */
-export function registrarIntentoFallido(clave: string, maxIntentos = MAX_INTENTOS, ventanaMs = VENTANA_MS): void {
+function registrarFalloEnMemoria(clave: string, ventanaMs: number): void {
   const ahora = Date.now();
   const intento = intentosPorClave.get(clave);
   if (!intento || ahora - intento.primerIntentoEn > ventanaMs) {
-    intentosPorClave.set(clave, { cantidad: 1, primerIntentoEn: ahora, ventanaMs, maxIntentos });
+    intentosPorClave.set(clave, { cantidad: 1, primerIntentoEn: ahora, ventanaMs });
   } else {
     intento.cantidad += 1;
   }
 }
 
-/** Limpia los intentos fallidos de una clave (se llama tras un login/recuperación exitosos). */
-export function limpiarIntentos(clave: string): void {
+function limpiarEnMemoria(clave: string): void {
   intentosPorClave.delete(clave);
 }
 
-export function minutosRestantes(clave: string): number {
+function minutosRestantesEnMemoria(clave: string): number {
   const intento = intentosPorClave.get(clave);
   if (!intento) return 0;
   const restante = intento.ventanaMs - (Date.now() - intento.primerIntentoEn);
   return Math.max(Math.ceil(restante / 60000), 0);
+}
+
+// -------------------------------------------------------------------------
+// API pública — ahora asíncrona. Misma semántica que antes: se cuentan los
+// intentos FALLIDOS, se limpian tras un éxito, y se bloquea cuando se llega
+// al máximo dentro de la ventana.
+//
+// `maxIntentos`/`ventanaMs` son opcionales: por defecto, el límite genérico
+// de login (5 / 10 min). La recuperación de contraseña pasa los suyos, más
+// estrictos (ver recuperar/route.ts).
+// -------------------------------------------------------------------------
+
+/** Devuelve true si la clave superó el máximo de intentos fallidos en la ventana. */
+export async function estaLimitado(
+  clave: string,
+  maxIntentos = MAX_INTENTOS,
+  ventanaMs = VENTANA_MS
+): Promise<boolean> {
+  if (redis) {
+    try {
+      const cantidad = await redis.get<number>(clave);
+      return (cantidad ?? 0) >= maxIntentos;
+    } catch (err) {
+      console.error("rateLimit: fallo al leer de Redis, uso memoria:", err);
+    }
+  }
+  return estaLimitadoEnMemoria(clave, maxIntentos, ventanaMs);
+}
+
+/** Registra un intento fallido para esa clave. */
+export async function registrarIntentoFallido(
+  clave: string,
+  maxIntentos = MAX_INTENTOS,
+  ventanaMs = VENTANA_MS
+): Promise<void> {
+  if (redis) {
+    try {
+      // INCR cuenta el fallo; la primera vez fijamos el vencimiento de la
+      // ventana. Al vencer, Redis borra la clave solo y el conteo arranca
+      // de cero — igual que la versión en memoria.
+      const cantidad = await redis.incr(clave);
+      if (cantidad === 1) await redis.pexpire(clave, ventanaMs);
+      return;
+    } catch (err) {
+      console.error("rateLimit: fallo al escribir en Redis, uso memoria:", err);
+    }
+  }
+  registrarFalloEnMemoria(clave, ventanaMs);
+}
+
+/** Limpia los intentos fallidos de una clave (tras un login/recuperación exitosos). */
+export async function limpiarIntentos(clave: string): Promise<void> {
+  if (redis) {
+    try {
+      await redis.del(clave);
+      return;
+    } catch (err) {
+      console.error("rateLimit: fallo al borrar en Redis, uso memoria:", err);
+    }
+  }
+  limpiarEnMemoria(clave);
+}
+
+/** Minutos que faltan para que se libere el bloqueo de una clave. */
+export async function minutosRestantes(clave: string): Promise<number> {
+  if (redis) {
+    try {
+      const ttlMs = await redis.pttl(clave); // ms restantes; -1 sin vencimiento, -2 sin clave
+      if (ttlMs <= 0) return 0;
+      return Math.max(Math.ceil(ttlMs / 60000), 0);
+    } catch (err) {
+      console.error("rateLimit: fallo al leer TTL de Redis, uso memoria:", err);
+    }
+  }
+  return minutosRestantesEnMemoria(clave);
 }

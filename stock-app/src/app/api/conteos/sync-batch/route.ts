@@ -1,14 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { guardarConteosLote, registrarHistorial } from "@/lib/sheets";
-import { esSuperAdmin } from "@/lib/permisos";
-import type { Agencia, Conteo, Rol } from "@/types";
+import { leerSesion } from "@/lib/sesion";
+import type { Agencia, Conteo } from "@/types";
 
 export async function POST(request: NextRequest) {
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
-  const rol = (request.headers.get("x-user-rol") || "operador") as Rol;
-  const agenciaPropia = (request.headers.get("x-user-agencia") || "Centro Logístico") as Agencia;
-  const puedeElegirAgencia = esSuperAdmin(email);
+  /*
+    Se lee la sesión con la misma función blindada que el resto de las rutas,
+    en vez de leer los headers a mano. Leer headers sueltos es justo el
+    patrón que dejó sin control el borrado en lote en su momento -- acá se
+    unifica para que no vuelva a pasar.
+  */
+  const sesion = leerSesion(request);
+  if (!sesion) {
+    return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+  }
+  if (!sesion.capacidades.contar) {
+    return NextResponse.json({ ok: false, error: "Tu perfil no puede registrar conteos" }, { status: 403 });
+  }
+  const { id: userId, email, rol, agencia: agenciaPropia } = sesion;
+  const puedeElegirAgencia = sesion.esSuperAdmin;
 
   try {
     const body = await request.json();
