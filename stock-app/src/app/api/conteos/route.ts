@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { getConteos, guardarConteo, getProductoPorCodigo, registrarHistorial } from "@/lib/sheets";
 import { conteoSchema } from "@/lib/validations";
 import { calcularDiferencia, estadoDesdeDiferencia, formatFecha, formatHora } from "@/lib/utils";
-import { leerHeaderTexto } from "@/lib/headers";
 import { leerSesion } from "@/lib/sesion";
 import type { Agencia } from "@/types";
 
@@ -43,10 +42,17 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const userId = leerHeaderTexto(request, "x-user-id") || "";
-  const email = leerHeaderTexto(request, "x-user-email") || "";
-  const rol = (leerHeaderTexto(request, "x-user-rol") || "operador") as "administrador" | "operador";
-  const agencia = (leerHeaderTexto(request, "x-user-agencia") || "Centro Logístico") as Agencia;
+  // Ronda 2: se lee la sesión con la función blindada y se exige la capacidad
+  // `contar` (antes leía headers sueltos, sin chequear permiso). La agencia
+  // sale de la sesión, no de un header que el cliente podría manipular.
+  const sesion = leerSesion(request);
+  if (!sesion) {
+    return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
+  }
+  if (!sesion.capacidades.contar) {
+    return NextResponse.json({ ok: false, error: "Tu perfil no puede registrar conteos" }, { status: 403 });
+  }
+  const { id: userId, email, rol, agencia } = sesion;
 
   try {
     const body = await request.json();

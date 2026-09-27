@@ -1,7 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { actualizarProducto, eliminarProducto, registrarHistorial } from "@/lib/sheets";
+import { actualizarProducto, eliminarProducto, registrarHistorial, getProductos } from "@/lib/sheets";
 import { productoSchema } from "@/lib/validations";
 import { leerSesion } from "@/lib/sesion";
+import type { Agencia } from "@/types";
+
+/*
+  Ronda 2 — AISLAMIENTO ENTRE PLANTAS: además de la capacidad `gestionarCatalogo`,
+  se verifica que el producto pertenezca a una planta del alcance del usuario. Sin
+  esto, un jefe con varias plantas podía editar/borrar por id un producto de otra.
+*/
+async function productoEnAlcance(id: string, alcance: Agencia[]) {
+  const todos = await getProductos();
+  const p = todos.find((x) => String(x.id) === String(id));
+  if (!p || !alcance.includes(p.agencia as Agencia)) return null;
+  return p;
+}
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const sesion = leerSesion(request);
@@ -17,6 +30,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const parsed = productoSchema.partial().safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: parsed.error.errors[0]?.message }, { status: 400 });
+    }
+
+    if (!(await productoEnAlcance(id, sesion.alcance))) {
+      return NextResponse.json({ ok: false, error: "Producto no encontrado o fuera de tu alcance" }, { status: 404 });
     }
 
     const producto = await actualizarProducto(id, parsed.data);
@@ -47,6 +64,11 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
   try {
     const { id } = await params;
+
+    if (!(await productoEnAlcance(id, sesion.alcance))) {
+      return NextResponse.json({ ok: false, error: "Producto no encontrado o fuera de tu alcance" }, { status: 404 });
+    }
+
     const resultado = await eliminarProducto(id);
 
     await registrarHistorial({

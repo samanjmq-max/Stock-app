@@ -1,4 +1,9 @@
-const CACHE_VERSION = "stockapp-v1";
+// IMPORTANTE: subir esta versión en cada deploy con cambios visibles. Al
+// cambiar el texto, el navegador detecta un service worker nuevo, lo activa y
+// el handler de `activate` borra las cachés viejas -> el celular deja de
+// mostrar la versión anterior. (Antes quedó fija en "stockapp-v1" para
+// siempre, por eso la PWA mostraba pantallas desactualizadas.)
+const CACHE_VERSION = "stockapp-2026-09-27";
 const APP_SHELL = ["/dashboard", "/login", "/manifest.json", "/offline.html"];
 
 self.addEventListener("install", (event) => {
