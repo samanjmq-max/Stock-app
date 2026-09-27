@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Download, FileSpreadsheet, FileText, AlertTriangle, CheckCircle2 } from "lucide-react";
-import type { Agencia } from "@/types";
+import type { Agencia, TotalesCierre } from "@/types";
 import { exportarExcel, exportarPDF } from "@/lib/exportacion";
 import { conteosService } from "@/services/conteos.service";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -19,6 +19,8 @@ interface Props {
   columnasPdf: { header: string; key: string }[];
   cantidad: number;
   importe: number;
+  /** Totales deduplicados (estado final) que se guardan en el resumen del cierre. */
+  totales: TotalesCierre;
   /** Se llama después de cerrar bien, para refrescar la pantalla. */
   onCerrado: () => void;
 }
@@ -29,7 +31,7 @@ function nombreBaseArchivo(agencia: string): string {
   return `cierre-conteo-${ag}-${fecha}`;
 }
 
-export function CerrarCicloDialog({ open, onClose, agencia, filas, columnasPdf, cantidad, importe, onCerrado }: Props) {
+export function CerrarCicloDialog({ open, onClose, agencia, filas, columnasPdf, cantidad, importe, totales, onCerrado }: Props) {
   const [conExcel, setConExcel] = useState(true);
   const [conPdf, setConPdf] = useState(true);
   const [generado, setGenerado] = useState(false);
@@ -76,7 +78,7 @@ export function CerrarCicloDialog({ open, onClose, agencia, filas, columnasPdf, 
     if (!generado || !confirmado) return;
     setCerrando(true);
     try {
-      const res = await conteosService.cerrarCiclo({ agencia, archivoGenerado: nombreArchivo });
+      const res = await conteosService.cerrarCiclo({ agencia, archivoGenerado: nombreArchivo, totales });
       toast.success(`Cíclico de ${agencia} cerrado: ${res.eliminados} conteos archivados y limpiados`);
       onCerrado();
       onClose();

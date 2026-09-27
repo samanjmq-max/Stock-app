@@ -36,11 +36,17 @@ export async function POST(request: NextRequest) {
       conteos = conteos.map((c) => (c.agencia === agenciaPropia ? c : { ...c, agencia: agenciaPropia }));
     }
 
+    // PASO QUE CONFIRMA (commit): si esto sale bien, los conteos YA quedaron
+    // guardados. Lo que venga después (auditoría) es best-effort y NO puede
+    // hacer fallar la respuesta.
     const resultado = await guardarConteosLote(conteos);
 
-    // Auditoría: una entrada de historial por cada conteo sincronizado,
-    // para no perder trazabilidad de qué se contó offline.
-    await Promise.all(
+    // Auditoría: una entrada de historial por cada conteo sincronizado, para
+    // no perder trazabilidad. `allSettled`: si alguna de estas escrituras de
+    // historial falla (timeout de Apps Script, etc.), NO se devuelve 500 —
+    // porque el cliente reintentaría el lote y duplicaría conteos ya guardados
+    // (guardarConteosLote solo hace append, no deduplica).
+    const historial = await Promise.allSettled(
       conteos.map((c) =>
         registrarHistorial({
           usuarioId: userId,
@@ -54,10 +60,19 @@ export async function POST(request: NextRequest) {
         })
       )
     );
+    const historialFallidos = historial.filter((h) => h.status === "rejected").length;
+    if (historialFallidos > 0) {
+      console.error(`sync-batch: ${historialFallidos}/${conteos.length} entradas de historial fallaron (los conteos SÍ se guardaron)`);
+    }
 
     return NextResponse.json({ ok: true, data: resultado });
   } catch (err) {
     console.error("Error al sincronizar conteos en lote:", err);
-    return NextResponse.json({ ok: false, error: "No se pudo sincronizar" }, { status: 500 });
+    // Se reenvía el mensaje real (fetchGas/leerRespuestaGas dan diagnósticos
+    // precisos), en vez de un genérico que deja al operario sin saber qué pasó.
+    return NextResponse.json(
+      { ok: false, error: err instanceof Error ? err.message : "No se pudo sincronizar" },
+      { status: 500 }
+    );
   }
 }

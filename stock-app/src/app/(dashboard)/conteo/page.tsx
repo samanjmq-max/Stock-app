@@ -83,6 +83,11 @@ export default function ConteoPage() {
   const [historialProducto, setHistorialProducto] = useState<ConteoLocal[]>([]);
   const [ubicacionIncorrecta, setUbicacionIncorrecta] = useState(false);
   const [ubicacionNueva, setUbicacionNueva] = useState("");
+  // `isSubmitting` de react-hook-form se apaga apenas termina el await (una
+  // escritura rápida a IndexedDB), pero el producto y la cantidad siguen en
+  // pantalla 600ms hasta el reset -> un segundo toque encolaba un conteo
+  // duplicado. `guardando` mantiene el botón deshabilitado toda esa ventana.
+  const [guardando, setGuardando] = useState(false);
 
   const {
     register,
@@ -262,11 +267,13 @@ export default function ConteoPage() {
   useHardwareScanner((codigo) => buscarCodigo(codigo), true);
 
   async function onSubmit(data: ConteoInput) {
+    if (guardando) return; // ya hay un guardado en curso
     if (ubicacionIncorrecta && !ubicacionNueva.trim()) {
       toast.error("Escribí la nueva ubicación, o marcá que la ubicación es correcta");
       return;
     }
 
+    setGuardando(true);
     const now = new Date();
     const stockSap = producto?.stockSap ?? 0;
     const diferencia = calcularDiferencia(stockSap, data.stockContado);
@@ -310,10 +317,12 @@ export default function ConteoPage() {
         setUbicacionIncorrecta(false);
         setUbicacionNueva("");
         reset({ codigo: "", stockContado: undefined, observaciones: "", ubicacionNueva: "" });
+        setGuardando(false);
       }, 600);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar el conteo");
       sonidoLecturaIncorrecta();
+      setGuardando(false);
     }
   }
 
@@ -564,8 +573,8 @@ export default function ConteoPage() {
                     importante de la pantalla, no a todos los botones (design-system:
                     "Animate 1-2 key elements per view max"), y "Guardar conteo" es
                     justo esa acción principal de Contar stock. */}
-                <Button type="submit" size="lg" className="w-full btn-shiny" loading={isSubmitting}>
-                  {!isSubmitting && <Save size={18} />}
+                <Button type="submit" size="lg" className="w-full btn-shiny" loading={isSubmitting || guardando}>
+                  {!(isSubmitting || guardando) && <Save size={18} />}
                   Guardar conteo
                 </Button>
               </CardContent>

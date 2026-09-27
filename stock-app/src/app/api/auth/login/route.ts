@@ -3,7 +3,7 @@ import { loginSchema } from "@/lib/validations";
 import { getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
 import { crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
 import { compararPassword } from "@/lib/password";
-import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes } from "@/lib/rateLimit";
+import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes, ipCliente } from "@/lib/rateLimit";
 import { perfilDe, rolDePerfil } from "@/lib/permisos";
 import type { Agencia } from "@/types";
 export async function POST(request: NextRequest) {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
       );
     }
     const { email, password } = parsed.data;
-    const ip = request.headers.get("x-forwarded-for") || "sin-ip";
+    const ip = ipCliente(request);
     const claveLimite = `${ip}:${email.toLowerCase().trim()}`;
     if (await estaLimitado(claveLimite)) {
       const minutos = await minutosRestantes(claveLimite);

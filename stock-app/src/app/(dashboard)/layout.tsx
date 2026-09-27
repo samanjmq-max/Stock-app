@@ -1,15 +1,17 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { Sidebar } from "@/components/layout/Sidebar";
 import { Topbar } from "@/components/layout/Topbar";
-import { MobileNav } from "@/components/layout/MobileNav";
+import { SidebarRail } from "@/components/layout/SidebarRail";
+import { FloatingNav } from "@/components/layout/FloatingNav";
 import { AuthGate } from "@/components/layout/AuthGate";
 
 const TITULOS: Record<string, string> = {
   "/dashboard": "Dashboard",
+  "/estado": "Estado por planta",
   "/conteo": "Contar stock",
   "/productos": "Productos",
+  "/etiquetas": "Generar etiqueta",
   "/historial": "Historial",
   "/usuarios": "Usuarios",
   "/configuracion": "Configuración",
@@ -21,19 +23,17 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
 
   return (
     <AuthGate>
-      <div className="flex min-h-screen">
-        <Sidebar />
-        <div className="flex-1 min-w-0 pb-16 md:pb-0">
+      <div className="min-h-screen">
+        {/* Escritorio: menú lateral que se expande al pasar el mouse. */}
+        <SidebarRail />
+        {/* El contenido deja lugar a la izquierda para la tira de íconos (68px)
+            en escritorio; la versión expandida se monta por encima, no empuja. */}
+        <div className="md:pl-[68px]">
           <Topbar title={titulo} />
-          {/* Centra y limita a 1400px en desktop -- sin esto el contenido se
-              estira sin límite en monitores grandes. Se usa max-w directo
-              (no la clase `container`) para no sumarle su padding propio al
-              p-4/md:p-6 que cada página ya trae, que aflojaría la densidad
-              alta que pide Dashboard. Conteo mantiene su propio max-w-xl
-              más angosto adentro, sin cambios visuales para esa página. */}
-          <div className="max-w-[1400px] mx-auto">{children}</div>
+          <div className="mx-auto max-w-[1400px] pb-28 md:pb-10">{children}</div>
         </div>
-        <MobileNav />
+        {/* Celular: barra flotante abajo (FloatingNav se oculta solo en md+). */}
+        <FloatingNav />
       </div>
     </AuthGate>
   );

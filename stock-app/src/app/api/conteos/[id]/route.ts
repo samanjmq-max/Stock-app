@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { editarConteo, eliminarConteo, registrarHistorial } from "@/lib/sheets";
 import { leerSesion } from "@/lib/sesion";
-import type { Rol } from "@/types";
 import { z } from "zod";
 
 const editarConteoSchema = z.object({
@@ -17,13 +16,14 @@ const editarConteoSchema = z.object({
 // cargado, como el caso del operador que encontró una diferencia al
 // final del turno.
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const rol = request.headers.get("x-user-rol") as Rol | null;
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
-
-  if (!rol) {
+  // Se lee la sesión con la función blindada (igual que el resto de las rutas),
+  // en vez de headers sueltos. Editar sigue abierto a cualquier usuario
+  // autenticado a propósito (un operario corrige un dato mal cargado).
+  const sesion = leerSesion(request);
+  if (!sesion) {
     return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
   }
+  const { rol, id: userId, email } = sesion;
 
   try {
     const { id } = await params;

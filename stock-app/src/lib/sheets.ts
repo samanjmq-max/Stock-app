@@ -1,5 +1,5 @@
 import "server-only";
-import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia, Perfil, ResumenMensual } from "@/types";
+import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia, Perfil, ResumenMensual, TotalesCierre } from "@/types";
 
 const GAS_URL = process.env.GAS_WEB_APP_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -192,6 +192,7 @@ export async function cerrarCiclo(input: {
   usuarioEmail?: string;
   usuarioNombre?: string;
   archivoGenerado?: string;
+  totales?: TotalesCierre;
 }): Promise<{ eliminados: number; resumen: ResumenMensual }> {
   return gasPost<{ eliminados: number; resumen: ResumenMensual }>("cerrarCiclo", input);
 }

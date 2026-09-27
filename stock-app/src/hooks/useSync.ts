@@ -19,6 +19,12 @@ export function useSync() {
   // El intervalo de reintento se lee desde un ref para no recrear el efecto
   // de montaje cada vez que cambia el estado de sincronización.
   const sincronizarRef = useRef<(() => Promise<void>) | undefined>(undefined);
+  // Candado SÍNCRONO. `sincronizando` es estado de React y puede leerse
+  // desfasado si dos disparadores entran casi a la vez (guardar conteo + el
+  // intervalo, o "online" + montaje): ambos verían `false` y subirían el
+  // MISMO lote -> conteos duplicados en la planilla (sync-batch solo hace
+  // append). Un ref se actualiza al instante y cierra esa ventana.
+  const enCursoRef = useRef(false);
 
   const refrescarPendientes = useCallback(async () => {
     const pendientesActuales = await getConteosPendientes();
@@ -27,7 +33,8 @@ export function useSync() {
   }, []);
 
   const sincronizarAhora = useCallback(async () => {
-    if (!navigator.onLine || sincronizando) return;
+    if (!navigator.onLine || enCursoRef.current) return;
+    enCursoRef.current = true;
     setSincronizando(true);
     try {
       const pendientesActuales = await getConteosPendientes();
@@ -77,9 +84,10 @@ export function useSync() {
       console.error("Error al sincronizar:", err);
       setErrorSync(err instanceof Error ? err.message : "No se pudo conectar para sincronizar");
     } finally {
+      enCursoRef.current = false;
       setSincronizando(false);
     }
-  }, [sincronizando, refrescarPendientes]);
+  }, [refrescarPendientes]);
 
   sincronizarRef.current = sincronizarAhora;
 

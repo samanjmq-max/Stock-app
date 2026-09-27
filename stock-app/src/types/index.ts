@@ -156,6 +156,36 @@ export interface ResumenMensual {
   emailCierre: string;
   archivoGenerado: string;
   creadoEn: string;
+  // Desglose por estado (artículos y pesos), congelado al momento del cierre.
+  // Opcionales: las filas viejas (cerradas antes de esta versión) no los tienen.
+  coincidencias?: number;
+  importeCoincidencias?: number;
+  diferenciasPositivas?: number;
+  importeDiferenciasPositivas?: number;
+  diferenciasNegativas?: number;
+  importeDiferenciasNegativas?: number;
+  porContar?: number;
+  importePorContar?: number;
+}
+
+/**
+ * Totales que el navegador calcula (estado final deduplicado) y manda al
+ * cerrar el cíclico, para que el resumen guardado coincida con lo que se ve
+ * en el Dashboard y en el documento.
+ */
+export interface TotalesCierre {
+  articulos: number;
+  totalContado: number;
+  totalDiferenciaAbs: number;
+  importe: number;
+  coincidencias: number;
+  importeCoincidencias: number;
+  diferenciasPositivas: number;
+  importeDiferenciasPositivas: number;
+  diferenciasNegativas: number;
+  importeDiferenciasNegativas: number;
+  porContar: number;
+  importePorContar: number;
 }
 
 export interface DashboardStats {

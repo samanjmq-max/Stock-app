@@ -31,6 +31,25 @@ import { Redis } from "@upstash/redis";
 const MAX_INTENTOS = 5;
 const VENTANA_MS = 10 * 60 * 1000; // 10 minutos
 
+/**
+ * IP del cliente para armar la clave del rate-limit. ANTES se usaba el header
+ * `x-forwarded-for` COMPLETO como clave; como ese header puede llevar varias
+ * IPs y un atacante puede anteponer valores inventados, cada request con un
+ * XFF distinto caía en un bucket nuevo y el límite se podía evadir. Ahora se
+ * prefiere `x-real-ip` (que fija el proxy y el cliente no controla) y, si no
+ * está, la PRIMERA IP del XFF, no la cadena entera.
+ */
+export function ipCliente(req: { headers: { get(name: string): string | null } }): string {
+  const real = req.headers.get("x-real-ip");
+  if (real && real.trim()) return real.trim();
+  const xff = req.headers.get("x-forwarded-for");
+  if (xff) {
+    const primera = xff.split(",")[0]?.trim();
+    if (primera) return primera;
+  }
+  return "sin-ip";
+}
+
 // -------------------------------------------------------------------------
 // Cliente de Redis (solo si están las dos variables). Si falta alguna, queda
 // en null y todo el archivo usa el contador en memoria.

@@ -181,7 +181,7 @@ export function StatCard({
     <Card
       onClick={onClick}
       className={cn(
-        "relative flex min-h-[176px] flex-col overflow-hidden border-[1.5px] p-0 transition-shadow duration-quick",
+        "relative flex min-h-[128px] md:min-h-[176px] flex-col overflow-hidden border-[1.5px] p-0 transition-shadow duration-quick",
         t.borde,
         onClick && "cursor-pointer hover:shadow-elev-2",
         // Filtro activo: un anillo del mismo color por fuera del contorno.
@@ -210,9 +210,9 @@ export function StatCard({
         />
       )}
 
-      <CardContent className="relative flex flex-1 flex-col p-[17px] pb-3">
-        <CardLabel className="mb-3 flex items-center gap-2.5 text-[12px] tracking-[0.1em]">
-          <span className={cn("grid h-[26px] w-[26px] shrink-0 place-items-center rounded-lg", t.chip)}>
+      <CardContent className="relative flex flex-1 flex-col p-3 pb-2.5 md:p-[17px] md:pb-3">
+        <CardLabel className="mb-2 flex items-center gap-2 text-[11px] tracking-[0.08em] md:mb-3 md:gap-2.5 md:text-[12px] md:tracking-[0.1em]">
+          <span className={cn("grid h-[22px] w-[22px] shrink-0 place-items-center rounded-lg md:h-[26px] md:w-[26px]", t.chip)}>
             <Icon size={14} />
           </span>
           <span className="truncate">{label}</span>
@@ -220,7 +220,7 @@ export function StatCard({
 
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <p className={cn("font-display text-[40px] font-bold leading-none tracking-tight tabular-nums", t.texto)}>
+            <p className={cn("font-display text-[30px] font-bold leading-none tracking-tight tabular-nums md:text-[40px]", t.texto)}>
               {value}
             </p>
             {aviso && (
@@ -250,7 +250,7 @@ export function StatCard({
         </div>
 
         {importe !== undefined && (
-          <div className="mt-auto border-t border-border/70 pt-2.5">
+          <div className="mt-auto border-t border-border/70 pt-2 md:pt-2.5">
             {/*
               El filete separa el importe de la cifra sin ponerle otro color
               encima: son dos magnitudes distintas (unidades y pesos) y sin
@@ -265,7 +265,7 @@ export function StatCard({
             <p className="font-mono text-[9.5px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
               Importe
             </p>
-            <p className="mt-1 truncate font-display text-[18px] font-semibold leading-none tabular-nums text-foreground">
+            <p className="mt-1 truncate font-display text-[15px] font-semibold leading-none tabular-nums text-foreground md:text-[18px]">
               {formatearImporte(importe)}
             </p>
           </div>
@@ -282,7 +282,7 @@ export function StatCard({
           final toman los tres el mismo token que la cifra.
         */
         <svg
-          className={cn("relative block h-[46px] w-full", t.texto)}
+          className={cn("relative block h-8 w-full md:h-[46px]", t.texto)}
           viewBox={`0 0 ${ANCHO} ${ALTO}`}
           preserveAspectRatio="none"
           aria-hidden="true"

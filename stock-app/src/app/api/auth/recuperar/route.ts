@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getUsuarioPorEmail, actualizarUsuario, registrarHistorial } from "@/lib/sheets";
 import { hashPassword } from "@/lib/password";
 import { esSuperAdmin } from "@/lib/permisos";
-import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes } from "@/lib/rateLimit";
+import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes, ipCliente } from "@/lib/rateLimit";
 import { z } from "zod";
 
 const recuperarSchema = z.object({
@@ -23,6 +23,13 @@ const ERROR_GENERICO = "No se pudo procesar la solicitud. Verificá el email y e
 const MAX_INTENTOS_RECUPERAR = 3;
 const VENTANA_RECUPERAR_MS = 30 * 60 * 1000; // 30 minutos
 
+// Tope ABSOLUTO por email, independiente de la IP. La clave por IP se puede
+// evadir rotando `x-forwarded-for`; este segundo bucket, que NO depende de la
+// IP, pone un techo firme a los intentos contra el email del super-admin y
+// cierra la fuerza bruta del RECOVERY_CODE. Se elige un límite holgado para no
+// bloquear a un admin legítimo que se equivoca algunas veces.
+const MAX_INTENTOS_RECUPERAR_EMAIL = 8;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -33,11 +40,16 @@ export async function POST(request: NextRequest) {
     const { email, codigo, nuevaPassword } = parsed.data;
     const emailNormalizado = email.toLowerCase().trim();
 
-    const ip = request.headers.get("x-forwarded-for") || "sin-ip";
+    const ip = ipCliente(request);
     const claveLimite = `recuperar:${ip}:${emailNormalizado}`;
+    const claveLimiteEmail = `recuperar:email:${emailNormalizado}`;
 
-    if (await estaLimitado(claveLimite, MAX_INTENTOS_RECUPERAR, VENTANA_RECUPERAR_MS)) {
-      const minutos = await minutosRestantes(claveLimite);
+    const [limitadoIp, limitadoEmail] = await Promise.all([
+      estaLimitado(claveLimite, MAX_INTENTOS_RECUPERAR, VENTANA_RECUPERAR_MS),
+      estaLimitado(claveLimiteEmail, MAX_INTENTOS_RECUPERAR_EMAIL, VENTANA_RECUPERAR_MS),
+    ]);
+    if (limitadoIp || limitadoEmail) {
+      const minutos = await minutosRestantes(limitadoEmail ? claveLimiteEmail : claveLimite);
       return NextResponse.json(
         { ok: false, error: `Demasiados intentos. Probá de nuevo en ${minutos} minuto${minutos === 1 ? "" : "s"}.` },
         { status: 429 }
@@ -53,19 +65,25 @@ export async function POST(request: NextRequest) {
     // Esta recuperación SOLO funciona para el email del super administrador.
     // Cualquier otro email recibe el mismo error genérico, sin distinción.
     if (!esSuperAdmin(emailNormalizado) || codigo !== codigoConfigurado) {
-      await registrarIntentoFallido(claveLimite, MAX_INTENTOS_RECUPERAR, VENTANA_RECUPERAR_MS);
+      await Promise.all([
+        registrarIntentoFallido(claveLimite, MAX_INTENTOS_RECUPERAR, VENTANA_RECUPERAR_MS),
+        registrarIntentoFallido(claveLimiteEmail, MAX_INTENTOS_RECUPERAR_EMAIL, VENTANA_RECUPERAR_MS),
+      ]);
       return NextResponse.json({ ok: false, error: ERROR_GENERICO }, { status: 401 });
     }
 
     const usuario = await getUsuarioPorEmail(emailNormalizado);
     if (!usuario) {
-      await registrarIntentoFallido(claveLimite, MAX_INTENTOS_RECUPERAR, VENTANA_RECUPERAR_MS);
+      await Promise.all([
+        registrarIntentoFallido(claveLimite, MAX_INTENTOS_RECUPERAR, VENTANA_RECUPERAR_MS),
+        registrarIntentoFallido(claveLimiteEmail, MAX_INTENTOS_RECUPERAR_EMAIL, VENTANA_RECUPERAR_MS),
+      ]);
       return NextResponse.json({ ok: false, error: ERROR_GENERICO }, { status: 401 });
     }
 
     const passwordHash = await hashPassword(nuevaPassword);
     await actualizarUsuario(usuario.id, { passwordHash });
-    await limpiarIntentos(claveLimite);
+    await Promise.all([limpiarIntentos(claveLimite), limpiarIntentos(claveLimiteEmail)]);
 
     await registrarHistorial({
       usuarioId: usuario.id,

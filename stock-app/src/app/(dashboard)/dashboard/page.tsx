@@ -258,8 +258,15 @@ export default function DashboardPage() {
 
   // Movimiento de hoy: cuántos conteos de cada estado se registraron en la
   // fecha de hoy. Es la cifra de la pastilla.
-  const hoy = new Date().toLocaleDateString("es-UY");
-  const deHoy = todosLosConteos.filter((c) => c.fecha === hoy);
+  // Comparar por el DÍA LOCAL de `creadoEn` (timestamp ISO real), no por el
+  // string `c.fecha` con locale: ese string lo arma el backend y puede venir
+  // con otro formato (ceros a la izquierda, etc.), con lo que `c.fecha === hoy`
+  // nunca daba true y el delta de hoy quedaba siempre en 0.
+  const hoyClave = new Date().toDateString();
+  const deHoy = todosLosConteos.filter((c) => {
+    const d = new Date(c.creadoEn);
+    return !isNaN(d.getTime()) && d.toDateString() === hoyClave;
+  });
   const deltaDe = (estado: EstadoConteo) => deHoy.filter((c) => c.estado === estado).length;
 
   const conteosFiltrados = vista && vista !== "pendientes" && vista !== "contados"
@@ -364,6 +371,31 @@ export default function DashboardPage() {
   // Datos para el cierre de cíclico (documento de detalle + importe total).
   const filasCierre = capacidades?.cerrarCiclo ? datosConteosParaExportar(todosLosConteos) : [];
   const importeCierre = filasCierre.reduce((s, f) => s + (Number((f as { Importe?: number }).Importe) || 0), 0);
+  // Totales deduplicados = el ESTADO FINAL (último conteo por código+ubicación),
+  // los mismos que salen en el documento. Se los mandamos al backend para que el
+  // resumen guardado coincida con el documento y el cierre no tenga que releer
+  // todos los productos (que era lento y sumaba el historial crudo, inflando).
+  const totalesCierre = {
+    articulos: todosLosConteos.length,
+    totalContado: todosLosConteos.reduce((s, c) => s + (Number(c.stockContado) || 0), 0),
+    totalDiferenciaAbs: todosLosConteos.reduce((s, c) => s + Math.abs(Number(c.diferencia) || 0), 0),
+    importe: importeCierre,
+    // Desglose por estado (mismo que las tarjetas del Dashboard) — en artículos
+    // y en pesos — para que el Estado por planta muestre el resumen claro.
+    coincidencias: stats.coincidencias,
+    importeCoincidencias: stats.importeCoincidencias,
+    diferenciasPositivas: stats.diferenciasPositivas,
+    importeDiferenciasPositivas: stats.importeDiferenciasPositivas,
+    diferenciasNegativas: stats.diferenciasNegativas,
+    importeDiferenciasNegativas: stats.importeDiferenciasNegativas,
+    porContar: stats.pendientes,
+    importePorContar: stats.importePendientes,
+  };
+  // El cierre borra el detalle de la PLANTA COMPLETA, pero con un filtro de
+  // zona activo el documento y el resumen reflejarían solo la zona filtrada
+  // -> se borraría más de lo archivado (pérdida de datos). Por eso el cierre
+  // se bloquea mientras haya un filtro de ubicación o familia puesto.
+  const hayFiltroZonaCierre = ubicacionFiltro.length > 0 || familiaFiltro.length > 0;
 
   async function vaciarConteos() {
     if (!agenciaParaVaciar) return;
@@ -677,22 +709,31 @@ export default function DashboardPage() {
           )}
 
           {capacidades?.cerrarCiclo && (
-            <div className="pt-2 border-t border-border">
+            <div className="pt-2 border-t border-border space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-xs text-muted-foreground">
                   {agenciaParaVaciar
-                    ? `Cerrar el cíclico de ${agenciaParaVaciar}: genera el documento de detalle, archiva el resumen y limpia el detalle.`
+                    ? `Cerrar el cíclico de ${agenciaParaVaciar}: genera el documento de detalle, archiva el resumen y limpia el detalle de TODA la planta.`
                     : "Elegí una agencia específica arriba para cerrar su cíclico"}
                 </p>
                 <Button
                   variant="default"
                   size="sm"
                   onClick={() => setCerrarAbierto(true)}
-                  disabled={!agenciaParaVaciar || conteos.length === 0}
+                  disabled={!agenciaParaVaciar || conteos.length === 0 || hayFiltroZonaCierre}
                 >
                   <Archive size={15} /> Cerrar cíclico {agenciaParaVaciar ? `(${agenciaParaVaciar})` : ""}
                 </Button>
               </div>
+              {hayFiltroZonaCierre && (
+                <div className="flex gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+                  <span>
+                    Tenés un <b>filtro de zona</b> activo. El cierre borra el detalle de la <b>planta completa</b>,
+                    no solo la zona filtrada. Quitá el filtro de ubicación/familia para poder cerrar.
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -749,6 +790,7 @@ export default function DashboardPage() {
           columnasPdf={COLUMNAS_CONTEOS}
           cantidad={todosLosConteos.length}
           importe={importeCierre}
+          totales={totalesCierre}
           onCerrado={recargar}
         />
       )}

@@ -26,6 +26,25 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const agencia = body.agencia as Agencia | undefined;
     const archivoGenerado = typeof body.archivoGenerado === "string" ? body.archivoGenerado : "";
+    // Totales deduplicados calculados en el navegador (estado final = documento),
+    // incluido el desglose por estado (artículos y pesos) para el Estado por planta.
+    const t = body.totales;
+    const totales = t && typeof t === "object"
+      ? {
+          articulos: Number(t.articulos) || 0,
+          totalContado: Number(t.totalContado) || 0,
+          totalDiferenciaAbs: Number(t.totalDiferenciaAbs) || 0,
+          importe: Number(t.importe) || 0,
+          coincidencias: Number(t.coincidencias) || 0,
+          importeCoincidencias: Number(t.importeCoincidencias) || 0,
+          diferenciasPositivas: Number(t.diferenciasPositivas) || 0,
+          importeDiferenciasPositivas: Number(t.importeDiferenciasPositivas) || 0,
+          diferenciasNegativas: Number(t.diferenciasNegativas) || 0,
+          importeDiferenciasNegativas: Number(t.importeDiferenciasNegativas) || 0,
+          porContar: Number(t.porContar) || 0,
+          importePorContar: Number(t.importePorContar) || 0,
+        }
+      : undefined;
 
     if (!agencia) {
       return NextResponse.json({ ok: false, error: "Falta la agencia a cerrar" }, { status: 400 });
@@ -41,6 +60,7 @@ export async function POST(request: NextRequest) {
       usuarioEmail: email,
       usuarioNombre: nombre,
       archivoGenerado,
+      totales,
     });
 
     await registrarHistorial({

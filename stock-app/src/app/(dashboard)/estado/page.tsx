@@ -1,40 +1,78 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Loader2, Archive, Building2, FileText } from "lucide-react";
+import {
+  Loader2, Archive, Building2, FileText, AlertTriangle, RefreshCw, FileSpreadsheet,
+} from "lucide-react";
 import { resumenService } from "@/services/resumen.service";
 import type { ResumenMensual } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
-function fmt(n: number): string {
-  return Number(n || 0).toLocaleString("es-UY");
+function fmtNum(n: number | undefined): string {
+  return Number(n || 0).toLocaleString("es-UY", { maximumFractionDigits: 0 });
+}
+function fmtPesos(n: number | undefined): string {
+  return "$ " + Number(n || 0).toLocaleString("es-UY", { maximumFractionDigits: 0 });
+}
+// Google Sheets suele convertir "2026-09" y las fechas a su propio formato y
+// las devuelve como timestamp ISO. Se formatean acá para que se lean bien.
+function fmtPeriodo(v: string): string {
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) return d.toLocaleDateString("es-UY", { month: "2-digit", year: "numeric" });
+  return String(v ?? "—");
+}
+// Partes de la fecha de cierre para el mini-almanaque (mes / día / año).
+function partesFecha(v: string): { mes: string; dia: string; anio: string } {
+  const d = new Date(v);
+  if (isNaN(d.getTime())) return { mes: "—", dia: "", anio: "" };
+  return {
+    mes: d.toLocaleDateString("es-UY", { month: "short" }).replace(".", ""),
+    dia: String(d.getDate()),
+    anio: String(d.getFullYear()),
+  };
+}
+
+// Las 4 categorías del cierre, en el mismo orden y color que el Dashboard.
+function categorias(r: ResumenMensual) {
+  return [
+    { label: "Coincidencias", art: r.coincidencias, pesos: r.importeCoincidencias, color: "hsl(var(--success))" },
+    { label: "Diferencias +", art: r.diferenciasPositivas, pesos: r.importeDiferenciasPositivas, color: "hsl(var(--info))" },
+    { label: "Diferencias −", art: r.diferenciasNegativas, pesos: r.importeDiferenciasNegativas, color: "hsl(var(--destructive))" },
+    { label: "Por contar", art: r.porContar, pesos: r.importePorContar, color: "hsl(var(--avance))" },
+  ];
 }
 
 export default function EstadoPage() {
   const [resumenes, setResumenes] = useState<ResumenMensual[]>([]);
   const [loading, setLoading] = useState(true);
+  // Un fallo de carga NO es lo mismo que "no hay cierres".
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    let vivo = true;
-    resumenService
-      .listar()
-      .then((data) => { if (vivo) setResumenes(data); })
-      .catch((err) => toast.error(err instanceof Error ? err.message : "No se pudo cargar el estado"))
-      .finally(() => { if (vivo) setLoading(false); });
-    return () => { vivo = false; };
+  const cargar = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await resumenService.listar();
+      setResumenes(data);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "No se pudo cargar el estado por planta";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { cargar(); }, [cargar]);
 
   // Más recientes primero.
   const ordenados = useMemo(
     () => [...resumenes].sort((a, b) => String(b.creadoEn).localeCompare(String(a.creadoEn))),
     [resumenes]
   );
-
-  const agenciasConCierre = useMemo(
-    () => new Set(resumenes.map((r) => r.agencia)).size,
-    [resumenes]
-  );
+  const agenciasConCierre = useMemo(() => new Set(resumenes.map((r) => r.agencia)).size, [resumenes]);
 
   if (loading) {
     return (
@@ -50,75 +88,122 @@ export default function EstadoPage() {
       <div>
         <h1 className="font-display text-2xl font-bold">Estado por planta</h1>
         <p className="text-sm text-muted-foreground">
-          Resumen de los cíclicos cerrados. El detalle de cada cierre quedó como documento (Excel/PDF) en poder de quien lo cerró; acá vive lo consolidado.
+          Resumen de cada cíclico cerrado. El detalle fino quedó como documento (Excel/PDF) en poder de quien lo cerró; acá vive el consolidado.
         </p>
       </div>
 
-      {/* Métricas rápidas */}
-      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+      {error && (
         <Card>
-          <CardContent className="flex items-center gap-3 py-4">
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Archive size={18} /></div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums leading-none">{resumenes.length}</p>
-              <p className="text-xs text-muted-foreground">cierres registrados</p>
-            </div>
+          <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+            <AlertTriangle size={28} className="text-destructive" />
+            <p className="text-sm text-destructive">{error}</p>
+            <p className="text-xs text-muted-foreground">No se pudo cargar la información. Esto no significa que no haya cierres.</p>
+            <Button variant="outline" size="sm" onClick={cargar}>
+              <RefreshCw size={15} /> Reintentar
+            </Button>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="flex items-center gap-3 py-4">
-            <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Building2 size={18} /></div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums leading-none">{agenciasConCierre}</p>
-              <p className="text-xs text-muted-foreground">plantas con cierre</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      )}
 
-      {ordenados.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center gap-2 py-14 text-center text-muted-foreground">
-            <FileText size={28} className="opacity-60" />
-            <p className="text-sm">Todavía no se cerró ningún cíclico.</p>
-            <p className="text-xs">Cuando cierres un cíclico desde el Dashboard, el resumen va a aparecer acá.</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <th className="px-4 py-3 font-semibold">Planta</th>
-                    <th className="px-4 py-3 font-semibold">Período</th>
-                    <th className="px-4 py-3 font-semibold">Cierre</th>
-                    <th className="px-4 py-3 text-right font-semibold">Artículos</th>
-                    <th className="px-4 py-3 text-right font-semibold">Contado</th>
-                    <th className="px-4 py-3 text-right font-semibold">Dif. (abs)</th>
-                    <th className="px-4 py-3 text-right font-semibold">Importe</th>
-                    <th className="px-4 py-3 font-semibold">Cerró</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ordenados.map((r, i) => (
-                    <tr key={r.id || i} className={i % 2 ? "bg-elevated/30" : ""}>
-                      <td className="px-4 py-3 font-medium">{r.agencia}</td>
-                      <td className="px-4 py-3 tabular-nums">{r.periodo}</td>
-                      <td className="px-4 py-3 tabular-nums">{r.fechaCierre}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{fmt(r.articulos)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{fmt(r.totalContado)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{fmt(r.totalDiferenciaAbs)}</td>
-                      <td className="px-4 py-3 text-right tabular-nums">{fmt(r.importe)}</td>
-                      <td className="px-4 py-3 text-muted-foreground">{r.usuarioCierre || r.emailCierre || "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+      {!error && (
+        <>
+          {/* Métricas rápidas */}
+          <div className="grid grid-cols-2 gap-3 sm:max-w-md">
+            <Card>
+              <CardContent className="flex items-center gap-3 py-4">
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Archive size={18} /></div>
+                <div>
+                  <p className="text-2xl font-bold tabular-nums leading-none">{resumenes.length}</p>
+                  <p className="text-xs text-muted-foreground">cierres registrados</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-3 py-4">
+                <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Building2 size={18} /></div>
+                <div>
+                  <p className="text-2xl font-bold tabular-nums leading-none">{agenciasConCierre}</p>
+                  <p className="text-xs text-muted-foreground">plantas con cierre</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {ordenados.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center gap-2 py-14 text-center text-muted-foreground">
+                <FileText size={28} className="opacity-60" />
+                <p className="text-sm">Todavía no se cerró ningún cíclico.</p>
+                <p className="text-xs">Cuando cierres un cíclico desde el Dashboard, el resumen va a aparecer acá.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {ordenados.map((r, i) => (
+                <Card key={r.id || i}>
+                  <CardContent className="space-y-4 py-4">
+                    {/* Encabezado del cierre — bloque calendario (Fecha C) */}
+                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
+                      <div className="flex items-center gap-3">
+                        {(() => {
+                          const f = partesFecha(r.fechaCierre);
+                          return (
+                            <div className="w-[52px] shrink-0 overflow-hidden rounded-lg border border-border text-center">
+                              <div className="bg-primary py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">{f.mes}</div>
+                              <div className="pt-0.5 text-[22px] font-bold leading-tight tabular-nums">{f.dia}</div>
+                              <div className="pb-1 text-[10px] text-muted-foreground tabular-nums">{f.anio}</div>
+                            </div>
+                          );
+                        })()}
+                        <div>
+                          <p className="font-display text-lg font-bold leading-tight">{r.agencia}</p>
+                          <p className="text-xs text-muted-foreground">Cierre del cíclico · período {fmtPeriodo(r.periodo)}</p>
+                          <p className="text-[11px] text-muted-foreground">Cerró: {r.usuarioCierre || r.emailCierre || "—"}</p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total contado</p>
+                        <p className="font-display text-base font-semibold tabular-nums">
+                          {fmtNum(r.articulos)} art. · {fmtPesos(r.importe)}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Desglose por estado: fila de mini-stats (artículos + pesos).
+                        Cada celda con un tinte y borde de su color -> se lee igual
+                        de bien en modo día (claro) que en modo noche (oscuro). */}
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      {categorias(r).map((c) => (
+                        <div
+                          key={c.label}
+                          className="flex items-center gap-2.5 rounded-lg border px-3 py-2.5"
+                          style={{
+                            borderColor: `color-mix(in srgb, ${c.color} 32%, transparent)`,
+                            background: `color-mix(in srgb, ${c.color} 8%, transparent)`,
+                          }}
+                        >
+                          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: c.color }} />
+                          <div className="min-w-0">
+                            <p className="truncate text-[11px] font-medium leading-tight" style={{ color: c.color }}>{c.label}</p>
+                            <p className="text-lg font-bold tabular-nums leading-tight">{fmtNum(c.art)}</p>
+                            <p className="text-[11px] tabular-nums text-muted-foreground">{fmtPesos(c.pesos)}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Pie: documento */}
+                    {r.archivoGenerado && (
+                      <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                        <FileSpreadsheet size={13} /> Documento de detalle: <span className="font-medium">{r.archivoGenerado}</span>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </>
       )}
     </div>
   );
