@@ -75,6 +75,13 @@ export interface Capacidades {
   etiquetas: boolean;
   /** Ve todas las plantas, sin importar cuáles tenga asignadas. */
   todasLasPlantas: boolean;
+  /**
+   * Cerrar el cíclico de una planta: genera el documento de detalle, guarda
+   * el resumen mensual y limpia los conteos de esa agencia. Es una acción
+   * destructiva, por eso hoy la tiene SOLO el encargado de almacén (que es
+   * quien está en el campo) y el súper administrador. Los demás visualizan.
+   */
+  cerrarCiclo: boolean;
 }
 
 /**
@@ -92,6 +99,7 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
     etiqueta: "Operario",
     descripcion: "Cuenta, corrige e imprime etiquetas. No borra nada y solo ve su planta.",
     capacidades: {
+      cerrarCiclo: false,
       contar: true,
       borrarLineas: false,
       gestionarUsuarios: false,
@@ -110,6 +118,7 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
     descripcion:
       "Cuenta, corrige, borra líneas de conteo, imprime etiquetas y sube el archivo de SAP para arrancar el cíclico. Solo su planta.",
     capacidades: {
+      cerrarCiclo: true,
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: false,
@@ -125,6 +134,7 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
     descripcion:
       "Todo lo operativo más catálogo, etiquetas e historial. Da de alta y baja operarios y encargados. Puede tener varias plantas a cargo.",
     capacidades: {
+      cerrarCiclo: false,
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: true,
@@ -139,6 +149,7 @@ export const PERFILES: Record<Perfil, { etiqueta: string; descripcion: string; c
     etiqueta: "Gerente",
     descripcion: "Todos los permisos sobre todas las plantas. No puede vaciar el inventario.",
     capacidades: {
+      cerrarCiclo: false,
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: true,
@@ -184,6 +195,7 @@ export function perfilDe(u: { perfil?: string | null; rol?: Rol | null }): Perfi
 export function capacidadesDe(u: { perfil?: string | null; rol?: Rol | null; email?: string | null }): Capacidades {
   if (esSuperAdmin(u.email ?? null)) {
     return {
+      cerrarCiclo: true,
       contar: true,
       borrarLineas: true,
       gestionarUsuarios: true,

@@ -1,4 +1,4 @@
-import type { Conteo, Agencia } from "@/types";
+import type { Conteo, Agencia, ResumenMensual } from "@/types";
 import type { ConteoInput } from "@/lib/validations";
 
 async function parseOrThrow<T>(res: Response): Promise<T> {
@@ -45,4 +45,17 @@ export const conteosService = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ agencia: agencia ?? null }),
     }).then((r) => parseOrThrow<{ eliminados: number }>(r)),
+
+  /**
+   * Cierra el cíclico de una agencia: guarda el resumen y borra su detalle.
+   * El documento de detalle se genera y descarga en el navegador ANTES de
+   * llamar acá; `archivoGenerado` es su nombre (para trazabilidad).
+   * Permiso: solo Encargado de Almacén y súper administrador.
+   */
+  cerrarCiclo: (input: { agencia: Agencia; archivoGenerado?: string }): Promise<{ eliminados: number; resumen: ResumenMensual }> =>
+    fetch("/api/conteos/cerrar-ciclo", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }).then((r) => parseOrThrow<{ eliminados: number; resumen: ResumenMensual }>(r)),
 };

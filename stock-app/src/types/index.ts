@@ -116,6 +116,7 @@ export type AccionHistorial =
   | "editar_conteo"
   | "eliminar_conteo"
   | "resetear_conteos"
+  | "cerrar_ciclo"
   | "importar_productos"
   | "exportar_datos"
   | "recuperar_password";
@@ -134,6 +135,27 @@ export interface HistorialEntry {
   hora: string;
   dispositivo: string;
   ip: string;
+}
+
+/**
+ * Resumen consolidado de un cíclico cerrado (1 fila por agencia por cierre).
+ * Vive en la hoja ResumenMensual del backend y alimenta el Estado por planta
+ * y el mini-dashboard mensual. El detalle fino se va como documento que baja
+ * el usuario — acá solo queda lo liviano.
+ */
+export interface ResumenMensual {
+  id: string;
+  agencia: Agencia;
+  periodo: string; // AAAA-MM
+  fechaCierre: string;
+  articulos: number;
+  totalContado: number;
+  totalDiferenciaAbs: number;
+  importe: number;
+  usuarioCierre: string;
+  emailCierre: string;
+  archivoGenerado: string;
+  creadoEn: string;
 }
 
 export interface DashboardStats {

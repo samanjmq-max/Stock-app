@@ -1,5 +1,5 @@
 import "server-only";
-import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia, Perfil } from "@/types";
+import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia, Perfil, ResumenMensual } from "@/types";
 
 const GAS_URL = process.env.GAS_WEB_APP_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -38,6 +38,7 @@ const TIMEOUT_POR_ACCION: Record<string, number> = {
   guardarConteosLote: 45000,
   eliminarConteos: 45000,
   resetearConteos: 45000,
+  cerrarCiclo: 45000,
 };
 
 function timeoutDe(accion: string): number {
@@ -176,6 +177,28 @@ export async function eliminarConteos(ids: string[]): Promise<{ eliminados: numb
 }
 export async function resetearConteos(agencia?: Agencia): Promise<{ eliminados: number }> {
   return gasPost<{ eliminados: number }>("resetearConteos", agencia ? { agencia } : {});
+}
+
+/* ==================== CIERRE DE CÍCLICO / RESUMEN ==================== */
+/**
+ * Cierra el cíclico de una agencia: el backend calcula el resumen, lo guarda
+ * en ResumenMensual y borra SOLO el detalle de esa agencia. El documento de
+ * detalle se genera en el navegador ANTES de llamar acá; `archivoGenerado` es
+ * su nombre, que se guarda para trazabilidad.
+ */
+export async function cerrarCiclo(input: {
+  agencia: Agencia;
+  usuarioId?: string;
+  usuarioEmail?: string;
+  usuarioNombre?: string;
+  archivoGenerado?: string;
+}): Promise<{ eliminados: number; resumen: ResumenMensual }> {
+  return gasPost<{ eliminados: number; resumen: ResumenMensual }>("cerrarCiclo", input);
+}
+
+/** Histórico consolidado (1 fila por agencia por cierre). Liviano. */
+export async function getResumenMensual(): Promise<ResumenMensual[]> {
+  return gasGet<ResumenMensual[]>("listarResumenMensual");
 }
 
 /* ==================== HISTORIAL ==================== */
