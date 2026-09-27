@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
-import { LayoutDashboard, ScanLine, Package, History, Users, type LucideIcon } from "lucide-react";
+import { LayoutDashboard, ScanLine, Package, ClipboardList, History, Users, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +38,13 @@ import { cn } from "@/lib/utils";
 const ITEMS = [
   { href: "/dashboard", label: "Inicio", icon: LayoutDashboard, soloAdmin: false },
   { href: "/productos", label: "Productos", icon: Package, soloAdmin: false },
+  /*
+    Estado por planta lo ve cualquiera con sesión, igual que en el sidebar de
+    escritorio: es la única forma de que el Encargado, que trabaja en el campo
+    con el teléfono, llegue al consolidado de cierres. Sin él, esta pantalla
+    quedaría escondida en móvil (el sidebar se oculta por debajo de md).
+  */
+  { href: "/estado", label: "Estado", icon: ClipboardList, soloAdmin: false },
   { href: "/historial", label: "Historial", icon: History, soloAdmin: true },
   { href: "/usuarios", label: "Usuarios", icon: Users, soloAdmin: true },
 ];

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   LayoutDashboard, ScanLine, Package, History, Users, Settings, Barcode,
-  PanelLeftClose, PanelLeftOpen,
+  ClipboardList, PanelLeftClose, PanelLeftOpen,
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import type { Capacidades } from "@/lib/permisos";
@@ -52,6 +52,12 @@ const GRUPOS: { titulo: string; items: Item[] }[] = [
     titulo: "Operación",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+      /*
+        Estado por planta lo ve cualquiera con sesión (sin capacidad): es una
+        vista de solo lectura del consolidado de cierres. El operario mira el
+        avance de su planta; el gerente y el súper admin, el de todas.
+      */
+      { href: "/estado", label: "Estado por planta", icon: ClipboardList },
       { href: "/conteo", label: "Contar stock", icon: ScanLine, capacidad: "contar" },
       { href: "/productos", label: "Productos", icon: Package },
       /*

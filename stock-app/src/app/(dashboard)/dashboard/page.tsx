@@ -5,7 +5,7 @@ import Link from "next/link";
 import dynamic from "next/dynamic";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
-import { Clock, TrendingUp, TrendingDown, Equal, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode } from "lucide-react";
+import { Clock, TrendingUp, TrendingDown, Equal, Download, Loader2, RotateCcw, RefreshCw, AlertTriangle, ScanBarcode, Archive } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDashboardData, esContable, normalizarCodigo, mapaPrecios, importeRelevante } from "@/hooks/useDashboardData";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -14,6 +14,7 @@ import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { TableroABC } from "@/components/dashboard/TableroABC";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
 import { EditarConteoDialog } from "@/components/dashboard/EditarConteoDialog";
+import { CerrarCicloDialog } from "@/components/dashboard/CerrarCicloDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -81,7 +82,7 @@ const DashboardCharts = dynamic(() => import("@/components/dashboard/DashboardCh
 });
 
 export default function DashboardPage() {
-  const { isAdmin, esSuperAdmin, agencia: agenciaUsuario } = useAuth();
+  const { isAdmin, esSuperAdmin, agencia: agenciaUsuario, capacidades } = useAuth();
   const [agenciaFiltro, setAgenciaFiltro] = useState<Agencia | undefined>(undefined);
   // Filtro cíclico por zona -- disponible para cualquier usuario (operario
   // incluido), a diferencia del selector de agencia que es solo para admin.
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   const [vaciando, setVaciando] = useState(false);
   const [vaciandoTodas, setVaciandoTodas] = useState(false);
   const [actualizando, setActualizando] = useState(false);
+  const [cerrarAbierto, setCerrarAbierto] = useState(false);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -358,6 +360,10 @@ export default function DashboardPage() {
   }
 
   const agenciaParaVaciar = (agenciaFiltro || agenciaUsuario || "") as Agencia | "";
+
+  // Datos para el cierre de cíclico (documento de detalle + importe total).
+  const filasCierre = capacidades?.cerrarCiclo ? datosConteosParaExportar(todosLosConteos) : [];
+  const importeCierre = filasCierre.reduce((s, f) => s + (Number((f as { Importe?: number }).Importe) || 0), 0);
 
   async function vaciarConteos() {
     if (!agenciaParaVaciar) return;
@@ -670,6 +676,26 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {capacidades?.cerrarCiclo && (
+            <div className="pt-2 border-t border-border">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {agenciaParaVaciar
+                    ? `Cerrar el cíclico de ${agenciaParaVaciar}: genera el documento de detalle, archiva el resumen y limpia el detalle.`
+                    : "Elegí una agencia específica arriba para cerrar su cíclico"}
+                </p>
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => setCerrarAbierto(true)}
+                  disabled={!agenciaParaVaciar || conteos.length === 0}
+                >
+                  <Archive size={15} /> Cerrar cíclico {agenciaParaVaciar ? `(${agenciaParaVaciar})` : ""}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {isAdmin && (
             <div className="pt-2 border-t border-border space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -713,6 +739,19 @@ export default function DashboardPage() {
 
       <EditarConteoDialog key={conteoAEditar?.id || "none"} conteo={conteoAEditar}
         onClose={() => setConteoAEditar(null)} onGuardado={recargar} />
+
+      {capacidades?.cerrarCiclo && agenciaParaVaciar && (
+        <CerrarCicloDialog
+          open={cerrarAbierto}
+          onClose={() => setCerrarAbierto(false)}
+          agencia={agenciaParaVaciar as Agencia}
+          filas={filasCierre}
+          columnasPdf={COLUMNAS_CONTEOS}
+          cantidad={todosLosConteos.length}
+          importe={importeCierre}
+          onCerrado={recargar}
+        />
+      )}
     </motion.div>
   );
 }
