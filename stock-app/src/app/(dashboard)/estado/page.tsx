@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
-  Loader2, Archive, Building2, FileText, AlertTriangle, RefreshCw, FileSpreadsheet,
+  Loader2, Archive, Building2, FileText, AlertTriangle, RefreshCw, FileSpreadsheet, Trash2,
 } from "lucide-react";
 import { resumenService } from "@/services/resumen.service";
 import type { ResumenMensual } from "@/types";
+import { useAuth } from "@/contexts/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -45,10 +46,12 @@ function categorias(r: ResumenMensual) {
 }
 
 export default function EstadoPage() {
+  const { esSuperAdmin } = useAuth();
   const [resumenes, setResumenes] = useState<ResumenMensual[]>([]);
   const [loading, setLoading] = useState(true);
   // Un fallo de carga NO es lo mismo que "no hay cierres".
   const [error, setError] = useState<string | null>(null);
+  const [eliminandoId, setEliminandoId] = useState<string | null>(null);
 
   const cargar = useCallback(async () => {
     setLoading(true);
@@ -66,6 +69,24 @@ export default function EstadoPage() {
   }, []);
 
   useEffect(() => { cargar(); }, [cargar]);
+
+  async function eliminar(r: ResumenMensual) {
+    if (!esSuperAdmin || !r.id) return;
+    const ok = window.confirm(
+      `¿Borrar este cierre de ${r.agencia}?\n\nSolo se borra el registro del resumen (Estado por planta). El documento que se descargó al cerrar no se toca. Esta acción no se puede deshacer.`
+    );
+    if (!ok) return;
+    setEliminandoId(r.id);
+    try {
+      await resumenService.eliminar(r.id);
+      setResumenes((prev) => prev.filter((x) => x.id !== r.id));
+      toast.success("Cierre borrado");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "No se pudo borrar el cierre");
+    } finally {
+      setEliminandoId(null);
+    }
+  }
 
   // Más recientes primero.
   const ordenados = useMemo(
@@ -109,7 +130,7 @@ export default function EstadoPage() {
         <>
           {/* Métricas rápidas */}
           <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-            <Card>
+            <Card className="shadow-sm">
               <CardContent className="flex items-center gap-3 py-4">
                 <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Archive size={18} /></div>
                 <div>
@@ -118,7 +139,7 @@ export default function EstadoPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="shadow-sm">
               <CardContent className="flex items-center gap-3 py-4">
                 <div className="grid h-10 w-10 place-items-center rounded-lg bg-primary/10 text-primary"><Building2 size={18} /></div>
                 <div>
@@ -140,33 +161,44 @@ export default function EstadoPage() {
           ) : (
             <div className="space-y-4">
               {ordenados.map((r, i) => (
-                <Card key={r.id || i}>
+                <Card key={r.id || i} className="shadow-sm">
                   <CardContent className="space-y-4 py-4">
-                    {/* Encabezado del cierre — bloque calendario (Fecha C) */}
-                    <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
-                      <div className="flex items-center gap-3">
-                        {(() => {
-                          const f = partesFecha(r.fechaCierre);
-                          return (
-                            <div className="w-[52px] shrink-0 overflow-hidden rounded-lg border border-border text-center">
-                              <div className="bg-primary py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">{f.mes}</div>
-                              <div className="pt-0.5 text-[22px] font-bold leading-tight tabular-nums">{f.dia}</div>
-                              <div className="pb-1 text-[10px] text-muted-foreground tabular-nums">{f.anio}</div>
-                            </div>
-                          );
-                        })()}
-                        <div>
-                          <p className="font-display text-lg font-bold leading-tight">{r.agencia}</p>
-                          <p className="text-xs text-muted-foreground">Cierre del cíclico · período {fmtPeriodo(r.periodo)}</p>
-                          <p className="text-[11px] text-muted-foreground">Cerró: {r.usuarioCierre || r.emailCierre || "—"}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total contado</p>
-                        <p className="font-display text-base font-semibold tabular-nums">
-                          {fmtNum(r.articulos)} art. · {fmtPesos(r.importe)}
+                    {/* Encabezado: calendario + planta, con el total como subtítulo (B) */}
+                    <div className="flex items-center gap-3 border-b border-border pb-3">
+                      {(() => {
+                        const f = partesFecha(r.fechaCierre);
+                        return (
+                          <div className="w-[52px] shrink-0 overflow-hidden rounded-lg border border-border text-center">
+                            <div className="bg-primary py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">{f.mes}</div>
+                            <div className="pt-0.5 text-[22px] font-bold leading-tight tabular-nums">{f.dia}</div>
+                            <div className="pb-1 text-[10px] text-muted-foreground tabular-nums">{f.anio}</div>
+                          </div>
+                        );
+                      })()}
+                      <div className="min-w-0">
+                        <p className="font-display text-lg font-bold leading-tight">{r.agencia}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">
+                          <b className="font-semibold tabular-nums text-foreground">{fmtNum(r.articulos)}</b> artículos ·{" "}
+                          <b className="font-semibold tabular-nums text-foreground">{fmtPesos(r.importe)}</b>
+                        </p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Cierre {fmtPeriodo(r.periodo)} · Cerró: {r.usuarioCierre || r.emailCierre || "—"}
                         </p>
                       </div>
+
+                      {/* Borrar cierre — solo súper admin (ej. limpiar pruebas). */}
+                      {esSuperAdmin && (
+                        <button
+                          type="button"
+                          onClick={() => eliminar(r)}
+                          disabled={eliminandoId === r.id}
+                          aria-label="Borrar cierre"
+                          title="Borrar este cierre"
+                          className="ml-auto grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+                        >
+                          {eliminandoId === r.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                      )}
                     </div>
 
                     {/* Desglose por estado: fila de mini-stats (artículos + pesos).

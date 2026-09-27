@@ -202,6 +202,11 @@ export async function getResumenMensual(): Promise<ResumenMensual[]> {
   return gasGet<ResumenMensual[]>("listarResumenMensual");
 }
 
+/** Borra un registro de ResumenMensual por id (solo súper admin). */
+export async function eliminarResumen(id: string): Promise<{ id: string; eliminado: boolean }> {
+  return gasPost<{ id: string; eliminado: boolean }>("eliminarResumen", { id });
+}
+
 /* ==================== HISTORIAL ==================== */
 export async function getHistorial(): Promise<HistorialEntry[]> { return gasGet<HistorialEntry[]>("listarHistorial"); }
 export async function registrarHistorial(input: { usuarioId: string; usuarioEmail: string; rol: Rol; accion: AccionHistorial; entidad?: string; valorAnterior?: string; valorNuevo?: string; observacion?: string; dispositivo?: string; ip?: string; }): Promise<HistorialEntry> {

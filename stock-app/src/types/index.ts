@@ -117,6 +117,7 @@ export type AccionHistorial =
   | "eliminar_conteo"
   | "resetear_conteos"
   | "cerrar_ciclo"
+  | "eliminar_resumen"
   | "importar_productos"
   | "exportar_datos"
   | "recuperar_password";

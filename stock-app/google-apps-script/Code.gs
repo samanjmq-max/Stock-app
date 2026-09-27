@@ -28,6 +28,10 @@ const ACCIONES_GET = {
   obtenerProductoPorCodigo: (p) => obtenerProductoPorCodigo_(p.codigo),
   listarConteos: () => listarConteos_(),
   listarHistorial: () => listarHistorial_(),
+  listarAgencias: () => listarAgencias_(),
+
+  // Cierre de cíclico / retención (ver Retencion.gs).
+  listarResumenMensual: () => listarResumenMensual_(),
 };
 
 const ACCIONES_POST = {
@@ -42,9 +46,16 @@ const ACCIONES_POST = {
 
   guardarConteo: (b) => guardarConteo_(b),
   guardarConteosLote: (b) => guardarConteosLote_(b),
-  resetearConteos: () => resetearConteos_(),
+  editarConteo: (b) => editarConteo_(b),
+  eliminarConteo: (b) => eliminarConteo_(b),
+  eliminarConteos: (b) => eliminarConteos_(b),
+  resetearConteos: (b) => resetearConteos_(b),
 
   registrarHistorial: (b) => registrarHistorial_(b),
+
+  // Cierre de cíclico / retención (ver Retencion.gs).
+  cerrarCiclo: (b) => cerrarCiclo_(b),
+  eliminarResumen: (b) => eliminarResumen_(b),
 };
 
 function doGet(e) {

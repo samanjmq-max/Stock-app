@@ -44,6 +44,27 @@ function guardarResumen_(obj) {
   return obj;
 }
 
+/**
+ * Borra un registro de ResumenMensual por id (usado por el súper admin desde
+ * "Estado por planta" para limpiar cierres — p. ej. filas de prueba). El
+ * permiso lo controla el servidor Next (solo súper admin); acá solo se borra.
+ */
+function eliminarResumen_(input) {
+  var id = input && input.id;
+  if (!id) throw new Error("Falta el id del resumen a eliminar");
+  var sheet = getResumenSheet_();
+  var values = sheet.getDataRange().getValues();
+  var idCol = values[0].indexOf("id");
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][idCol]) === String(id)) {
+      sheet.deleteRow(i + 1);
+      logAccion_("eliminarResumen", id);
+      return { id: id, eliminado: true };
+    }
+  }
+  throw new Error("No se encontró el resumen (id: " + id + ")");
+}
+
 function listarResumenMensual_() {
   var sheet = getResumenSheet_();
   var values = sheet.getDataRange().getValues();

@@ -14,4 +14,9 @@ export const resumenService = {
    */
   listar: (): Promise<ResumenMensual[]> =>
     fetch("/api/resumen-mensual").then((r) => parseOrThrow<ResumenMensual[]>(r)),
+
+  /** Borra un cierre por id (solo súper admin — el servidor lo verifica). */
+  eliminar: (id: string): Promise<{ id: string; eliminado: boolean }> =>
+    fetch(`/api/resumen-mensual/${encodeURIComponent(id)}`, { method: "DELETE" })
+      .then((r) => parseOrThrow<{ id: string; eliminado: boolean }>(r)),
 };
