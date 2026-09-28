@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { loginSchema } from "@/lib/validations";
 import { getUsuarioPorEmail, registrarHistorial } from "@/lib/sheets";
 import { crearToken, AUTH_COOKIE_NAME } from "@/lib/auth";
-import { compararPassword } from "@/lib/password";
+import { compararPassword, HASH_SENUELO } from "@/lib/password";
 import { estaLimitado, registrarIntentoFallido, limpiarIntentos, minutosRestantes, ipCliente } from "@/lib/rateLimit";
 import { perfilDe, rolDePerfil } from "@/lib/permisos";
 import type { Agencia } from "@/types";
@@ -28,6 +28,12 @@ export async function POST(request: NextRequest) {
     }
     const usuario = await getUsuarioPorEmail(email.toLowerCase().trim());
     if (!usuario || !usuario.activo) {
+      // Enumeración por tiempos: si esta rama respondiera al instante, un
+      // email inexistente contestaría más rápido que uno válido (que sí corre
+      // bcrypt), y midiendo el tiempo se podría descubrir qué emails existen.
+      // Se corre una comparación contra el hash señuelo para gastar el mismo
+      // tiempo antes de devolver exactamente el mismo error.
+      await compararPassword(password, HASH_SENUELO);
       await registrarIntentoFallido(claveLimite);
       return NextResponse.json({ ok: false, error: "Email o contraseña incorrectos" }, { status: 401 });
     }

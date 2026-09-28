@@ -52,6 +52,9 @@ export function AvisoActualizacion() {
   // porque cambiarla no tiene que repintar nada: es el punto de comparación,
   // no algo que se muestre.
   const versionInicial = useRef<string | null>(null);
+  // Id del temporizador de "posponer", para poder limpiarlo (evita apilar
+  // timers al posponer varias veces y setState sobre un componente desmontado).
+  const posponerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const consultar = useCallback(async () => {
     try {
@@ -91,6 +94,7 @@ export function AvisoActualizacion() {
       clearInterval(id);
       document.removeEventListener("visibilitychange", alVolver);
       window.removeEventListener("focus", alVolver);
+      if (posponerTimer.current) clearTimeout(posponerTimer.current);
     };
   }, [consultar]);
 
@@ -113,7 +117,8 @@ export function AvisoActualizacion() {
 
   function posponer() {
     setVisible(false);
-    setTimeout(() => setVisible(true), POSPONER_MS);
+    if (posponerTimer.current) clearTimeout(posponerTimer.current);
+    posponerTimer.current = setTimeout(() => setVisible(true), POSPONER_MS);
   }
 
   if (!hayVersionNueva || !visible) return null;

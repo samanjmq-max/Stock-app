@@ -66,6 +66,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "La contraseña es obligatoria para un usuario nuevo" }, { status: 400 });
     }
 
+    // El email del súper admin (SUPER_ADMIN_EMAIL) da control total en runtime;
+    // nadie salvo el propio súper admin puede crear una cuenta con ese email.
+    if (esSuperAdmin(parsed.data.email) && !sesion.esSuperAdmin) {
+      return NextResponse.json({ ok: false, error: "No podés crear una cuenta con ese email" }, { status: 403 });
+    }
+
     // Un nuevo usuario creado desde el formulario NUNCA es el super
     // administrador (ese es fijo, por variable de entorno) — así que
     // la planta siempre es obligatoria acá, sin excepción.

@@ -65,6 +65,52 @@ function eliminarResumen_(input) {
   throw new Error("No se encontró el resumen (id: " + id + ")");
 }
 
+/**
+ * Borra los conteos de UNA agencia (o de todas si no se pasa agencia), en
+ * bloque para no trabar el candado del script.
+ *
+ * Por qué existe: `resetearConteos_` (Conteos.gs) borra la hoja ENTERA sin
+ * mirar la agencia. Como `cerrarCiclo_` y el botón "Reiniciar inventario" son
+ * por planta, usar aquel borraría los conteos EN CURSO de las otras 8 plantas.
+ * Esta función respeta la agencia: conserva las filas de las demás y reescribe.
+ */
+function borrarConteosDeAgencia_(agencia) {
+  var sheet = getSheet_(SHEETS.CONTEOS);
+  var lastRow = sheet.getLastRow();
+  if (lastRow < 2) return { eliminados: 0 };
+
+  // Sin agencia (súper admin "todas las plantas"): borrar todo, rápido.
+  if (!agencia) {
+    var n = lastRow - 1;
+    sheet.deleteRows(2, n);
+    logAccion_("resetearConteos", n + " conteos eliminados (todas las plantas)");
+    return { eliminados: n };
+  }
+
+  // Con agencia: conservar el resto y reescribir en bloque.
+  var values = sheet.getDataRange().getValues();
+  var headers = values[0];
+  var colAg = headers.indexOf("agencia");
+  if (colAg === -1) throw new Error("La hoja Conteos no tiene columna 'agencia'");
+
+  var conservar = [];
+  var eliminados = 0;
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][colAg]) === String(agencia)) eliminados++;
+    else conservar.push(values[i]);
+  }
+  if (eliminados === 0) return { eliminados: 0 };
+
+  // Limpiar el cuerpo y reescribir solo lo que se conserva (2 operaciones,
+  // sin borrar fila por fila -> no dispara el "Lock timeout").
+  sheet.getRange(2, 1, lastRow - 1, headers.length).clearContent();
+  if (conservar.length > 0) {
+    sheet.getRange(2, 1, conservar.length, headers.length).setValues(conservar);
+  }
+  logAccion_("resetearConteos", eliminados + " conteos eliminados (" + agencia + ")");
+  return { eliminados: eliminados };
+}
+
 function listarResumenMensual_() {
   var sheet = getResumenSheet_();
   var values = sheet.getDataRange().getValues();
@@ -132,8 +178,10 @@ function cerrarCiclo_(input) {
     };
   }
 
-  // 1) Borrar primero (rápido, en bloque). Si no había nada, no se guarda resumen.
-  var r = resetearConteos_({ agencia: agencia });
+  // 1) Borrar primero SOLO esta planta (en bloque). Antes usaba
+  //    resetearConteos_, que borra la hoja entera -> cerrar el cíclico de una
+  //    planta borraba los conteos en curso de las otras. Ahora es por agencia.
+  var r = borrarConteosDeAgencia_(agencia);
   if (!r.eliminados) {
     throw new Error("No hay conteos para cerrar en " + agencia);
   }

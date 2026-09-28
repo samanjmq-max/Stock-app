@@ -67,10 +67,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     router.refresh();
   }
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    setUser(null);
-    router.push("/login");
-    router.refresh();
+    // El cierre de sesión local NO debe depender del servidor: en el depósito
+    // sin señal, si el fetch falla, igual hay que sacar al usuario y llevarlo
+    // al login. Por eso el setUser/redirect va en el finally.
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      // Sin conexión o el server no respondió: se cierra igual del lado del cliente.
+    } finally {
+      setUser(null);
+      router.push("/login");
+      router.refresh();
+    }
   }
   return (
     <AuthContext.Provider value={{

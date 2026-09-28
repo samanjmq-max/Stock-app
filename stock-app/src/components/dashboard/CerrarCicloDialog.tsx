@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Download, FileSpreadsheet, FileText, AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { Agencia, TotalesCierre } from "@/types";
@@ -74,8 +74,15 @@ export function CerrarCicloDialog({ open, onClose, agencia, filas, columnasPdf, 
     }
   }
 
+  // Candado SÍNCRONO contra el doble-tap: cerrar el cíclico ARCHIVA y BORRA el
+  // detalle en el servidor. Un doble toque en el celular puede entrar dos veces
+  // antes de que el estado `cerrando` re-renderice; el ref se actualiza al
+  // instante y evita el segundo disparo (doble archivado / error).
+  const cerrandoRef = useRef(false);
+
   async function cerrar() {
-    if (!generado || !confirmado) return;
+    if (!generado || !confirmado || cerrandoRef.current) return;
+    cerrandoRef.current = true;
     setCerrando(true);
     try {
       const res = await conteosService.cerrarCiclo({ agencia, archivoGenerado: nombreArchivo, totales });
@@ -85,6 +92,7 @@ export function CerrarCicloDialog({ open, onClose, agencia, filas, columnasPdf, 
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "No se pudo cerrar el cíclico");
     } finally {
+      cerrandoRef.current = false;
       setCerrando(false);
     }
   }

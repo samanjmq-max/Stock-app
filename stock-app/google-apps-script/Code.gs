@@ -24,9 +24,17 @@
 const ACCIONES_GET = {
   listarUsuarios: () => listarUsuarios_(),
   obtenerUsuarioPorEmail: (p) => obtenerUsuarioPorEmail_(p.email),
-  listarProductos: () => listarProductos_(),
-  obtenerProductoPorCodigo: (p) => obtenerProductoPorCodigo_(p.codigo),
-  listarConteos: () => listarConteos_(),
+
+  // IMPORTANTE: estas acciones SÍ tienen que reenviar la agencia que pide el
+  // servidor. Si no se la pasan, la función devuelve TODO y el selector "Ver
+  // agencia" del Dashboard no cambia nada (muestra siempre la misma planta).
+  listarProductos: (p) => listarProductos_(p.agencia),
+  obtenerProductoPorCodigo: (p) => obtenerProductoPorCodigo_(p.codigo, p.agencia),
+  listarConteos: (p) =>
+    p && p.agencia
+      ? listarConteos_().filter((c) => String(c.agencia) === String(p.agencia))
+      : listarConteos_(),
+
   listarHistorial: () => listarHistorial_(),
   listarAgencias: () => listarAgencias_(),
 
@@ -49,7 +57,10 @@ const ACCIONES_POST = {
   editarConteo: (b) => editarConteo_(b),
   eliminarConteo: (b) => eliminarConteo_(b),
   eliminarConteos: (b) => eliminarConteos_(b),
-  resetearConteos: (b) => resetearConteos_(b),
+  // Reiniciar inventario: borra SOLO la planta pedida (o todas si no viene
+  // agencia). Va por borrarConteosDeAgencia_ (Retencion.gs), NO por
+  // resetearConteos_, que borra la hoja entera sin mirar la agencia.
+  resetearConteos: (b) => borrarConteosDeAgencia_(b && b.agencia),
 
   registrarHistorial: (b) => registrarHistorial_(b),
 

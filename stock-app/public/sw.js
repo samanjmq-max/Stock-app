@@ -3,22 +3,24 @@
 // el handler de `activate` borra las cachés viejas -> el celular deja de
 // mostrar la versión anterior. (Antes quedó fija en "stockapp-v1" para
 // siempre, por eso la PWA mostraba pantallas desactualizadas.)
-const CACHE_VERSION = "stockapp-2026-09-27";
+const CACHE_VERSION = "stockapp-2026-09-27b";
 const APP_SHELL = ["/dashboard", "/login", "/manifest.json", "/offline.html"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => cache.addAll(APP_SHELL)).catch(() => {})
   );
-  self.skipWaiting();
+  // OJO: NO llamar self.skipWaiting() acá. Si el SW nuevo se activa solo,
+  // dispara controllerchange y el cliente (PwaRegister) recarga la pestaña de
+  // sorpresa -- en medio de un conteo se pierde lo que se está tipeando. En su
+  // lugar el SW queda en "waiting" y solo se activa cuando el usuario toca
+  // "Actualizar" (que manda el mensaje SKIP_WAITING de abajo). Así la rama
+  // registro.waiting del cliente funciona y el aviso aparece a tiempo.
 });
 
 // El registro (PwaRegister.tsx) manda esto cuando el usuario toca "Actualizar"
-// en el aviso de nueva versión -- sin esto, skipWaiting() de arriba ya activa
-// el SW nuevo en segundo plano, pero una pestaña/PWA que ya estaba abierta
-// sigue corriendo el JS viejo que tiene cargado en memoria hasta que alguien
-// la recarga a mano. Con este mensaje + el reload en controllerchange del
-// cliente, la actualización se aplica sin que haga falta cerrar la app.
+// en el aviso de nueva versión: recién ahí el SW nuevo toma el control y el
+// cliente se recarga. Es el único punto donde se hace skipWaiting.
 self.addEventListener("message", (event) => {
   if (event.data === "SKIP_WAITING") self.skipWaiting();
 });

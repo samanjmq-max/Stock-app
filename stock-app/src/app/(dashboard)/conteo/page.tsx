@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -88,6 +88,10 @@ export default function ConteoPage() {
   // pantalla 600ms hasta el reset -> un segundo toque encolaba un conteo
   // duplicado. `guardando` mantiene el botón deshabilitado toda esa ventana.
   const [guardando, setGuardando] = useState(false);
+  // Candado síncrono contra el doble-tap: `guardando` es estado y puede leerse
+  // desfasado si el dedo entra dos veces en el mismo frame -> conteo duplicado
+  // en la cola. El ref se actualiza al instante.
+  const guardandoRef = useRef(false);
 
   const {
     register,
@@ -267,12 +271,13 @@ export default function ConteoPage() {
   useHardwareScanner((codigo) => buscarCodigo(codigo), true);
 
   async function onSubmit(data: ConteoInput) {
-    if (guardando) return; // ya hay un guardado en curso
+    if (guardando || guardandoRef.current) return; // ya hay un guardado en curso
     if (ubicacionIncorrecta && !ubicacionNueva.trim()) {
       toast.error("Escribí la nueva ubicación, o marcá que la ubicación es correcta");
       return;
     }
 
+    guardandoRef.current = true;
     setGuardando(true);
     const now = new Date();
     const stockSap = producto?.stockSap ?? 0;
@@ -317,11 +322,13 @@ export default function ConteoPage() {
         setUbicacionIncorrecta(false);
         setUbicacionNueva("");
         reset({ codigo: "", stockContado: undefined, observaciones: "", ubicacionNueva: "" });
+        guardandoRef.current = false;
         setGuardando(false);
       }, 600);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Error al guardar el conteo");
       sonidoLecturaIncorrecta();
+      guardandoRef.current = false;
       setGuardando(false);
     }
   }

@@ -9,6 +9,21 @@ import {
 /** Cada cuánto se reintenta subir la cola cuando quedó algo pendiente. */
 const INTERVALO_REINTENTO_MS = 2 * 60 * 1000;
 
+/** Corta un fetch de sincronización colgado para no dejar el candado tomado. */
+const TIMEOUT_SYNC_MS = 30 * 1000;
+
+/*
+  Candado a NIVEL MÓDULO, compartido por TODAS las instancias del hook.
+
+  useSync se monta en más de un lugar a la vez (el Topbar vive siempre en el
+  layout y la página de Conteo monta otra instancia). El ref `enCursoRef` es
+  por instancia, así que no alcanza: dos instancias leen la MISMA cola de
+  IndexedDB y suben el mismo lote -> conteos duplicados (sync-batch solo hace
+  append). Esta variable de módulo se comparte entre instancias del mismo
+  documento y cierra esa ventana.
+*/
+let sincronizacionGlobalEnCurso = false;
+
 export function useSync() {
   const [isOnline, setIsOnline] = useState(true);
   const [pendientes, setPendientes] = useState(0);
@@ -33,19 +48,33 @@ export function useSync() {
   }, []);
 
   const sincronizarAhora = useCallback(async () => {
-    if (!navigator.onLine || enCursoRef.current) return;
+    // Doble candado: el global evita que dos instancias del hook suban el
+    // mismo lote; el de instancia evita reentradas dentro de la misma.
+    if (!navigator.onLine || enCursoRef.current || sincronizacionGlobalEnCurso) return;
     enCursoRef.current = true;
+    sincronizacionGlobalEnCurso = true;
     setSincronizando(true);
     try {
       const pendientesActuales = await getConteosPendientes();
       if (pendientesActuales.length > 0) {
-        const res = await fetch("/api/conteos/sync-batch", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conteos: pendientesActuales.map(({ localId, synced, createdAt, ...resto }) => resto),
-          }),
-        });
+        // Timeout: sin esto, un fetch colgado (señal mala en el depósito) deja
+        // el candado tomado hasta que el navegador corte por su cuenta,
+        // bloqueando toda sincronización posterior.
+        const controlador = new AbortController();
+        const temporizador = setTimeout(() => controlador.abort(), TIMEOUT_SYNC_MS);
+        let res: Response;
+        try {
+          res = await fetch("/api/conteos/sync-batch", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            signal: controlador.signal,
+            body: JSON.stringify({
+              conteos: pendientesActuales.map(({ localId, synced, createdAt, ...resto }) => resto),
+            }),
+          });
+        } finally {
+          clearTimeout(temporizador);
+        }
 
         // El servidor puede devolver una página de error (HTML) en vez de
         // JSON si la función se cayó o expiró: sin este manejo, el .json()
@@ -85,6 +114,7 @@ export function useSync() {
       setErrorSync(err instanceof Error ? err.message : "No se pudo conectar para sincronizar");
     } finally {
       enCursoRef.current = false;
+      sincronizacionGlobalEnCurso = false;
       setSincronizando(false);
     }
   }, [refrescarPendientes]);

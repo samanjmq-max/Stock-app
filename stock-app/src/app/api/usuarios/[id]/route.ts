@@ -25,6 +25,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ ok: false, error: "Usuario no encontrado" }, { status: 404 });
     }
 
+    // La cuenta del súper administrador solo la puede editar él mismo. Sin
+    // esto, un gerente que "pueda gestionar" esa fila podría desactivarla o
+    // cambiarle el email y dejar al súper admin fuera del sistema (la última
+    // llave). Espeja el candado que ya tiene el DELETE.
+    if (esSuperAdmin(objetivo.email) && !sesion.esSuperAdmin) {
+      return NextResponse.json({ ok: false, error: "Solo el súper administrador puede editar su propia cuenta" }, { status: 403 });
+    }
+
     // Se verifica contra el usuario COMO ESTÁ HOY: hay que poder tocarlo
     // antes de mirar siquiera qué cambios se piden.
     if (!puedeGestionarA(sesion, objetivo)) {
@@ -38,6 +46,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const parsed = usuarioSchema.partial().safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ ok: false, error: parsed.error.errors[0]?.message }, { status: 400 });
+    }
+
+    // Nadie que no sea el súper admin puede darle a un usuario el email del
+    // súper admin: ese email es la llave de control total (SUPER_ADMIN_EMAIL),
+    // así que reasignarlo sería escalar privilegios por la puerta de atrás.
+    if (parsed.data.email && esSuperAdmin(parsed.data.email) && !sesion.esSuperAdmin) {
+      return NextResponse.json({ ok: false, error: "No podés asignar ese email" }, { status: 403 });
     }
 
     // La planta es obligatoria para cualquier usuario, EXCEPTO si la cuenta
