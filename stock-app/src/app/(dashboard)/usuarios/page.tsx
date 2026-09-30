@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { Loader2, Plus, Pencil, Trash2, ShieldCheck, ShieldOff } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, ShieldCheck, ShieldOff, Search } from "lucide-react";
 import { usuariosService } from "@/services/usuarios.service";
 import type { UsuarioInput } from "@/lib/validations";
 import { PERFILES, perfilDe } from "@/lib/permisos";
@@ -29,6 +29,7 @@ const COLOR_PERFIL: Record<Perfil, "info" | "destructive" | "warning" | "seconda
 };
 import type { Usuario } from "@/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 import { useConfirm } from "@/hooks/useConfirm";
 import { UsuarioFormDialog } from "@/features/usuarios/components/UsuarioFormDialog";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,9 @@ export default function UsuariosPage() {
   const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [usuarioEditando, setUsuarioEditando] = useState<Usuario | null>(null);
+  // Buscador + filtro por perfil (estilo Apple). Client-side sobre la lista ya cargada.
+  const [busqueda, setBusqueda] = useState("");
+  const [perfilFiltro, setPerfilFiltro] = useState<Perfil | "">("");
 
   async function cargar() {
     setLoading(true);
@@ -104,6 +108,22 @@ export default function UsuariosPage() {
     }
   }
 
+  const usuariosFiltrados = usuarios.filter((u) => {
+    if (perfilFiltro && !u.esSuperAdmin && perfilDe(u) !== perfilFiltro) return false;
+    if (perfilFiltro && u.esSuperAdmin) return false; // el súper admin no cae en ningún perfil
+    const q = busqueda.trim().toLowerCase();
+    if (!q) return true;
+    return u.nombre.toLowerCase().includes(q) || u.email.toLowerCase().includes(q);
+  });
+
+  const FILTROS_PERFIL: { valor: Perfil | ""; etiqueta: string }[] = [
+    { valor: "", etiqueta: "Todos" },
+    { valor: "operario", etiqueta: "Operario" },
+    { valor: "encargado", etiqueta: "Encargado" },
+    { valor: "jefe", etiqueta: "Jefe" },
+    { valor: "gerente", etiqueta: "Gerente" },
+  ];
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[60vh]">
@@ -121,15 +141,51 @@ export default function UsuariosPage() {
         </Button>
       </div>
 
+      {/* Buscador + filtro por perfil (estilo Apple) */}
+      <div className="space-y-2.5">
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-3 py-2">
+          <Search size={16} className="shrink-0 text-muted-foreground" />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder="Buscar por nombre o email…"
+            className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+          />
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {FILTROS_PERFIL.map((f) => (
+            <button
+              key={f.valor || "todos"}
+              type="button"
+              onClick={() => setPerfilFiltro(f.valor)}
+              className={cn(
+                "rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-quick",
+                perfilFiltro === f.valor
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border text-muted-foreground hover:text-foreground"
+              )}
+            >
+              {f.etiqueta}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {error && <p className="text-sm text-destructive bg-destructive/10 rounded-lg px-3 py-2">{error}</p>}
 
       {/* Mismo "crumple & collapse" que ProductosTable al eliminar (design-system,
           evolución futurista) -- la card se arruga y colapsa en vez de
           desaparecer en seco. El diálogo de confirmación existente no cambia,
           solo cómo se ve la salida una vez confirmado. */}
+      {usuariosFiltrados.length === 0 && (
+        <p className="rounded-lg border border-border bg-muted/30 px-3 py-6 text-center text-sm text-muted-foreground">
+          Ningún usuario coincide con la búsqueda.
+        </p>
+      )}
+
       <div className="space-y-2">
         <AnimatePresence initial={false}>
-          {usuarios.map((u) => (
+          {usuariosFiltrados.map((u) => (
             <motion.div
               key={u.id}
               layout="position"

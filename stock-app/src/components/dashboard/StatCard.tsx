@@ -3,8 +3,16 @@ import { Card, CardContent, CardLabel } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { LucideIcon } from "lucide-react";
 
-function formatearImporte(valor: number): string {
-  return `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+/**
+ * Importe en pesos SIN abreviar (número completo) + la palabra de magnitud
+ * al lado ("mil" / "millones"), para que se lea de un golpe si son miles o
+ * millones sin tener que contar los puntos. Ej: "$ 15.353.368" + "millones".
+ */
+function partesImporte(valor: number): { texto: string; escala: string } {
+  const abs = Math.abs(valor);
+  const texto = `$ ${valor.toLocaleString("es-UY", { maximumFractionDigits: 0 })}`;
+  const escala = abs >= 1_000_000 ? "millones" : abs >= 1_000 ? "mil" : "";
+  return { texto, escala };
 }
 
 type Tono = "default" | "success" | "warning" | "destructive" | "info" | "avance";
@@ -265,9 +273,19 @@ export function StatCard({
             <p className="font-mono text-[9.5px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
               Importe
             </p>
-            <p className="mt-1 truncate font-display text-[15px] font-semibold leading-none tabular-nums text-foreground md:text-[18px]">
-              {formatearImporte(importe)}
-            </p>
+            {(() => {
+              const p = partesImporte(importe);
+              return (
+                <p className="mt-1 flex items-baseline gap-1.5 truncate font-display text-[15px] font-semibold leading-none tabular-nums text-foreground md:text-[18px]">
+                  <span className="truncate">{p.texto}</span>
+                  {p.escala && (
+                    <span className="shrink-0 font-sans text-[11px] font-medium text-muted-foreground md:text-[12px]">
+                      {p.escala}
+                    </span>
+                  )}
+                </p>
+              );
+            })()}
           </div>
         )}
       </CardContent>

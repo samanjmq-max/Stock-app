@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +81,7 @@ export interface ArticuloValor {
   codigo: string;
   descripcion: string;
   unidadMedida?: string;
+  familia?: string;
   stockSap: number;
   valor: number;
 }
@@ -100,10 +102,15 @@ const CORTE_B = 70000;
 const ACUM_A = 0.8;
 const ACUM_B = 0.95;
 
+/*
+  Colores ejecutivos, elegidos por Maximiliano: A rojo, B amarillo, C azul.
+  Planos (sin resplandor / neón). El rojo queda en la clase A porque es la que
+  concentra el valor -- es la que más hay que mirar.
+*/
 const TONOS: Record<Clave, string> = {
-  a: "#ffc93c", // oro
-  b: "#2fd0e8", // cian
-  c: "#a78bfa", // violeta
+  a: "#d1493f", // rojo
+  b: "#d99a2b", // amarillo
+  c: "#3f7fd4", // azul
 };
 
 /*
@@ -212,12 +219,28 @@ function Columna({
   const pctValor = totalValor > 0 ? (valor / totalValor) * 100 : 0;
   const pctItems = totalItems > 0 ? (articulos.length / totalItems) * 100 : 0;
 
-  // Solo se dibujan las primeras filas: la clase C puede tener doce mil
-  // artículos y montar doce mil <tr> congelaría el dashboard en un celular
-  // de depósito. El resto se resume en el pie.
+  // Buscador + filtro por familia, DENTRO de cada cuadro.
+  const [busqueda, setBusqueda] = useState("");
+  const [familiaSel, setFamiliaSel] = useState("");
+  const familias = useMemo(
+    () => Array.from(new Set(articulos.map((a) => (a.familia || "").trim()).filter(Boolean))).sort(),
+    [articulos]
+  );
+  const filtrados = useMemo(() => {
+    const q = busqueda.trim().toLowerCase();
+    return articulos.filter((a) => {
+      if (familiaSel && (a.familia || "").trim() !== familiaSel) return false;
+      if (!q) return true;
+      return String(a.codigo).toLowerCase().includes(q) || String(a.descripcion).toLowerCase().includes(q);
+    });
+  }, [articulos, busqueda, familiaSel]);
+  const hayFiltro = busqueda.trim() !== "" || familiaSel !== "";
+
+  // Solo se dibujan las primeras filas: la clase C puede tener miles de
+  // artículos y montar miles de <tr> congelaría el dashboard en un celular.
   const VISIBLES = 40;
-  const visibles = articulos.slice(0, VISIBLES);
-  const restantes = articulos.length - visibles.length;
+  const visibles = filtrados.slice(0, VISIBLES);
+  const restantes = filtrados.length - visibles.length;
 
   return (
     <div
@@ -234,37 +257,25 @@ function Columna({
         style={{ background: `linear-gradient(90deg, transparent, ${h}, transparent)` }}
       />
 
-      <div className="relative overflow-hidden p-[15px] pb-[15px]">
-        {/* Resplandor: sube desde la esquina, difuminado, sin bordes. */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute -left-[60px] -top-[100px] h-[200px] w-[200px] rounded-full opacity-30 blur-[46px]"
-          style={{ background: h }}
-        />
-
+      <div className="relative overflow-hidden p-[13px]">
         <div className="relative flex items-center gap-2.5">
           <span
-            className="grid h-8 w-8 place-items-center rounded-[9px] font-hud text-[17px] font-bold leading-none"
-            style={{
-              color: h,
-              background: `${h}29`,
-              border: `1px solid ${h}85`,
-              boxShadow: `0 0 15px -2px ${h}99, inset 0 0 10px -4px ${h}bf`,
-            }}
+            className="grid h-7 w-7 place-items-center rounded-[8px] font-hud text-[15px] font-bold leading-none"
+            style={{ color: h, background: `${h}22`, border: `1px solid ${h}66` }}
           >
             {LETRA[clave]}
           </span>
-          <span className="font-mono text-[10.5px] text-[#9aa3b2]">{rango}</span>
+          <span className="font-mono text-[10px] text-[#9aa3b2]">{rango}</span>
         </div>
 
         <p
-          className="relative mt-3 font-hud text-[44px] font-bold leading-none tabular-nums"
-          style={{ color: h, textShadow: `0 0 28px ${h}7a` }}
+          className="relative mt-2.5 font-hud text-[30px] font-bold leading-none tabular-nums"
+          style={{ color: h }}
         >
           {porcentaje(valor, totalValor)}
-          <span className="ml-0.5 text-[19px] font-semibold opacity-70">%</span>
+          <span className="ml-0.5 text-[15px] font-semibold opacity-70">%</span>
         </p>
-        <p className="relative mt-px text-[11.5px] text-[#9aa3b2]">del valor total en stock</p>
+        <p className="relative mt-px text-[10.5px] text-[#9aa3b2]">del valor total en stock</p>
 
         {/*
           Las dos barras. El riel entero es SIEMPRE el total -- los dos
@@ -282,11 +293,7 @@ function Columna({
             <div className="h-1.5 overflow-hidden rounded-[4px] bg-white/[0.06]">
               <div
                 className="relative h-full min-w-[3px] rounded-[4px]"
-                style={{
-                  width: `${pctValor.toFixed(2)}%`,
-                  background: `linear-gradient(90deg, ${h}57, ${h})`,
-                  boxShadow: `0 0 13px -1px ${h}c7`,
-                }}
+                style={{ width: `${pctValor.toFixed(2)}%`, background: h }}
               />
             </div>
           </div>
@@ -309,11 +316,35 @@ function Columna({
         </div>
       </div>
 
+      {/* Buscador + filtro por familia, dentro del cuadro */}
+      <div className="flex gap-1.5 px-[13px] pb-2.5 pt-2.5" style={{ borderTop: `1px solid ${h}2e` }}>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[#2a241c] bg-[#191512] px-2 py-1.5">
+          <Search size={12} className="shrink-0 text-[#8a8278]" />
+          <input
+            value={busqueda}
+            onChange={(e) => setBusqueda(e.target.value)}
+            placeholder={`Buscar en ${LETRA[clave]}…`}
+            className="w-full min-w-0 bg-transparent text-[11px] text-[#e9e5dd] placeholder:text-[#8a8278] focus:outline-none"
+          />
+        </div>
+        {familias.length > 0 && (
+          <select
+            value={familiaSel}
+            onChange={(e) => setFamiliaSel(e.target.value)}
+            aria-label="Filtrar por familia"
+            className="max-w-[104px] shrink-0 rounded-lg border border-[#2a241c] bg-[#191512] px-2 py-1.5 text-[11px] font-medium text-[#c9c4bb] focus:outline-none"
+          >
+            <option value="">Familia</option>
+            {familias.map((f) => <option key={f} value={f}>{f}</option>)}
+          </select>
+        )}
+      </div>
+
       <div className="flex-1" style={{ borderTop: `1px solid ${h}2e` }}>
-        <div className="max-h-[230px] overflow-y-auto">
-          {articulos.length === 0 ? (
+        <div className="max-h-[250px] overflow-y-auto">
+          {filtrados.length === 0 ? (
             <p className="px-3 py-8 text-center text-xs text-[#9aa3b2]">
-              Ningún artículo cae en esta clase.
+              {hayFiltro ? "Ningún artículo coincide con la búsqueda." : "Ningún artículo cae en esta clase."}
             </p>
           ) : (
             <table className="w-full text-xs">

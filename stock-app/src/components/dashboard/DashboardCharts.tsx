@@ -72,7 +72,8 @@ export default function DashboardCharts({
 }: Props) {
   return (
     <>
-      <div className="grid md:grid-cols-2 gap-4">
+      {/* Los tres gráficos en una sola fila (Estado · Importe · Progreso). */}
+      <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Estado del conteo — {tituloAgencia}</CardTitle></CardHeader>
           <CardContent>
@@ -145,9 +146,9 @@ export default function DashboardCharts({
         <Card>
           <CardHeader><CardTitle>Importe contado (en pesos)</CardTitle></CardHeader>
           <CardContent>
-            {stats.importeCoincidencias === 0 && stats.importeDiferenciasPositivas === 0 && stats.importeDiferenciasNegativas === 0
+            {stats.importeCoincidencias === 0 && stats.importeDiferenciasPositivas === 0 && stats.importeDiferenciasNegativas === 0 && stats.importePendientes === 0
               ? <p className="text-sm text-muted-foreground py-8 text-center">Sin importes para mostrar — cargá precios unitarios en el catálogo.</p>
-              : <ResponsiveContainer width="100%" height={220}>
+              : <ResponsiveContainer width="100%" height={230}>
                   <BarChart data={importeData}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" fontSize={11} tickLine={false} />
@@ -166,18 +167,15 @@ export default function DashboardCharts({
                 </ResponsiveContainer>}
           </CardContent>
         </Card>
-      </div>
 
-      {/* Ancho completo, no parte de la grilla de 2 columnas -- una serie de
-          tiempo se lee mejor con espacio horizontal de sobra. Area chart con
-          degradado (en vez de línea simple) para un look más actual;
-          --success porque es, literalmente, progreso positivo acumulándose. */}
-      <Card>
-        <CardHeader><CardTitle>Progreso del conteo (en el tiempo)</CardTitle></CardHeader>
+        {/* Progreso: ahora en la misma fila que los otros dos (antes iba a
+            ancho completo debajo). Area chart con degradado en color avance. */}
+        <Card>
+          <CardHeader><CardTitle>Progreso del conteo (en el tiempo)</CardTitle></CardHeader>
         <CardContent>
           {progresoTiempo.length === 0
             ? <p className="text-sm text-muted-foreground py-8 text-center">Todavía no hay conteos registrados.</p>
-            : <ResponsiveContainer width="100%" height={320}>
+            : <ResponsiveContainer width="100%" height={230}>
                 <AreaChart data={progresoTiempo} margin={{ right: 16, top: 8 }}>
                   <defs>
                     {/* Amarillo de avance, el mismo color que el porcentaje
@@ -212,8 +210,8 @@ export default function DashboardCharts({
                 </AreaChart>
               </ResponsiveContainer>}
         </CardContent>
-      </Card>
-
+        </Card>
+      </div>
     </>
   );
 }

@@ -12,6 +12,7 @@ import { StatCard } from "@/components/dashboard/StatCard";
 import { FiltrosMoviles } from "@/components/layout/FiltrosMoviles";
 import { ConteosTable } from "@/components/dashboard/ConteosTable";
 import { TableroABC } from "@/components/dashboard/TableroABC";
+import { GenericosPanel } from "@/components/dashboard/GenericosPanel";
 import { PendientesTable } from "@/components/dashboard/PendientesTable";
 import { EditarConteoDialog } from "@/components/dashboard/EditarConteoDialog";
 import { CerrarCicloDialog } from "@/components/dashboard/CerrarCicloDialog";
@@ -22,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { SearchableSelect } from "@/components/ui/searchable-select";
 import { exportarExcel, exportarPDF } from "@/lib/exportacion";
 import { conteosService } from "@/services/conteos.service";
+import { getConteosPendientes } from "@/db/offlineDb";
 import { AGENCIAS } from "@/types";
 import { cn } from "@/lib/utils";
 import type { Conteo, Producto, EstadoConteo, Agencia } from "@/types";
@@ -96,6 +98,12 @@ export default function DashboardPage() {
   const [vaciandoTodas, setVaciandoTodas] = useState(false);
   const [actualizando, setActualizando] = useState(false);
   const [cerrarAbierto, setCerrarAbierto] = useState(false);
+  // Conteos guardados en ESTE dispositivo que todavía no se subieron, para la
+  // planta que se va a cerrar. Si hay pendientes, cerrar el cíclico dejaría
+  // esos conteos afuera del documento y del resumen (y reaparecerían sueltos
+  // al sincronizar después), así que se bloquea el cierre hasta que la cola
+  // llegue a cero. Se lee directo de IndexedDB (sin montar el loop de sync).
+  const [pendientesLocalesCierre, setPendientesLocalesCierre] = useState(0);
 
   useEffect(() => {
     const intervalo = setInterval(() => {
@@ -103,6 +111,25 @@ export default function DashboardPage() {
     }, INTERVALO_AUTO_ACTUALIZACION);
     return () => clearInterval(intervalo);
   }, [recargar]);
+
+  useEffect(() => {
+    let vivo = true;
+    const agenciaActual = (agenciaFiltro || agenciaUsuario || "") as Agencia | "";
+    if (!agenciaActual) {
+      setPendientesLocalesCierre(0);
+      return;
+    }
+    getConteosPendientes()
+      .then((lista) => {
+        if (vivo) setPendientesLocalesCierre(lista.filter((c) => c.agencia === agenciaActual).length);
+      })
+      .catch(() => {
+        if (vivo) setPendientesLocalesCierre(0);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [agenciaFiltro, agenciaUsuario, cerrarAbierto]);
 
   async function actualizarManual() {
     setActualizando(true);
@@ -153,8 +180,9 @@ export default function DashboardPage() {
 
   const importeData = [
     { name: LABEL_VISTA.coincide!, value: stats.importeCoincidencias, color: COLORS.coincide },
-    { name: LABEL_VISTA.falta!, value: stats.importeDiferenciasNegativas, color: COLORS.falta },
     { name: LABEL_VISTA.sobra!, value: stats.importeDiferenciasPositivas, color: COLORS.sobra },
+    { name: LABEL_VISTA.falta!, value: stats.importeDiferenciasNegativas, color: COLORS.falta },
+    { name: LABEL_VISTA.pendientes!, value: stats.importePendientes, color: COLORS.pendientes },
   ];
 
   const ultimoPorCodigoUbicacion = new Map<string, Conteo>();
@@ -189,6 +217,7 @@ export default function DashboardPage() {
       codigo: p.codigo,
       descripcion: p.descripcion,
       unidadMedida: p.unidadMedida,
+      familia: p.familia,
       stockSap: Number(p.stockSap) || 0,
       valor: (Number(p.precioUnitario) || 0) * Number(p.stockSap || 0),
     }))
@@ -666,6 +695,9 @@ export default function DashboardPage() {
         saltoTicksTiempo={saltoTicksTiempo}
       />
 
+      {/* Genéricos primero, y el tablero ABC debajo. */}
+      <GenericosPanel productos={productos} />
+
       <TableroABC articulos={articulosValor} tituloAgencia={tituloAgencia} />
 
       {vista === "pendientes"
@@ -720,11 +752,21 @@ export default function DashboardPage() {
                   variant="default"
                   size="sm"
                   onClick={() => setCerrarAbierto(true)}
-                  disabled={!agenciaParaVaciar || conteos.length === 0 || hayFiltroZonaCierre}
+                  disabled={!agenciaParaVaciar || conteos.length === 0 || hayFiltroZonaCierre || pendientesLocalesCierre > 0}
                 >
                   <Archive size={15} /> Cerrar cíclico {agenciaParaVaciar ? `(${agenciaParaVaciar})` : ""}
                 </Button>
               </div>
+              {pendientesLocalesCierre > 0 && (
+                <div className="flex gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+                  <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+                  <span>
+                    Hay <b>{pendientesLocalesCierre} conteo{pendientesLocalesCierre === 1 ? "" : "s"} sin sincronizar</b> en
+                    este dispositivo para {agenciaParaVaciar}. Si cerrás ahora, no entran en el documento ni en el resumen
+                    y quedarían sueltos al subir después. Esperá a que el contador de sincronización llegue a cero y cerrá.
+                  </span>
+                </div>
+              )}
               {hayFiltroZonaCierre && (
                 <div className="flex gap-2 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
                   <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
