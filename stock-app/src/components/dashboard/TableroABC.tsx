@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -57,8 +57,8 @@ import { cn } from "@/lib/utils";
   ESTE TABLERO ES SIEMPRE OSCURO, TAMBIÉN EN MODO DÍA
   ---------------------------------------------------------------------------
 
-  Y por eso NO usa los tokens de tema (`text-[#f2f4f7]`,
-  `text-[#9aa3b2]`, `border-[#32302c]`): todos los colores de texto están
+  Y por eso NO usa los tokens de tema (`text-foreground`,
+  `text-muted-foreground`, `border-border`): todos los colores de texto están
   escritos literales.
 
   El bug que esto arregla: el fondo estaba fijo en oscuro pero las letras
@@ -236,6 +236,24 @@ function Columna({
   }, [articulos, busqueda, familiaSel]);
   const hayFiltro = busqueda.trim() !== "" || familiaSel !== "";
 
+  function limpiarFiltro() {
+    setBusqueda("");
+    setFamiliaSel("");
+  }
+
+  // Selección de artículos: tildar filas para ver cuánta plata representan
+  // (ej. dentro de A, marcar urea + fertilizantes y ver el total).
+  const [seleccion, setSeleccion] = useState<Set<string>>(new Set());
+  function toggle(codigo: string) {
+    setSeleccion((prev) => {
+      const s = new Set(prev);
+      if (s.has(codigo)) s.delete(codigo);
+      else s.add(codigo);
+      return s;
+    });
+  }
+  const valorSeleccion = articulos.reduce((s, a) => (seleccion.has(a.codigo) ? s + a.valor : s), 0);
+
   // Solo se dibujan las primeras filas: la clase C puede tener miles de
   // artículos y montar miles de <tr> congelaría el dashboard en un celular.
   const VISIBLES = 40;
@@ -244,11 +262,8 @@ function Columna({
 
   return (
     <div
-      className="relative flex flex-col overflow-hidden rounded-xl"
-      /* Fondo casi neutro y no marrón: era cálido de cuando las tres columnas
-         eran doradas, y contra el cian y el violeta ensuciaba el tono. El
-         color de cada columna lo pone el resplandor de abajo, no la base. */
-      style={{ background: "#100f11", border: `1px solid ${h}3d` }}
+      className="relative flex flex-col overflow-hidden rounded-xl border bg-muted/50"
+      style={{ borderColor: `${h}55` }}
     >
       {/* Filete superior: el gesto que convierte la tarjeta en instrumento. */}
       <span
@@ -265,7 +280,7 @@ function Columna({
           >
             {LETRA[clave]}
           </span>
-          <span className="font-mono text-[10px] text-[#9aa3b2]">{rango}</span>
+          <span className="font-mono text-[10px] text-muted-foreground">{rango}</span>
         </div>
 
         <p
@@ -275,7 +290,7 @@ function Columna({
           {porcentaje(valor, totalValor)}
           <span className="ml-0.5 text-[15px] font-semibold opacity-70">%</span>
         </p>
-        <p className="relative mt-px text-[10.5px] text-[#9aa3b2]">del valor total en stock</p>
+        <p className="relative mt-px text-[10.5px] text-muted-foreground">del valor total en stock</p>
 
         {/*
           Las dos barras. El riel entero es SIEMPRE el total -- los dos
@@ -285,12 +300,12 @@ function Columna({
         <div className="relative mt-3.5 flex flex-col gap-[11px]">
           <div>
             <div className="mb-[5px] flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#9aa3b2]">Plata</span>
-              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-[#9aa3b2]">
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-muted-foreground">Plata</span>
+              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground">
                 <b className="font-semibold" style={{ color: h }}>{pesos(valor)}</b> de {pesos(totalValor)}
               </span>
             </div>
-            <div className="h-1.5 overflow-hidden rounded-[4px] bg-white/[0.06]">
+            <div className="h-1.5 overflow-hidden rounded-[4px] bg-foreground/[0.08]">
               <div
                 className="relative h-full min-w-[3px] rounded-[4px]"
                 style={{ width: `${pctValor.toFixed(2)}%`, background: h }}
@@ -300,15 +315,15 @@ function Columna({
 
           <div>
             <div className="mb-[5px] flex items-baseline justify-between gap-2">
-              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-[#9aa3b2]">Artículos</span>
-              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-[#9aa3b2]">
-                <b className="font-semibold text-[#f2f4f7]">{miles(articulos.length)}</b> de {miles(totalItems)}
+              <span className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-muted-foreground">Artículos</span>
+              <span className="whitespace-nowrap font-mono text-[11px] tabular-nums text-muted-foreground">
+                <b className="font-semibold text-foreground">{miles(articulos.length)}</b> de {miles(totalItems)}
               </span>
             </div>
             {/* Gris y no dorada: es el contrapeso, no el protagonista. */}
-            <div className="h-1.5 overflow-hidden rounded-[4px] bg-white/[0.06]">
+            <div className="h-1.5 overflow-hidden rounded-[4px] bg-foreground/[0.08]">
               <div
-                className="h-full min-w-[3px] rounded-[4px] bg-white/25"
+                className="h-full min-w-[3px] rounded-[4px] bg-foreground/30"
                 style={{ width: `${pctItems.toFixed(2)}%` }}
               />
             </div>
@@ -318,13 +333,13 @@ function Columna({
 
       {/* Buscador + filtro por familia, dentro del cuadro */}
       <div className="flex gap-1.5 px-[13px] pb-2.5 pt-2.5" style={{ borderTop: `1px solid ${h}2e` }}>
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-[#2a241c] bg-[#191512] px-2 py-1.5">
-          <Search size={12} className="shrink-0 text-[#8a8278]" />
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-border bg-background px-2 py-1.5">
+          <Search size={12} className="shrink-0 text-muted-foreground" />
           <input
             value={busqueda}
             onChange={(e) => setBusqueda(e.target.value)}
             placeholder={`Buscar en ${LETRA[clave]}…`}
-            className="w-full min-w-0 bg-transparent text-[11px] text-[#e9e5dd] placeholder:text-[#8a8278] focus:outline-none"
+            className="w-full min-w-0 bg-transparent text-[11px] text-foreground placeholder:text-muted-foreground focus:outline-none"
           />
         </div>
         {familias.length > 0 && (
@@ -332,18 +347,29 @@ function Columna({
             value={familiaSel}
             onChange={(e) => setFamiliaSel(e.target.value)}
             aria-label="Filtrar por familia"
-            className="max-w-[104px] shrink-0 rounded-lg border border-[#2a241c] bg-[#191512] px-2 py-1.5 text-[11px] font-medium text-[#c9c4bb] focus:outline-none"
+            className="max-w-[104px] shrink-0 rounded-lg border border-border bg-background px-2 py-1.5 text-[11px] font-medium text-foreground focus:outline-none"
           >
             <option value="">Familia</option>
             {familias.map((f) => <option key={f} value={f}>{f}</option>)}
           </select>
+        )}
+        {hayFiltro && (
+          <button
+            type="button"
+            onClick={limpiarFiltro}
+            title="Borrar filtro"
+            aria-label="Borrar filtro"
+            className="grid shrink-0 place-items-center rounded-lg border border-border bg-background px-2 text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <X size={13} />
+          </button>
         )}
       </div>
 
       <div className="flex-1" style={{ borderTop: `1px solid ${h}2e` }}>
         <div className="max-h-[250px] overflow-y-auto">
           {filtrados.length === 0 ? (
-            <p className="px-3 py-8 text-center text-xs text-[#9aa3b2]">
+            <p className="px-3 py-8 text-center text-xs text-muted-foreground">
               {hayFiltro ? "Ningún artículo coincide con la búsqueda." : "Ningún artículo cae en esta clase."}
             </p>
           ) : (
@@ -351,25 +377,48 @@ function Columna({
               <thead>
                 <tr>
                   <th
-                    className="sticky top-0 z-[2] px-3 py-2 text-left font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-[#9aa3b2]"
-                    style={{ background: "#100f11", borderBottom: `1px solid ${h}2e` }}
+                    className="sticky top-0 z-[2] w-6 px-2 py-2"
+                    style={{ background: "hsl(var(--muted))", borderBottom: `1px solid ${h}2e` }}
+                    aria-label="Seleccionar"
+                  />
+                  <th
+                    className="sticky top-0 z-[2] px-3 py-2 text-left font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                    style={{ background: "hsl(var(--muted))", borderBottom: `1px solid ${h}2e` }}
                   >
                     Artículo
                   </th>
                   <th
-                    className="sticky top-0 z-[2] px-3 py-2 text-right font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-[#9aa3b2]"
-                    style={{ background: "#100f11", borderBottom: `1px solid ${h}2e` }}
+                    className="sticky top-0 z-[2] px-3 py-2 text-right font-mono text-[9.5px] font-medium uppercase tracking-[0.12em] text-muted-foreground"
+                    style={{ background: "hsl(var(--muted))", borderBottom: `1px solid ${h}2e` }}
                   >
                     Valor
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {visibles.map((art) => (
-                  <tr key={art.codigo} className="border-b border-white/[0.04] last:border-0">
+                {visibles.map((art) => {
+                  const marcado = seleccion.has(art.codigo);
+                  return (
+                  <tr
+                    key={art.codigo}
+                    onClick={() => toggle(art.codigo)}
+                    className="cursor-pointer border-b border-border/60 last:border-0 transition-colors hover:bg-foreground/[0.04]"
+                    style={marcado ? { background: `${h}1f` } : undefined}
+                  >
+                    <td className="px-2 py-2 align-top">
+                      <input
+                        type="checkbox"
+                        checked={marcado}
+                        onChange={() => toggle(art.codigo)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Seleccionar ${art.codigo}`}
+                        className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-current"
+                        style={{ accentColor: h }}
+                      />
+                    </td>
                     <td className="max-w-px px-3 py-2 align-top">
-                      <span className="block font-mono text-[11px] text-[#9aa3b2]">{art.codigo}</span>
-                      <span className="block truncate text-[11.5px] text-[#9aa3b2]" title={art.descripcion}>
+                      <span className="block font-mono text-[11px] text-muted-foreground">{art.codigo}</span>
+                      <span className="block truncate text-[11.5px] text-muted-foreground" title={art.descripcion}>
                         {art.descripcion}
                       </span>
                     </td>
@@ -377,16 +426,17 @@ function Columna({
                       <span className="font-mono text-[11.5px] font-semibold" style={{ color: h }}>
                         {pesos(art.valor)}
                       </span>
-                      <span className="mt-0.5 block font-mono text-[10px] text-[#9aa3b2]">
+                      <span className="mt-0.5 block font-mono text-[10px] text-muted-foreground">
                         {miles(art.stockSap)}
                         {art.unidadMedida ? ` ${art.unidadMedida}` : ""}
                       </span>
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
                 {restantes > 0 && (
                   <tr>
-                    <td colSpan={2} className="px-3 py-2.5 text-center text-[11.5px] text-[#9aa3b2]">
+                    <td colSpan={3} className="px-3 py-2.5 text-center text-[11.5px] text-muted-foreground">
                       y {miles(restantes)} artículo{restantes === 1 ? "" : "s"} más
                     </td>
                   </tr>
@@ -395,6 +445,32 @@ function Columna({
             </table>
           )}
         </div>
+
+        {/* Total de lo seleccionado: cuánta plata representan las filas tildadas. */}
+        {seleccion.size > 0 && (
+          <div
+            className="flex items-center justify-between gap-2 px-3 py-2.5"
+            style={{ borderTop: `1px solid ${h}2e`, background: `${h}14` }}
+          >
+            <span className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+              {seleccion.size} seleccionado{seleccion.size === 1 ? "" : "s"}
+            </span>
+            <div className="flex items-center gap-2.5">
+              <span className="font-mono text-[13px] font-bold tabular-nums" style={{ color: h }}>
+                {pesos(valorSeleccion)}
+              </span>
+              <button
+                type="button"
+                onClick={() => setSeleccion(new Set())}
+                title="Limpiar selección"
+                aria-label="Limpiar selección"
+                className="grid place-items-center rounded-md border border-border px-1.5 py-1 text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -420,34 +496,14 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
   const totalItems = ordenados.length;
 
   return (
-    <Card
-      className="overflow-hidden border-[1.5px]"
-      /* `color` explícito: la Card de shadcn trae `text-card-foreground`, que
-         en modo día es tinta oscura. Sin esto, todo lo que no declara su
-         propio color -- el título, por ejemplo -- se pierde contra el fondo. */
-      style={{ background: "#0d0a05", borderColor: "#2b2110", color: "#f2f4f7" }}
-    >
+    <Card className="overflow-hidden border-[1.5px] border-border bg-card text-card-foreground">
       <CardContent className="relative p-5">
-        {/* Rejilla tenue: profundidad sin competir con nada. Se desvanece
-            hacia abajo para no ensuciar las tarjetas. */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0"
-          style={{
-            backgroundImage:
-              "linear-gradient(#ffd24a0d 1px, transparent 1px), linear-gradient(90deg, #ffd24a0d 1px, transparent 1px)",
-            backgroundSize: "46px 46px",
-            maskImage: "radial-gradient(130% 95% at 50% 0%, #000 0%, transparent 74%)",
-            WebkitMaskImage: "radial-gradient(130% 95% at 50% 0%, #000 0%, transparent 74%)",
-          }}
-        />
-
         <div className="relative mb-4 flex flex-wrap items-end justify-between gap-4">
           <div>
             <p className="font-hud text-[17px] font-semibold tracking-[0.02em]">
               Clasificación ABC — {tituloAgencia}
             </p>
-            <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#9aa3b2]">
+            <p className="mt-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
               por valor en stock · precio unitario × stock SAP
             </p>
           </div>
@@ -460,7 +516,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
               dejan de ser números redondos. Cuál sirve depende de para qué
               se esté mirando, así que se puede cambiar y comparar.
             */}
-            <div className="flex rounded-lg border border-[#32302c] p-0.5">
+            <div className="flex rounded-lg border border-border p-0.5">
               {([
                 ["montos", "Montos fijos"],
                 ["acumulado", "80/15/5"],
@@ -472,7 +528,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
                   aria-pressed={criterio === valor}
                   className={cn(
                     "rounded-[6px] px-2.5 py-1 font-mono text-[10.5px] transition-colors duration-quick",
-                    criterio === valor ? "bg-white/10 text-[#f2f4f7]" : "text-[#9aa3b2] hover:text-[#f2f4f7]"
+                    criterio === valor ? "bg-foreground/10 text-foreground" : "text-muted-foreground hover:text-foreground"
                   )}
                 >
                   {etiqueta}
@@ -481,10 +537,10 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
             </div>
 
             <div className="text-right">
-              <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#9aa3b2]">
+              <p className="font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
                 Valor total del catálogo
               </p>
-              <p className="font-hud text-[26px] font-bold leading-none tabular-nums text-[#f2f4f7]">
+              <p className="font-hud text-[26px] font-bold leading-none tabular-nums text-foreground">
                 {pesos(totalValor)}
               </p>
             </div>
@@ -492,7 +548,7 @@ export function TableroABC({ articulos, tituloAgencia }: Props) {
         </div>
 
         {totalValor === 0 ? (
-          <p className="relative py-10 text-center text-sm text-[#9aa3b2]">
+          <p className="relative py-10 text-center text-sm text-muted-foreground">
             Sin importes para clasificar — cargá precios unitarios en el catálogo.
           </p>
         ) : (

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { Producto } from "@/types";
 
 /*
@@ -70,8 +71,13 @@ interface Fila {
   cantidad: number | null; // null = no está en el catálogo de esta planta
 }
 
+type EstadoFiltro = "todos" | "abajar" | "cero";
+type Orden = "codigo" | "cantDesc" | "cantAsc" | "desc";
+
 export function GenericosPanel({ productos }: { productos: Producto[] }) {
   const [busqueda, setBusqueda] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState<EstadoFiltro>("todos");
+  const [orden, setOrden] = useState<Orden>("codigo");
 
   const filas: Fila[] = useMemo(() => {
     const porCodigo = new Map<string, Producto>();
@@ -94,9 +100,27 @@ export function GenericosPanel({ productos }: { productos: Producto[] }) {
 
   const filasVisibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
-    if (!q) return filas;
-    return filas.filter((f) => f.codigo.toLowerCase().includes(q) || f.descripcion.toLowerCase().includes(q));
-  }, [filas, busqueda]);
+    const out = filas.filter((f) => {
+      if (q && !(f.codigo.toLowerCase().includes(q) || f.descripcion.toLowerCase().includes(q))) return false;
+      if (estadoFiltro === "abajar" && !((f.cantidad ?? 0) > 0)) return false;
+      if (estadoFiltro === "cero" && !(f.cantidad !== null && f.cantidad === 0)) return false;
+      return true;
+    });
+    out.sort((a, b) => {
+      if (orden === "codigo") return a.codigo.localeCompare(b.codigo);
+      if (orden === "desc") return a.descripcion.localeCompare(b.descripcion);
+      const ca = a.cantidad ?? -1;
+      const cb = b.cantidad ?? -1;
+      return orden === "cantDesc" ? cb - ca : ca - cb;
+    });
+    return out;
+  }, [filas, busqueda, estadoFiltro, orden]);
+
+  const FILTROS: { valor: EstadoFiltro; etiqueta: string }[] = [
+    { valor: "todos", etiqueta: "Todos" },
+    { valor: "abajar", etiqueta: "A bajar" },
+    { valor: "cero", etiqueta: "En cero" },
+  ];
 
   // Dona: verde = en cero, rojo = a bajar. dasharray sobre circunferencia ~100.
   const dashEnCero = (enCero / totalPresentes) * 100;
@@ -122,6 +146,41 @@ export function GenericosPanel({ productos }: { productos: Producto[] }) {
               placeholder="Buscar código o descripción…"
               className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             />
+          </div>
+
+          {/* Filtro por estado + orden */}
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {FILTROS.map((f) => (
+                <button
+                  key={f.valor}
+                  type="button"
+                  onClick={() => setEstadoFiltro(f.valor)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-colors duration-quick",
+                    estadoFiltro === f.valor
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {f.etiqueta}
+                </button>
+              ))}
+            </div>
+            <div className="ml-auto flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">Ordenar:</span>
+              <select
+                value={orden}
+                onChange={(e) => setOrden(e.target.value as Orden)}
+                aria-label="Ordenar genéricos"
+                className="rounded-lg border border-border bg-muted/40 px-2 py-1 text-xs font-medium text-foreground focus:outline-none"
+              >
+                <option value="codigo">Código</option>
+                <option value="cantDesc">Cantidad (mayor primero)</option>
+                <option value="cantAsc">Cantidad (menor primero)</option>
+                <option value="desc">Descripción (A-Z)</option>
+              </select>
+            </div>
           </div>
 
           <div className="max-h-[340px] overflow-y-auto rounded-lg border border-border">
