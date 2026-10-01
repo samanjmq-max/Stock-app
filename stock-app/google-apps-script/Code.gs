@@ -1,24 +1,8 @@
 /**
  * Code.gs — punto de entrada del Web App de Google Apps Script.
  *
- * Cómo publicarlo:
- *   1. Extensiones > Apps Script (desde tu planilla de Google Sheets).
- *   2. Pegá cada archivo .gs de esta carpeta como un archivo del proyecto.
- *   3. Ejecutá una vez la función `configurarProyecto` (Utils.gs) para que
- *      cree todas las hojas necesarias con sus encabezados.
- *   4. Extensiones > Propiedades del script > agregá API_KEY (una clave
- *      larga y aleatoria — no reutilices contraseñas).
- *   5. Implementar > Nueva implementación > tipo "Aplicación web".
- *      - Ejecutar como: Yo (tu cuenta)
- *      - Quién tiene acceso: Cualquier usuario
- *   6. Copiá la URL que te da (".../exec") a GAS_WEB_APP_URL en el .env de
- *      Next.js, y la misma API_KEY a GAS_API_KEY.
- *
  * GET  -> operaciones de lectura (?action=...&apiKey=...&...params)
  * POST -> operaciones de escritura (body JSON: { action, apiKey, ...datos })
- *
- * Se usa LockService en las operaciones de escritura para evitar
- * condiciones de carrera cuando dos personas cuentan al mismo tiempo.
  */
 
 const ACCIONES_GET = {

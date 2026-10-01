@@ -230,10 +230,32 @@ function importarProductos_(input) {
     if (filaExistente !== undefined) {
       // Se actualiza en memoria, NO se llama a Sheets fila por fila.
       values[filaExistente][descripcionCol] = p.descripcion;
-      values[filaExistente][ubicacionCol] = p.ubicacion || "";
-      values[filaExistente][familiaCol] = p.familia || "";
-      values[filaExistente][proveedorCol] = p.proveedor || "";
+      // La ubicación y la familia SOLO se pisan si la fila trae un valor.
+      //
+      // Antes se escribía `p.ubicacion || ""` sin condición, y eso es una
+      // bomba: el export crudo del SAP TIENE la columna "Ubicación" pero
+      // viene vacía en casi todas las filas. O sea, el archivo pasaba la
+      // validación de columnas del front (la columna existe) y acto seguido
+      // le borraba la ubicación a todos los artículos de la planta -- justo
+      // el dato con el que el operario camina el depósito. La validación de
+      // columnas protege contra una columna AUSENTE; esto protege contra una
+      // columna PRESENTE Y VACÍA, que es el caso real.
+      //
+      // Para vaciar una ubicación a propósito está la edición del producto.
+      // Una importación masiva nunca debería poder borrar datos en silencio.
+      if (ubicacionCol !== -1 && p.ubicacion) {
+        values[filaExistente][ubicacionCol] = String(p.ubicacion).trim();
+      }
+      if (familiaCol !== -1 && p.familia) {
+        values[filaExistente][familiaCol] = String(p.familia).trim();
+      }
       values[filaExistente][stockSapCol] = Number(p.stockSap) || 0;
+      // El proveedor SOLO se pisa si la fila trae uno. El SAP de SAMAN no
+      // exporta esa columna, así que la importación diaria no tiene que
+      // borrarle el proveedor a los productos que lo tengan cargado a mano.
+      if (proveedorCol !== -1 && p.proveedor) {
+        values[filaExistente][proveedorCol] = String(p.proveedor).trim();
+      }
       // La unidad, como el precio, SOLO se pisa si la fila trae una. La
       // columna es opcional todavía y hay productos con la unidad ya
       // cargada a mano: un archivo sin esa columna no tiene que borrarla.

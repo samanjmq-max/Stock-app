@@ -1,16 +1,5 @@
 /**
  * Utils.gs — helpers compartidos por todos los módulos.
- *
- * Cómo se configura:
- *   Extensiones > Propiedades del script > agregar:
- *     - SHEET_ID   -> el ID de esta misma planilla (o de otra, ver nota abajo)
- *     - API_KEY    -> una clave larga y aleatoria (la misma que ponés en
- *                     GAS_API_KEY del .env de Next.js)
- *
- * Nota: lo más simple es que este script esté "contenedor vinculado" a la
- * planilla (Extensiones > Apps Script desde la propia hoja). En ese caso
- * SpreadsheetApp.getActiveSpreadsheet() ya apunta a la hoja correcta y
- * SHEET_ID es opcional (se usa como respaldo si el script fuera standalone).
  */
 
 const SHEETS = {
@@ -36,7 +25,7 @@ const AGENCIAS = [
 ];
 
 const HEADERS = {
-    [SHEETS.USUARIOS]: ["id", "nombre", "email", "passwordHash", "rol", "perfil", "agencia", "agencias", "activo", "creadoEn"],
+  [SHEETS.USUARIOS]: ["id", "nombre", "email", "passwordHash", "rol", "perfil", "agencia", "agencias", "activo", "creadoEn"],
   [SHEETS.PRODUCTOS]: ["id", "codigo", "descripcion", "ubicacion", "familia", "proveedor", "stockSap","unidadMedida", "precioUnitario", "agencia", "actualizadoEn"],
   [SHEETS.CONTEOS]: [
     "id", "codigo", "descripcion", "ubicacion", "stockSap", "stockContado", "diferencia",
@@ -77,12 +66,6 @@ function configurarProyecto() {
   return "Listo: todas las hojas fueron creadas o ya existían.";
 }
 
-/**
- * Migración de una sola vez: a los productos y conteos que ya existían
- * ANTES de agregar el concepto de "agencia", les asigna "Centro
- * Logístico" (para no perder ni mezclar nada de lo ya cargado). Ejecutar
- * UNA vez manualmente desde el editor después de pegar este código.
- */
 function migrarAgenciaCentroLogistico() {
   [SHEETS.PRODUCTOS, SHEETS.CONTEOS].forEach((nombre) => {
     const sheet = getSheet_(nombre);
@@ -132,18 +115,6 @@ function leerHoja_(nombre) {
     });
 }
 
-/**
- * Compara los encabezados que el código espera (HEADERS[nombre]) contra
- * los que REALMENTE existen en la fila 1 de la hoja. Si falta alguno —por
- * ejemplo, se agregó un campo nuevo en el código pero la planilla es
- * vieja y todavía no tiene esa columna— lo agrega solo, como columna
- * nueva al final, sin tocar ni desordenar las columnas existentes.
- *
- * Devuelve el orden REAL (y ya actualizado) de columnas de la hoja, para
- * que agregarFila_/agregarFilas_ escriban cada valor en su columna
- * correcta por NOMBRE, sin depender de que el orden del código y el de
- * la planilla coincidan a mano.
- */
 function sincronizarEncabezados_(sheet, headersEsperados) {
   const ultimaCol = sheet.getLastColumn();
   const headersActuales = ultimaCol > 0
@@ -229,22 +200,20 @@ function respuestaError_(mensaje) {
   return ContentService.createTextOutput(JSON.stringify({ ok: false, error: String(mensaje) }))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
 /** Crea en cada hoja las columnas que el código espera y la planilla todavía no tiene. */
 function sincronizarEncabezadosDeTodasLasHojas() {
   const creadas = [];
-
   Object.keys(HEADERS).forEach(function (nombre) {
     const sheet = getSheet_(nombre);
     const ultimaCol = sheet.getLastColumn();
     const antes = ultimaCol > 0
       ? sheet.getRange(1, 1, 1, ultimaCol).getValues()[0].filter(function (h) { return h !== ""; })
       : [];
-
     sincronizarEncabezados_(sheet, HEADERS[nombre]).forEach(function (h) {
       if (antes.indexOf(h) === -1) creadas.push(nombre + " → " + h);
     });
   });
-
   logAccion_("sincronizarEncabezados", creadas.join(", ") || "sin cambios");
   return creadas.length
     ? "Columnas agregadas:\n" + creadas.join("\n")
