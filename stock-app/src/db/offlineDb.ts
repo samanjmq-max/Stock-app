@@ -57,10 +57,12 @@ export async function getProductosCache(): Promise<Producto[]> {
   return db.getAll("stock");
 }
 
-export async function getProductoCachePorCodigo(codigo: string): Promise<Producto | undefined> {
+export async function getProductoCachePorCodigo(codigo: string, agencia?: Agencia): Promise<Producto | undefined> {
   const db = await getDb();
   const todos: Producto[] = await db.getAll("stock");
-  return todos.find((p) => p.codigo.toLowerCase() === codigo.toLowerCase());
+  return todos.find(
+    (p) => p.codigo.toLowerCase() === codigo.toLowerCase() && (agencia === undefined || p.agencia === agencia)
+  );
 }
 
 /* ---------- CONTEOS (cola offline) ---------- */
@@ -69,9 +71,10 @@ export async function encolarConteo(conteo: Omit<ConteoLocal, "localId" | "synce
   return db.add("counts", { ...conteo, synced: false, createdAt: Date.now() });
 }
 
-export async function getConteosLocales(): Promise<ConteoLocal[]> {
+export async function getConteosLocales(agencia?: Agencia): Promise<ConteoLocal[]> {
   const db = await getDb();
-  return db.getAll("counts");
+  const todos: ConteoLocal[] = await db.getAll("counts");
+  return agencia === undefined ? todos : todos.filter((c) => c.agencia === agencia);
 }
 
 export async function getConteosPendientes(): Promise<ConteoLocal[]> {
@@ -116,8 +119,8 @@ export async function limpiarConteosSincronizados(): Promise<number> {
   return yaSincronizados.length;
 }
 
-export async function getHistorialLocalDeProducto(codigo: string): Promise<ConteoLocal[]> {
-  const todos = await getConteosLocales();
+export async function getHistorialLocalDeProducto(codigo: string, agencia?: Agencia): Promise<ConteoLocal[]> {
+  const todos = await getConteosLocales(agencia);
   return todos
     .filter((c) => c.codigo.toLowerCase() === codigo.toLowerCase())
     .sort((a, b) => b.createdAt - a.createdAt);

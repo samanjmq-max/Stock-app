@@ -24,7 +24,6 @@ import { SearchableSelect } from "@/components/ui/searchable-select";
 import { exportarExcel, exportarPDF } from "@/lib/exportacion";
 import { conteosService } from "@/services/conteos.service";
 import { getConteosPendientes } from "@/db/offlineDb";
-import { AGENCIAS } from "@/types";
 import { cn } from "@/lib/utils";
 import type { Conteo, Producto, EstadoConteo, Agencia } from "@/types";
 
@@ -64,7 +63,7 @@ const LABEL_VISTA: Record<string, string> = {
 };
 
 // Auto-actualización: cada cuánto se refresca el Dashboard solo, en milisegundos.
-const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 60 * 1000; // 5 horas
+const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 1000; // 5 minutos
 
 // recharts es la librería más pesada del bundle de Dashboard -- separada en
 // su propio componente cargado dinámicamente (ssr:false), mismo criterio
@@ -84,8 +83,16 @@ const DashboardCharts = dynamic(() => import("@/components/dashboard/DashboardCh
 });
 
 export default function DashboardPage() {
-  const { isAdmin, esSuperAdmin, agencia: agenciaUsuario, capacidades } = useAuth();
+  const { isAdmin, esSuperAdmin, agencia: agenciaUsuario, alcance, capacidades } = useAuth();
   const [agenciaFiltro, setAgenciaFiltro] = useState<Agencia | undefined>(undefined);
+
+  // Plantas que este usuario puede ver (su alcance real). El backend NO
+  // consolida varias plantas: con el filtro vacío cae a la planta principal.
+  // Por eso el selector lista solo el alcance y arranca en la planta principal,
+  // en vez de ofrecer un "Todas las agencias" que en realidad no consolida.
+  // Súper admin y gerente tienen las 9; un jefe, solo las suyas.
+  const agenciasVisibles: Agencia[] = alcance.length ? alcance : agenciaUsuario ? [agenciaUsuario] : [];
+  const mostrarSelectorAgencia = isAdmin && agenciasVisibles.length > 1;
   // Filtro cíclico por zona -- disponible para cualquier usuario (operario
   // incluido), a diferencia del selector de agencia que es solo para admin.
   const [ubicacionFiltro, setUbicacionFiltro] = useState<string[]>([]);
@@ -480,16 +487,13 @@ export default function DashboardPage() {
           ahí los filtros van en línea, que es lo que ya funcionaba. */}
       <FiltrosMoviles
         agencia={
-          isAdmin
+          mostrarSelectorAgencia && agenciaUsuario
             ? {
-                valor: agenciaFiltro ?? "todas",
-                valorNeutro: "todas",
-                opciones: [
-                  { valor: "todas", etiqueta: "Todas las agencias" },
-                  ...AGENCIAS.map((a) => ({ valor: a, etiqueta: a })),
-                ],
+                valor: agenciaFiltro ?? agenciaUsuario,
+                valorNeutro: agenciaUsuario,
+                opciones: agenciasVisibles.map((a) => ({ valor: a, etiqueta: a })),
                 onChange: (v) => {
-                  setAgenciaFiltro(v === "todas" ? undefined : (v as Agencia));
+                  setAgenciaFiltro(v === agenciaUsuario ? undefined : (v as Agencia));
                   setUbicacionFiltro([]);
                   setFamiliaFiltro([]);
                   setVista(null);
@@ -508,13 +512,13 @@ export default function DashboardPage() {
 
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="hidden items-center gap-3 flex-wrap md:flex">
-          {isAdmin && (
+          {mostrarSelectorAgencia && agenciaUsuario && (
             <>
               <p className="text-sm text-muted-foreground">Ver agencia:</p>
               <Select
-                value={agenciaFiltro ?? "todas"}
+                value={agenciaFiltro ?? agenciaUsuario}
                 onValueChange={(v) => {
-                  setAgenciaFiltro(v === "todas" ? undefined : v as Agencia);
+                  setAgenciaFiltro(v === agenciaUsuario ? undefined : v as Agencia);
                   // Ubicaciones/familias de la agencia anterior ya no aplican.
                   setUbicacionFiltro([]);
                   setFamiliaFiltro([]);
@@ -525,12 +529,11 @@ export default function DashboardPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todas">Todas las agencias</SelectItem>
-                  {AGENCIAS.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  {agenciasVisibles.map((a) => <SelectItem key={a} value={a}>{a}</SelectItem>)}
                 </SelectContent>
               </Select>
               <span className="text-xs text-muted-foreground">
-                {agenciaFiltro ? `Mostrando: ${agenciaFiltro}` : "Mostrando el consolidado de toda la empresa"}
+                Mostrando: {agenciaFiltro ?? agenciaUsuario}
               </span>
             </>
           )}
@@ -779,7 +782,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {isAdmin && (
+          {esSuperAdmin && (
             <div className="pt-2 border-t border-border space-y-2">
               <div className="flex items-center justify-between flex-wrap gap-2">
                 <p className="text-xs text-muted-foreground">

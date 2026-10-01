@@ -1,6 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getHistorial, registrarHistorial } from "@/lib/sheets";
-import type { AccionHistorial, Rol } from "@/types";
+import { NextResponse } from "next/server";
+import { getHistorial } from "@/lib/sheets";
 
 export async function GET() {
   try {
@@ -16,27 +15,10 @@ export async function GET() {
   }
 }
 
-export async function POST(request: NextRequest) {
-  const userId = request.headers.get("x-user-id") || "";
-  const email = request.headers.get("x-user-email") || "";
-  const rol = (request.headers.get("x-user-rol") || "operador") as Rol;
-
-  try {
-    const body = await request.json();
-    const entrada = await registrarHistorial({
-      usuarioId: userId,
-      usuarioEmail: email,
-      rol,
-      accion: body.accion as AccionHistorial,
-      entidad: body.entidad,
-      valorAnterior: body.valorAnterior,
-      valorNuevo: body.valorNuevo,
-      observacion: body.observacion,
-      dispositivo: request.headers.get("user-agent") || "",
-    });
-    return NextResponse.json({ ok: true, data: entrada }, { status: 201 });
-  } catch (err) {
-    console.error("Error al registrar historial:", err);
-    return NextResponse.json({ ok: false, error: "No se pudo registrar en el historial" }, { status: 500 });
-  }
-}
+/*
+  No hay POST: el historial de auditoría se escribe SOLO desde el servidor
+  (registrarHistorial dentro de cada ruta que hace la acción). Antes existía un
+  POST que aceptaba accion/entidad arbitrarios del body sin validar -> cualquiera
+  con permiso de ver el historial podía inyectar registros falsos en el log de
+  auditoría. No se usaba desde el cliente, así que se eliminó.
+*/

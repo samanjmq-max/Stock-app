@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resetearConteos, registrarHistorial } from "@/lib/sheets";
 import { leerSesion } from "@/lib/sesion";
+import { puedeVaciarInventario } from "@/lib/permisos";
 import type { Agencia } from "@/types";
 
 export async function POST(request: NextRequest) {
@@ -13,10 +14,19 @@ export async function POST(request: NextRequest) {
   if (!sesion) {
     return NextResponse.json({ ok: false, error: "No autenticado" }, { status: 401 });
   }
-  const { id: userId, email, rol, agencia: agenciaPropia, esSuperAdmin: esSuper } = sesion;
+  const { id: userId, email, rol, agencia: agenciaPropia } = sesion;
 
-  if (rol !== "administrador") {
-    return NextResponse.json({ ok: false, error: "Solo un administrador puede reiniciar los conteos" }, { status: 403 });
+  /*
+    Vaciar el inventario -- de una planta o de todas -- es exclusivo del súper
+    administrador. Antes alcanzaba con ser "administrador" (jefe/gerente), que
+    podía reiniciar su propia planta; por decisión del dueño, reiniciar conteos
+    ahora es solo del súper admin, incluso por planta.
+  */
+  if (!puedeVaciarInventario(email)) {
+    return NextResponse.json(
+      { ok: false, error: "Solo el súper administrador puede reiniciar los conteos" },
+      { status: 403 }
+    );
   }
 
   try {
@@ -24,27 +34,6 @@ export async function POST(request: NextRequest) {
     // Si viene una agencia en el body, borra solo esa. Si no, usa la del usuario.
     // Para borrar TODAS las agencias, el body debe traer agencia: null explícito.
     const agenciaPedida = "agencia" in body ? (body.agencia as Agencia | null) : agenciaPropia;
-
-    /*
-      Vaciar el inventario COMPLETO -- las nueve plantas de una -- es del
-      super admin y de nadie más. Antes alcanzaba con ser administrador:
-      un jefe de planta que mandara { agencia: null } borraba todo.
-
-      Y un administrador común solo puede vaciar SU planta, no elegir otra:
-      mismo criterio que el GET de conteos.
-    */
-    if (!esSuper && agenciaPedida == null) {
-      return NextResponse.json(
-        { ok: false, error: "Solo el super administrador puede vaciar el inventario de todas las plantas" },
-        { status: 403 }
-      );
-    }
-    if (!esSuper && agenciaPedida !== agenciaPropia) {
-      return NextResponse.json(
-        { ok: false, error: "Solo podés vaciar el inventario de tu propia planta" },
-        { status: 403 }
-      );
-    }
 
     const agencia = agenciaPedida;
     const resultado = await resetearConteos(agencia ?? undefined);

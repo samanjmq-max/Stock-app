@@ -15,7 +15,7 @@ export type LoginInput = z.infer<typeof loginSchema>;
 export const usuarioSchema = z.object({
   nombre: z.string().min(2, "El nombre es muy corto"),
   email: z.string().email("Email inválido"),
-  password: z.union([z.literal(""), z.string().min(6, "Mínimo 6 caracteres")]).optional(),
+  password: z.union([z.literal(""), z.string().min(8, "Mínimo 8 caracteres")]).optional(),
   perfil: z.enum(["operario", "encargado", "jefe", "gerente"]),
   /** Planta principal: la que se usa por defecto al contar. */
   agencia: z.union([z.literal(""), z.enum(AGENCIAS)]).optional().default(""),

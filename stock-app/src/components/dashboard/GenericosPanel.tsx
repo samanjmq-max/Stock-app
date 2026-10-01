@@ -93,10 +93,11 @@ export function GenericosPanel({ productos }: { productos: Producto[] }) {
   }, [productos]);
 
   const presentes = filas.filter((f) => f.cantidad !== null);
+  const hayPresentes = presentes.length > 0;
   const conStock = presentes.filter((f) => (f.cantidad ?? 0) > 0).length;
   const enCero = presentes.filter((f) => (f.cantidad ?? 0) === 0).length;
   const totalPresentes = presentes.length || 1;
-  const pctEnCero = Math.round((enCero / totalPresentes) * 100);
+  const pctEnCero = hayPresentes ? Math.round((enCero / totalPresentes) * 100) : 0;
 
   const filasVisibles = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -245,22 +246,32 @@ export function GenericosPanel({ productos }: { productos: Producto[] }) {
               <div className="relative shrink-0">
                 <svg width="96" height="96" viewBox="0 0 42 42" aria-hidden="true">
                   <circle cx="21" cy="21" r="15.9" fill="none" stroke="hsl(var(--muted))" strokeWidth="6" />
-                  <circle
-                    cx="21" cy="21" r="15.9" fill="none"
-                    stroke="hsl(var(--success))" strokeWidth="6"
-                    strokeDasharray={`${dashEnCero.toFixed(1)} ${(100 - dashEnCero).toFixed(1)}`}
-                    strokeDashoffset={25}
-                  />
-                  <circle
-                    cx="21" cy="21" r="15.9" fill="none"
-                    stroke="hsl(var(--destructive))" strokeWidth="6"
-                    strokeDasharray={`${(100 - dashEnCero).toFixed(1)} ${dashEnCero.toFixed(1)}`}
-                    strokeDashoffset={(25 - dashEnCero).toFixed(1)}
-                  />
+                  {hayPresentes && (
+                    <>
+                      <circle
+                        cx="21" cy="21" r="15.9" fill="none"
+                        stroke="hsl(var(--success))" strokeWidth="6"
+                        strokeDasharray={`${dashEnCero.toFixed(1)} ${(100 - dashEnCero).toFixed(1)}`}
+                        strokeDashoffset={25}
+                      />
+                      <circle
+                        cx="21" cy="21" r="15.9" fill="none"
+                        stroke="hsl(var(--destructive))" strokeWidth="6"
+                        strokeDasharray={`${(100 - dashEnCero).toFixed(1)} ${dashEnCero.toFixed(1)}`}
+                        strokeDashoffset={(25 - dashEnCero).toFixed(1)}
+                      />
+                    </>
+                  )}
                 </svg>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-display text-lg font-bold leading-none tabular-nums">{pctEnCero}%</span>
-                  <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">en cero</span>
+                  {hayPresentes ? (
+                    <>
+                      <span className="font-display text-lg font-bold leading-none tabular-nums">{pctEnCero}%</span>
+                      <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground">en cero</span>
+                    </>
+                  ) : (
+                    <span className="font-mono text-[8px] uppercase tracking-wider text-muted-foreground text-center leading-tight">sin datos</span>
+                  )}
                 </div>
               </div>
               <div className="text-sm">

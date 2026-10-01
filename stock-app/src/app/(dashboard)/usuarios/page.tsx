@@ -214,7 +214,13 @@ export default function UsuariosPage() {
                 <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>
               </div>
               <div className="flex gap-1 shrink-0">
-                <Button variant="ghost" size="icon" onClick={() => toggleActivo(u)} title={u.activo ? "Desactivar" : "Activar"}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleActivo(u)}
+                  disabled={u.id === user?.id}
+                  title={u.id === user?.id ? "No podés desactivar tu propio usuario" : u.activo ? "Desactivar" : "Activar"}
+                >
                   {u.activo ? <ShieldCheck size={15} className="text-success" /> : <ShieldOff size={15} className="text-muted-foreground" />}
                 </Button>
                 <Button variant="ghost" size="icon" onClick={() => { setUsuarioEditando(u); setDialogOpen(true); }}>

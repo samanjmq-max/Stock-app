@@ -43,7 +43,7 @@ function Switch({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 export default function ConfiguracionPage() {
-  const { isAdmin } = useAuth();
+  const { esSuperAdmin } = useAuth();
   const { sincronizarAhora, sincronizando, isOnline } = useSync();
   const { confirm, ConfirmDialogElement } = useConfirm();
   const [sonidos, setSonidos] = useToggle("config_sonidos", true);
@@ -109,7 +109,7 @@ export default function ConfiguracionPage() {
         </CardContent>
       </Card>
 
-      {isAdmin && (
+      {esSuperAdmin && (
         <Card className="border-destructive/30">
           <CardHeader><CardTitle>Zona de riesgo</CardTitle></CardHeader>
           <CardContent className="space-y-3">

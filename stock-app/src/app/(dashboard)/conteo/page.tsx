@@ -132,8 +132,8 @@ export default function ConteoPage() {
   // del servidor para que el avance de la zona no "olvide" lo recién
   // contado offline hasta que se sincronice.
   useEffect(() => {
-    getConteosLocales().then(setLocalesPendientes).catch(() => {});
-  }, [producto, noExiste]);
+    getConteosLocales(agenciaOperativa).then(setLocalesPendientes).catch(() => {});
+  }, [producto, noExiste, agenciaOperativa]);
 
   const opcionesUbicacion = Array.from(new Set(catalogoAgencia.map((p) => p.ubicacion).filter(Boolean))).sort();
   const opcionesFamilia = Array.from(new Set(catalogoAgencia.map((p) => p.familia).filter(Boolean))).sort();
@@ -172,8 +172,8 @@ export default function ConteoPage() {
       // todavía no terminó -- el código se encontraría igual y devolvería el
       // producto de la agencia equivocada, con SU stock de SAP. Por eso se
       // verifica la agencia y, si no coincide, se va al servidor.
-      const enCache = await getProductoCachePorCodigo(c);
-      if (enCache && enCache.agencia === agenciaOperativa) return enCache;
+      const enCache = await getProductoCachePorCodigo(c, agenciaOperativa);
+      if (enCache) return enCache;
       const todos = await productosService.listar(agenciaOperativa);
       return todos.find((p) => p.codigo.toLowerCase() === c.toLowerCase());
     },
@@ -257,8 +257,8 @@ export default function ConteoPage() {
         // Mismo criterio que arriba: el historial local es del dispositivo, no
         // de la planta. Se acota a la agencia operativa para no mostrar, como
         // "conteos anteriores de este producto", los de otro depósito.
-        const historial = await getHistorialLocalDeProducto(c);
-        setHistorialProducto(historial.filter((h) => h.agencia === agenciaOperativa));
+        const historial = await getHistorialLocalDeProducto(c, agenciaOperativa);
+        setHistorialProducto(historial);
       } catch (err) {
         toast.error(err instanceof Error ? err.message : "No se pudo buscar el producto");
       } finally {

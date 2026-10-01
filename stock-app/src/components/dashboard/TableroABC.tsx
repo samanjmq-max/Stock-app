@@ -215,7 +215,9 @@ function Columna({
   rango: string;
 }) {
   const h = TONOS[clave];
-  const valor = articulos.reduce((s, a) => s + a.valor, 0);
+  // Con la clase C a escala de miles de artículos, este reduce corre en cada
+  // tecla del buscador; memoizado para que tipear no recalcule toda la suma.
+  const valor = useMemo(() => articulos.reduce((s, a) => s + a.valor, 0), [articulos]);
   const pctValor = totalValor > 0 ? (valor / totalValor) * 100 : 0;
   const pctItems = totalItems > 0 ? (articulos.length / totalItems) * 100 : 0;
 
@@ -252,7 +254,10 @@ function Columna({
       return s;
     });
   }
-  const valorSeleccion = articulos.reduce((s, a) => (seleccion.has(a.codigo) ? s + a.valor : s), 0);
+  const valorSeleccion = useMemo(
+    () => (seleccion.size === 0 ? 0 : articulos.reduce((s, a) => (seleccion.has(a.codigo) ? s + a.valor : s), 0)),
+    [articulos, seleccion]
+  );
 
   // Solo se dibujan las primeras filas: la clase C puede tener miles de
   // artículos y montar miles de <tr> congelaría el dashboard en un celular.

@@ -67,6 +67,21 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     delete cambios.password;
     delete cambios.agencias;
 
+    // El súper admin no pertenece a ninguna planta ni a un perfil: su formulario
+    // manda agencia:"" y el backend la rechaza ("agencia '' no es una planta
+    // válida") -> por eso no podía cambiar su propia contraseña. Para su cuenta
+    // solo tienen sentido nombre/email/activo/contraseña; se quitan agencia y
+    // perfil para no mandar valores que el backend rechaza.
+    if (objetivoEsSuperAdmin) {
+      delete cambios.agencia;
+      delete cambios.perfil;
+      // El estatus de súper admin se define por el email (SUPER_ADMIN_EMAIL).
+      // Si se le cambiara el email a la propia cuenta del súper admin, la fila
+      // dejaría de coincidir con esa variable y perdería el control total sin
+      // forma de recuperarlo (auto-lockout). El email de esta cuenta es fijo.
+      delete cambios.email;
+    }
+
     /*
       Y ahora contra CÓMO QUEDARÍA. Los dos controles son necesarios: el de
       arriba evita que toque a alguien que no le corresponde; éste evita que
