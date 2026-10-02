@@ -36,6 +36,12 @@ interface Props {
   tituloAgencia: string;
   pieData: DatoColor[];
   importeData: DatoColor[];
+  /**
+   * Dibuja UNA sola de las dos tarjetas, para poder ubicarlas en lugares
+   * distintos del Dashboard (la dona al lado del avance; el importe al lado
+   * de Genéricos). Sin esta prop se dibujan las dos, lado a lado.
+   */
+  solo?: "estado" | "importe";
 }
 
 function formatearImporte(valor: number): string {
@@ -60,13 +66,15 @@ export default function DashboardCharts({
   tituloAgencia,
   pieData,
   importeData,
+  solo,
 }: Props) {
   return (
     <>
       {/* Dos gráficos en una fila (Estado · Importe). El progreso en el tiempo
           pasó a la tarjeta principal del Dashboard (AvanceChart). */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
+      <div className={solo ? "h-full" : "grid gap-4 md:grid-cols-2"}>
+        {solo !== "importe" && (
+        <Card className="h-full">
           <CardHeader><CardTitle>Estado del conteo — {tituloAgencia}</CardTitle></CardHeader>
           <CardContent>
             {stats.totalContados === 0
@@ -134,14 +142,21 @@ export default function DashboardCharts({
               )}
           </CardContent>
         </Card>
+        )}
 
-        <Card>
+        {solo !== "estado" && (
+        <Card className="flex h-full flex-col">
           <CardHeader><CardTitle>Importe contado (en pesos)</CardTitle></CardHeader>
-          <CardContent>
+          {/* Sola (al lado de Genéricos) la tarjeta se estira al alto de su
+              vecina: el gráfico ocupa todo ese alto en vez de quedar arriba
+              con un hueco debajo. */}
+          <CardContent className={solo ? "min-h-[260px] flex-1" : undefined}>
             {stats.importeCoincidencias === 0 && stats.importeDiferenciasPositivas === 0 && stats.importeDiferenciasNegativas === 0 && stats.importePendientes === 0
               ? <p className="text-sm text-muted-foreground py-8 text-center">Sin importes para mostrar — cargá precios unitarios en el catálogo.</p>
-              : <ResponsiveContainer width="100%" height={230}>
-                  <BarChart data={importeData}>
+              : <ResponsiveContainer width="100%" height={solo ? "100%" : 230}>
+                  {/* Margen arriba: sin él, el importe escrito sobre la barra
+                      más alta se cortaba contra el borde del gráfico. */}
+                  <BarChart data={importeData} margin={{ top: 26, right: 8, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                     <XAxis dataKey="name" fontSize={11} tickLine={false} />
                     <YAxis fontSize={10} tickLine={false} tickFormatter={(v) => `$${(v / 1000).toFixed(0)}k`} />
@@ -159,7 +174,7 @@ export default function DashboardCharts({
                 </ResponsiveContainer>}
           </CardContent>
         </Card>
-
+        )}
       </div>
     </>
   );

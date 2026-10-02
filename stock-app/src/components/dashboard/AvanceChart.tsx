@@ -7,7 +7,10 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
  * tiempo. Va en la tarjeta principal del Dashboard, al lado de las cuatro
  * tarjetas de estado.
  *
- * Estilo: línea con resplandor en el color de avance y, debajo, un relleno
+ * Color: el del texto (--foreground), o sea blanca en modo oscuro y oscura en
+ * modo claro. El amarillo de avance queda solo para la tarjeta "Por contar".
+ *
+ * Estilo: línea con resplandor y, debajo, un relleno
  * degradado cortado en barras verticales finas. Las barras se logran pintando
  * encima del relleno una trama de rayas del color de la tarjeta, así no hace
  * falta una serie de barras aparte.
@@ -24,19 +27,19 @@ interface Props {
 export default function AvanceChart({ progresoTiempo, totalContable, saltoTicksTiempo }: Props) {
   if (progresoTiempo.length === 0) {
     return (
-      <p className="flex h-[240px] items-center justify-center text-center text-sm text-muted-foreground">
+      <p className="flex h-[190px] items-center justify-center text-center text-sm text-muted-foreground">
         Todavía no hay conteos registrados.
       </p>
     );
   }
 
   return (
-    <ResponsiveContainer width="100%" height={240}>
+    <ResponsiveContainer width="100%" height={190}>
       <AreaChart data={progresoTiempo} margin={{ top: 14, right: 12, bottom: 0, left: -8 }}>
         <defs>
           <linearGradient id="avanceRelleno" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="hsl(var(--avance))" stopOpacity={0.5} />
-            <stop offset="100%" stopColor="hsl(var(--avance))" stopOpacity={0.04} />
+            <stop offset="0%" stopColor="hsl(var(--foreground))" stopOpacity={0.5} />
+            <stop offset="100%" stopColor="hsl(var(--foreground))" stopOpacity={0.04} />
           </linearGradient>
           {/* Rayas del color de la tarjeta: cortan el relleno en barras finas. */}
           <pattern id="avanceRayas" width="7" height="7" patternUnits="userSpaceOnUse">
@@ -115,12 +118,12 @@ export default function AvanceChart({ progresoTiempo, totalContable, saltoTicksT
           type="monotone"
           dataKey="acumulado"
           name="linea"
-          stroke="hsl(var(--avance))"
+          stroke="hsl(var(--foreground))"
           strokeWidth={2.5}
           fill="none"
           filter="url(#avanceBrillo)"
           dot={false}
-          activeDot={{ r: 5, fill: "hsl(var(--avance))", stroke: "hsl(var(--card))", strokeWidth: 2 }}
+          activeDot={{ r: 5, fill: "hsl(var(--foreground))", stroke: "hsl(var(--card))", strokeWidth: 2 }}
           tooltipType="none"
         />
       </AreaChart>

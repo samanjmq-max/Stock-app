@@ -50,8 +50,7 @@ const COLORS = {
   coincide: "hsl(var(--success))",
   sobra: "hsl(var(--info))",
   falta: "hsl(var(--destructive))",
-  // Gris: el amarillo de avance queda solo para el gráfico principal.
-  pendientes: "hsl(var(--muted-foreground))",
+  pendientes: "hsl(var(--avance))",
 };
 type Vista = EstadoConteo | "pendientes" | "contados" | null;
 
@@ -73,7 +72,7 @@ const INTERVALO_AUTO_ACTUALIZACION = 5 * 60 * 1000; // 5 minutos
 // Curva grande del avance (tarjeta principal). Misma razón: recharts.
 const AvanceChart = dynamic(() => import("@/components/dashboard/AvanceChart"), {
   ssr: false,
-  loading: () => <Skeleton className="h-[240px]" />,
+  loading: () => <Skeleton className="h-[190px]" />,
 });
 const DashboardCharts = dynamic(() => import("@/components/dashboard/DashboardCharts"), {
   ssr: false,
@@ -598,20 +597,18 @@ export default function DashboardPage() {
         ningún dato: se pierde la repetición.
       */}
       {/*
-        Todo a la vista en una pantalla ancha: a la izquierda el avance y,
-        debajo, los otros dos gráficos; a la derecha, en columna, las cuatro
-        tarjetas de estado. En celular se apila: avance, tarjetas (2 y 2) y
-        gráficos.
+        Fila 1: el avance (cifra + curva en el tiempo, en color de texto) y,
+        al lado, la dona de estado. En pantallas angostas se apilan.
       */}
-      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_244px]">
-        <Card className="overflow-hidden xl:col-start-1 xl:row-start-1">
+      <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <Card className="overflow-hidden">
           <CardContent className="space-y-3 p-5">
             <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
               <div>
                 <p className="font-mono text-[10.5px] font-medium uppercase tracking-[0.13em] text-muted-foreground">
                   Avance del conteo
                 </p>
-                <p className="mt-2 font-display text-[clamp(38px,8vw,56px)] font-bold leading-none tracking-tight tabular-nums text-avance">
+                <p className="mt-2 font-display text-[clamp(38px,8vw,56px)] font-bold leading-none tracking-tight tabular-nums text-foreground">
                   {stats.porcentajeCompletado}%
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">{tituloAgencia}</p>
@@ -639,58 +636,66 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/*
-          Orden: lo que falta contar primero, después lo que coincide y al
-          final las dos diferencias. "Por contar" va en gris (tono neutro):
-          el amarillo queda solo para el gráfico de avance.
-        */}
-        <div className="grid grid-cols-2 gap-3 xl:col-start-2 xl:row-span-2 xl:row-start-1 xl:grid-cols-1 xl:grid-rows-4">
-          <StatCard id="pendientes" label={LABEL_VISTA.pendientes!} value={stats.pendientes}
-            icon={Clock} tone="neutro"
-            onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
-            importe={stats.importePendientes}
-            serie={serieDescendente()}
-            delta={-deHoy.length} compacta />
+        <DashboardCharts
+          solo="estado"
+          stats={stats}
+          tituloAgencia={tituloAgencia}
+          pieData={pieData}
+          importeData={importeData}
+        />
+      </div>
 
-          <StatCard id="coincide" label={LABEL_VISTA.coincide!} value={stats.coincidencias}
-            icon={Equal} tone="success"
-            onClick={() => toggleVista("coincide")} activo={vista === "coincide"}
-            importe={stats.importeCoincidencias}
-            serie={serieAcumulada((c) => c.estado === "coincide")}
-            delta={deltaDe("coincide")} compacta />
+      {/*
+        Fila 2: las cuatro tarjetas de estado, en versión compacta. Orden: lo
+        que falta contar primero, lo que coincide y al final las diferencias.
+        Colores: amarillo, verde, azul y rojo.
+      */}
+      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+        <StatCard id="pendientes" label={LABEL_VISTA.pendientes!} value={stats.pendientes}
+          icon={Clock} tone="avance"
+          onClick={() => toggleVista("pendientes")} activo={vista === "pendientes"}
+          importe={stats.importePendientes}
+          serie={serieDescendente()}
+          delta={-deHoy.length} compacta />
 
-          <StatCard id="sobra" label={LABEL_VISTA.sobra!} value={stats.diferenciasPositivas}
-            icon={TrendingUp} tone="info"
-            onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
-            importe={stats.importeDiferenciasPositivas}
-            serie={serieAcumulada((c) => c.estado === "sobra")}
-            delta={deltaDe("sobra")} compacta />
+        <StatCard id="coincide" label={LABEL_VISTA.coincide!} value={stats.coincidencias}
+          icon={Equal} tone="success"
+          onClick={() => toggleVista("coincide")} activo={vista === "coincide"}
+          importe={stats.importeCoincidencias}
+          serie={serieAcumulada((c) => c.estado === "coincide")}
+          delta={deltaDe("coincide")} compacta />
 
-          <StatCard id="falta" label={LABEL_VISTA.falta!} value={stats.diferenciasNegativas}
-            icon={TrendingDown} tone="destructive"
-            onClick={() => toggleVista("falta")} activo={vista === "falta"}
-            importe={stats.importeDiferenciasNegativas}
-            aviso={stats.diferenciasNegativas > 0 ? "Sin revisar" : undefined}
-            serie={serieAcumulada((c) => c.estado === "falta")}
-            delta={deltaDe("falta")} compacta />
-        </div>
+        <StatCard id="sobra" label={LABEL_VISTA.sobra!} value={stats.diferenciasPositivas}
+          icon={TrendingUp} tone="info"
+          onClick={() => toggleVista("sobra")} activo={vista === "sobra"}
+          importe={stats.importeDiferenciasPositivas}
+          serie={serieAcumulada((c) => c.estado === "sobra")}
+          delta={deltaDe("sobra")} compacta />
 
-        <div className="xl:col-start-1 xl:row-start-2">
-          <DashboardCharts
-            stats={stats}
-            tituloAgencia={tituloAgencia}
-            pieData={pieData}
-            importeData={importeData}
-          />
-        </div>
+        <StatCard id="falta" label={LABEL_VISTA.falta!} value={stats.diferenciasNegativas}
+          icon={TrendingDown} tone="destructive"
+          onClick={() => toggleVista("falta")} activo={vista === "falta"}
+          importe={stats.importeDiferenciasNegativas}
+          aviso={stats.diferenciasNegativas > 0 ? "Sin revisar" : undefined}
+          serie={serieAcumulada((c) => c.estado === "falta")}
+          delta={deltaDe("falta")} compacta />
       </div>
 
       <p className="text-xs text-muted-foreground">
         $ → Importe total en pesos (calculado con el precio unitario cargado en cada producto; los que todavía no tienen precio no suman).
       </p>
 
-      {/* Genéricos primero, y el tablero ABC debajo. */}
-      <GenericosPanel productos={productos} />
+      {/* Importe contado al lado de Genéricos, y el tablero ABC debajo. */}
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+        <DashboardCharts
+          solo="importe"
+          stats={stats}
+          tituloAgencia={tituloAgencia}
+          pieData={pieData}
+          importeData={importeData}
+        />
+        <GenericosPanel productos={productos} />
+      </div>
 
       <TableroABC articulos={articulosValor} tituloAgencia={tituloAgencia} />
 

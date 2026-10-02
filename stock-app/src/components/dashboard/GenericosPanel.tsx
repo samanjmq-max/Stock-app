@@ -127,7 +127,7 @@ export function GenericosPanel({ productos }: { productos: Producto[] }) {
   const dashEnCero = (enCero / totalPresentes) * 100;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
+    <div className="flex flex-col gap-4">
       {/* Lista */}
       <Card>
         <CardContent className="p-4">
@@ -226,22 +226,25 @@ export function GenericosPanel({ productos }: { productos: Producto[] }) {
         </CardContent>
       </Card>
 
-      {/* Resumen + gráfico */}
+      {/* Resumen + gráfico: una franja debajo de la lista (antes era una
+          columna al costado). Así la lista usa todo el ancho y el resumen se
+          lee de izquierda a derecha: a bajar, en cero y la dona. */}
       <Card>
-        <CardContent className="p-4">
-          <h3 className="mb-3 font-display text-base font-bold">Resumen</h3>
+        <CardContent className="flex flex-wrap items-center gap-x-10 gap-y-4 p-4">
+          <h3 className="font-display text-base font-bold">Resumen</h3>
 
-          <p className="font-display text-[40px] font-bold leading-none text-destructive tabular-nums">{conStock}</p>
-          <p className="text-xs text-muted-foreground">genéricos con stock (a bajar)</p>
+          <div>
+            <p className="font-display text-[34px] font-bold leading-none text-destructive tabular-nums">{conStock}</p>
+            <p className="mt-1 text-xs text-muted-foreground">genéricos con stock (a bajar)</p>
+          </div>
 
-          <hr className="my-3 border-border" />
+          <div>
+            <p className="font-display text-[34px] font-bold leading-none text-success tabular-nums">{enCero}</p>
+            <p className="mt-1 text-xs text-muted-foreground">ya en cero ✓</p>
+          </div>
 
-          <p className="font-display text-[30px] font-bold leading-none text-success tabular-nums">{enCero}</p>
-          <p className="text-xs text-muted-foreground">ya en cero ✓</p>
-
-          {/* Gráfico: aprovecha el espacio de abajo */}
-          <div className="mt-4 border-t border-border pt-4">
-            <p className="mb-3 font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">En cero vs. a bajar</p>
+          {/* Gráfico: a la derecha de la franja */}
+          <div className="sm:ml-auto">
             <div className="flex items-center gap-4">
               <div className="relative shrink-0">
                 <svg width="96" height="96" viewBox="0 0 42 42" aria-hidden="true">
