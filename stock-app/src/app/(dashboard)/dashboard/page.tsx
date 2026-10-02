@@ -241,6 +241,22 @@ export default function DashboardPage() {
   // Reemplaza al viejo gráfico "por ubicación" (barras por zona, sin
   // relación temporal) que no se entendía como progreso.
   const totalContable = productos.filter(esContable).length;
+
+  /*
+    Avance del conteo, medido contra lo que REALMENTE hay que contar: los
+    artículos con stock (contados + por contar), no el catálogo entero. Una
+    planta puede tener 12.000 artículos en catálogo y solo 800 con stock; el
+    porcentaje y el "de N" tienen que hablar de esos 800.
+
+    Por debajo de 10% se muestra un decimal: con 3 de 819 el avance es 0,4%, y
+    redondeado a entero se leía "0%", como si no se hubiera contado nada.
+  */
+  const aContar = stats.totalContados + stats.pendientes;
+  const avancePct = aContar > 0 ? Math.min(100, (stats.totalContados / aContar) * 100) : 0;
+  const avanceTexto =
+    avancePct > 0 && avancePct < 10
+      ? avancePct.toLocaleString("es-UY", { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+      : String(Math.round(avancePct));
   const conteosOrdenados = [...conteos].sort(
     (a, b) => new Date(a.creadoEn).getTime() - new Date(b.creadoEn).getTime()
   );
@@ -609,7 +625,7 @@ export default function DashboardPage() {
                   Avance del conteo
                 </p>
                 <p className="mt-2 font-display text-[clamp(38px,8vw,56px)] font-bold leading-none tracking-tight tabular-nums text-foreground">
-                  {stats.porcentajeCompletado}%
+                  {avanceTexto}%
                 </p>
                 <p className="mt-2 text-xs text-muted-foreground">{tituloAgencia}</p>
               </div>
@@ -625,7 +641,7 @@ export default function DashboardPage() {
                 >
                   {stats.totalContados.toLocaleString("es-UY")} contados
                 </button>
-                <span>de {stats.totalProductos.toLocaleString("es-UY")} productos</span>
+                <span>de {aContar.toLocaleString("es-UY")} con stock</span>
               </div>
             </div>
             <AvanceChart
