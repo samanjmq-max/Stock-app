@@ -3,8 +3,6 @@
 import {
   BarChart,
   Bar,
-  AreaChart,
-  Area,
   PieChart,
   Pie,
   XAxis,
@@ -14,7 +12,6 @@ import {
   Cell,
   CartesianGrid,
   LabelList,
-  ReferenceLine,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardStats } from "@/types";
@@ -39,9 +36,6 @@ interface Props {
   tituloAgencia: string;
   pieData: DatoColor[];
   importeData: DatoColor[];
-  progresoTiempo: { momento: string; acumulado: number }[];
-  totalContable: number;
-  saltoTicksTiempo: number;
 }
 
 function formatearImporte(valor: number): string {
@@ -66,14 +60,12 @@ export default function DashboardCharts({
   tituloAgencia,
   pieData,
   importeData,
-  progresoTiempo,
-  totalContable,
-  saltoTicksTiempo,
 }: Props) {
   return (
     <>
-      {/* Los tres gráficos en una sola fila (Estado · Importe · Progreso). */}
-      <div className="grid gap-4 md:grid-cols-3">
+      {/* Dos gráficos en una fila (Estado · Importe). El progreso en el tiempo
+          pasó a la tarjeta principal del Dashboard (AvanceChart). */}
+      <div className="grid gap-4 md:grid-cols-2">
         <Card>
           <CardHeader><CardTitle>Estado del conteo — {tituloAgencia}</CardTitle></CardHeader>
           <CardContent>
@@ -168,49 +160,6 @@ export default function DashboardCharts({
           </CardContent>
         </Card>
 
-        {/* Progreso: ahora en la misma fila que los otros dos (antes iba a
-            ancho completo debajo). Area chart con degradado en color avance. */}
-        <Card>
-          <CardHeader><CardTitle>Progreso del conteo (en el tiempo)</CardTitle></CardHeader>
-        <CardContent>
-          {progresoTiempo.length === 0
-            ? <p className="text-sm text-muted-foreground py-8 text-center">Todavía no hay conteos registrados.</p>
-            : <ResponsiveContainer width="100%" height={230}>
-                <AreaChart data={progresoTiempo} margin={{ right: 16, top: 8 }}>
-                  <defs>
-                    {/* Amarillo de avance, el mismo color que el porcentaje
-                        grande de arriba y que la tarjeta de "Por contar":
-                        esta curva es exactamente ese número en el tiempo. */}
-                    <linearGradient id="gradienteProgreso" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="hsl(var(--avance))" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="hsl(var(--avance))" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
-                  <XAxis dataKey="momento" fontSize={10} tickLine={false} interval={saltoTicksTiempo} />
-                  <YAxis fontSize={10} tickLine={false} allowDecimals={false} />
-                  <Tooltip {...tooltipStyle} formatter={(v: number) => [v, "Códigos contados (acumulado)"]} />
-                  {totalContable > 0 && (
-                    <ReferenceLine
-                      y={totalContable}
-                      stroke="hsl(var(--muted-foreground))"
-                      strokeDasharray="4 4"
-                      label={{ value: `Total a contar (${totalContable})`, position: "insideTopRight", fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
-                    />
-                  )}
-                  <Area
-                    type="monotone"
-                    dataKey="acumulado"
-                    stroke="hsl(var(--avance))"
-                    strokeWidth={2.5}
-                    fill="url(#gradienteProgreso)"
-                    dot={progresoTiempo.length <= 30}
-                    activeDot={{ r: 5 }}
-                  />
-                </AreaChart>
-              </ResponsiveContainer>}
-        </CardContent>
-        </Card>
       </div>
     </>
   );

@@ -24,6 +24,7 @@ const ACCIONES_GET = {
 
   // Cierre de cíclico / retención (ver Retencion.gs).
   listarResumenMensual: () => listarResumenMensual_(),
+  listarDetalleCierre: (p) => listarDetalleCierre_(p.id),
 };
 
 const ACCIONES_POST = {
@@ -51,6 +52,7 @@ const ACCIONES_POST = {
   // Cierre de cíclico / retención (ver Retencion.gs).
   cerrarCiclo: (b) => cerrarCiclo_(b),
   eliminarResumen: (b) => eliminarResumen_(b),
+  eliminarDetalleCierre: (b) => eliminarDetalleCierre_(b),
 };
 
 function doGet(e) {

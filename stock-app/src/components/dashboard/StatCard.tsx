@@ -15,7 +15,7 @@ function partesImporte(valor: number): { texto: string; escala: string } {
   return { texto, escala };
 }
 
-type Tono = "default" | "success" | "warning" | "destructive" | "info" | "avance";
+type Tono = "default" | "success" | "warning" | "destructive" | "info" | "avance" | "neutro";
 
 /*
   Tarjeta de KPI — "panel nocturno, contorno completo".
@@ -49,10 +49,11 @@ type Tono = "default" | "success" | "warning" | "destructive" | "info" | "avance
 */
 
 /** Colores por tono. Un solo lugar donde vive el mapeo tono -> token. */
-const TONOS: Record<Tono, { texto: string; borde: string; anillo: string; halo: string; chip: string; pastilla: string }> = {
+const TONOS: Record<Tono, { texto: string; borde: string; bordeSuave: string; anillo: string; halo: string; chip: string; pastilla: string }> = {
   default: {
     texto: "text-foreground",
     borde: "border-border",
+    bordeSuave: "border-border",
     anillo: "ring-border",
     halo: "",
     chip: "bg-muted text-muted-foreground",
@@ -61,6 +62,7 @@ const TONOS: Record<Tono, { texto: string; borde: string; anillo: string; halo: 
   success: {
     texto: "text-success",
     borde: "border-success",
+    bordeSuave: "border-success/45",
     anillo: "ring-success",
     halo: "bg-success",
     chip: "bg-success/15 text-success",
@@ -69,6 +71,7 @@ const TONOS: Record<Tono, { texto: string; borde: string; anillo: string; halo: 
   info: {
     texto: "text-info",
     borde: "border-info",
+    bordeSuave: "border-info/50",
     anillo: "ring-info",
     halo: "bg-info",
     chip: "bg-info/15 text-info",
@@ -77,6 +80,7 @@ const TONOS: Record<Tono, { texto: string; borde: string; anillo: string; halo: 
   destructive: {
     texto: "text-destructive",
     borde: "border-destructive",
+    bordeSuave: "border-destructive/50",
     anillo: "ring-destructive",
     halo: "bg-destructive",
     chip: "bg-destructive/15 text-destructive",
@@ -88,6 +92,7 @@ const TONOS: Record<Tono, { texto: string; borde: string; anillo: string; halo: 
     // acá lo hacía invisible en oscuro: casi negro sobre casi negro.
     texto: "text-warning",
     borde: "border-warning",
+    bordeSuave: "border-warning/45",
     anillo: "ring-warning",
     halo: "bg-warning",
     chip: "bg-warning/15 text-warning",
@@ -96,10 +101,23 @@ const TONOS: Record<Tono, { texto: string; borde: string; anillo: string; halo: 
   avance: {
     texto: "text-avance",
     borde: "border-avance",
+    bordeSuave: "border-avance/45",
     anillo: "ring-avance",
     halo: "bg-avance",
     chip: "bg-avance/15 text-avance",
     pastilla: "bg-avance/15 text-avance",
+  },
+  // Gris claro, sin color de estado. Lo usa "Por contar" en la disposición
+  // compacta: el amarillo queda reservado al gráfico de avance, así no se
+  // pisan dos amarillos en la misma pantalla.
+  neutro: {
+    texto: "text-muted-foreground",
+    borde: "border-muted-foreground/60",
+    bordeSuave: "border-muted-foreground/40",
+    anillo: "ring-muted-foreground",
+    halo: "",
+    chip: "bg-muted text-muted-foreground",
+    pastilla: "bg-muted text-muted-foreground",
   },
 };
 
@@ -150,6 +168,7 @@ export function StatCard({
   serie,
   delta,
   id,
+  compacta = false,
 }: {
   label: string;
   value: string | number;
@@ -176,6 +195,12 @@ export function StatCard({
   serie?: number[];
   /** Cuánto se movió la cifra hoy. Se muestra como pastilla con flecha. */
   delta?: number;
+  /**
+   * Versión chica para la columna del costado del Dashboard: misma
+   * información, pero la cifra va en color de texto y el color del estado
+   * queda en el contorno, el título y la curva. Sin resplandor interno.
+   */
+  compacta?: boolean;
   /** Necesario para que el degradado del SVG no choque entre tarjetas. */
   id: string;
 }) {
@@ -189,8 +214,8 @@ export function StatCard({
     <Card
       onClick={onClick}
       className={cn(
-        "relative flex min-h-[128px] md:min-h-[176px] flex-col overflow-hidden border-[1.5px] p-0 transition-shadow duration-quick",
-        t.borde,
+        "relative flex flex-col overflow-hidden p-0 transition-shadow duration-quick",
+        compacta ? cn("min-h-[120px] border", t.bordeSuave) : cn("min-h-[128px] border-[1.5px] md:min-h-[176px]", t.borde),
         onClick && "cursor-pointer hover:shadow-elev-2",
         // Filtro activo: un anillo del mismo color por fuera del contorno.
         // No se puede armar la clase con .replace() -- Tailwind escanea el
@@ -211,7 +236,7 @@ export function StatCard({
       }
     >
       {/* El resplandor. Sube desde abajo a la izquierda, difuminado, sin bordes. */}
-      {t.halo && (
+      {t.halo && !compacta && (
         <span
           aria-hidden="true"
           className={cn(
@@ -221,8 +246,15 @@ export function StatCard({
         />
       )}
 
-      <CardContent className="relative flex flex-1 flex-col p-3 pb-2.5 md:p-[17px] md:pb-3">
-        <CardLabel className="mb-2 flex items-center gap-2 text-[11px] tracking-[0.08em] md:mb-3 md:gap-2.5 md:text-[12px] md:tracking-[0.1em]">
+      <CardContent className={cn("relative flex flex-1 flex-col", compacta ? "p-3 pb-2" : "p-3 pb-2.5 md:p-[17px] md:pb-3")}>
+        <CardLabel
+          className={cn(
+            "flex items-center gap-2",
+            compacta
+              ? cn("mb-1.5 text-[10.5px] tracking-[0.08em]", t.texto)
+              : "mb-2 text-[11px] tracking-[0.08em] md:mb-3 md:gap-2.5 md:text-[12px] md:tracking-[0.1em]"
+          )}
+        >
           <span className={cn("grid h-[22px] w-[22px] shrink-0 place-items-center rounded-lg md:h-[26px] md:w-[26px]", t.chip)}>
             <Icon size={14} />
           </span>
@@ -231,7 +263,12 @@ export function StatCard({
 
         <div className="flex items-end justify-between gap-2">
           <div className="min-w-0">
-            <p className={cn("font-display text-[30px] font-bold leading-none tracking-tight tabular-nums md:text-[40px]", t.texto)}>
+            <p
+              className={cn(
+                "font-display font-bold leading-none tracking-tight tabular-nums",
+                compacta ? "text-[28px] text-foreground" : cn("text-[30px] md:text-[40px]", t.texto)
+              )}
+            >
               {value}
             </p>
             {aviso && (
@@ -261,7 +298,7 @@ export function StatCard({
         </div>
 
         {importe !== undefined && (
-          <div className="mt-auto border-t border-border/70 pt-2 md:pt-2.5">
+          <div className={cn("mt-auto border-t border-border/70 pt-2", compacta ? "mt-2" : "md:pt-2.5")}>
             {/*
               El filete separa el importe de la cifra sin ponerle otro color
               encima: son dos magnitudes distintas (unidades y pesos) y sin
@@ -279,7 +316,12 @@ export function StatCard({
             {(() => {
               const p = partesImporte(importe);
               return (
-                <p className="mt-1 flex items-baseline gap-1.5 truncate font-display text-[15px] font-semibold leading-none tabular-nums text-foreground md:text-[18px]">
+                <p
+                  className={cn(
+                    "mt-1 flex items-baseline gap-1.5 truncate font-display font-semibold leading-none tabular-nums text-foreground",
+                    compacta ? "text-[14px]" : "text-[15px] md:text-[18px]"
+                  )}
+                >
                   <span className="truncate">{p.texto}</span>
                   {p.escala && (
                     <span className="shrink-0 font-sans text-[11px] font-medium text-muted-foreground md:text-[12px]">
@@ -303,7 +345,7 @@ export function StatCard({
           final toman los tres el mismo token que la cifra.
         */
         <svg
-          className={cn("relative block h-8 w-full md:h-[46px]", t.texto)}
+          className={cn("relative block w-full", compacta ? "h-7" : "h-8 md:h-[46px]", t.texto)}
           viewBox={`0 0 ${ANCHO} ${ALTO}`}
           preserveAspectRatio="none"
           aria-hidden="true"

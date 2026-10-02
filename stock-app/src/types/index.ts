@@ -118,6 +118,7 @@ export type AccionHistorial =
   | "resetear_conteos"
   | "cerrar_ciclo"
   | "eliminar_resumen"
+  | "eliminar_detalle_cierre"
   | "importar_productos"
   | "exportar_datos"
   | "recuperar_password";
@@ -167,6 +168,29 @@ export interface ResumenMensual {
   importeDiferenciasNegativas?: number;
   porContar?: number;
   importePorContar?: number;
+  /**
+   * Cuántos artículos de detalle hay guardados para este cierre. Vacío o 0 =
+   * no hay (cierre anterior a esta función, o ya se borraron a los 2 meses).
+   */
+  detalleArticulos?: number;
+}
+
+/**
+ * Un artículo dentro de un cierre (hoja DetalleCierres). Es el estado final
+ * del conteo: el último por código + ubicación. Se pide recién cuando el
+ * usuario abre la tarjeta del cierre en Estado por planta.
+ */
+export interface DetalleCierre {
+  cierreId: string;
+  agencia: Agencia;
+  creadoEn: string;
+  codigo: string;
+  descripcion: string;
+  ubicacion: string;
+  stockSap: number;
+  stockContado: number;
+  diferencia: number;
+  estado: EstadoConteo;
 }
 
 /**

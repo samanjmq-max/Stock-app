@@ -1,5 +1,5 @@
 import "server-only";
-import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia, Perfil, ResumenMensual, TotalesCierre } from "@/types";
+import type { Usuario, Producto, Conteo, HistorialEntry, AccionHistorial, Rol, Agencia, Perfil, ResumenMensual, TotalesCierre, DetalleCierre } from "@/types";
 
 const GAS_URL = process.env.GAS_WEB_APP_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -39,6 +39,9 @@ const TIMEOUT_POR_ACCION: Record<string, number> = {
   eliminarConteos: 45000,
   resetearConteos: 45000,
   cerrarCiclo: 45000,
+  listarDetalleCierre: 30000,
+  eliminarDetalleCierre: 45000,
+  eliminarResumen: 45000,
 };
 
 function timeoutDe(accion: string): number {
@@ -205,6 +208,16 @@ export async function getResumenMensual(): Promise<ResumenMensual[]> {
 /** Borra un registro de ResumenMensual por id (solo súper admin). */
 export async function eliminarResumen(id: string): Promise<{ id: string; eliminado: boolean }> {
   return gasPost<{ id: string; eliminado: boolean }>("eliminarResumen", { id });
+}
+
+/** Artículos de un cierre (hoja DetalleCierres). Se pide al abrir la tarjeta. */
+export async function getDetalleCierre(id: string): Promise<DetalleCierre[]> {
+  return gasGet<DetalleCierre[]>("listarDetalleCierre", { id });
+}
+
+/** Borra los artículos de un cierre; el resumen queda. */
+export async function eliminarDetalleCierre(id: string): Promise<{ id: string; eliminados: number }> {
+  return gasPost<{ id: string; eliminados: number }>("eliminarDetalleCierre", { id });
 }
 
 /* ==================== HISTORIAL ==================== */
